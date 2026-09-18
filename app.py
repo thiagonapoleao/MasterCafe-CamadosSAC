@@ -569,17 +569,9 @@ def generate_full_pdf_report(
     return buffer.getvalue()
 
 
-@st.cache_data(ttl=600)  # ttl=600 faz o cache expirar a cada 10 min para buscar dados novos
+@st.cache_data
 def load_data():
-    # Substitua pelos seus valores reais:
-    SHEET_ID = "SEU_ID_DA_PLANILHA_AQUI"
-    SHEET_GID = "SEU_GID_DA_ABA_AQUI"  # ex: "0" ou "182736452"
-
-    url = "https://docs.google.com/spreadsheets/d/18flfeGQHTFhYNpECgQ1QZcuTQ8P7hUDS-379vQAD2Mc/edit?gid=1403362399#gid=1403362399"
-
-    # O pandas lê o CSV diretamente da URL
-    df = pd.read_csv(url)
-
+    df = pd.read_excel("Sac Master Café.xlsx")
     month_map = {
         "Janeiro": "Janeiro",
         "janeiro": "Janeiro",
@@ -610,6 +602,7 @@ def load_data():
     df["Descrição"] = df["Descrição"].fillna("Sem descrição").astype(str)
     df["Data_Str"] = df["Data"].astype(str)
     return df
+
 
 df = load_data()
 
