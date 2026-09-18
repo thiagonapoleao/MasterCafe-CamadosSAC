@@ -262,13 +262,7 @@ def generate_full_pdf_report(
     )
 
     # 2. Quadro de Filtros Ativos
-    filtros_txt = (
-        f"<b>Filtros Atuais Aplicados:</b> Mês: <code>{active_filters.get('mes')}</code> | "
-        f"Cliente: <code>{active_filters.get('cliente')}</code> | "
-        f"Local Interno: <code>{active_filters.get('local')}</code> | "
-        f"Ocorrência: <code>{active_filters.get('problema')}</code> | "
-        f"Dia: <code>{active_filters.get('dia')}</code>"
-    )
+    filtros_txt = f"<b>Filtros Atuais Aplicados:</b> Ano: <code>{active_filters.get('ano', 'Todos')}</code>"
     t_filtros = Table(
         [[Paragraph(filtros_txt, table_cell)]],
         colWidths=[540],
@@ -405,155 +399,6 @@ def generate_full_pdf_report(
     elements.append(t_mes_tab)
     elements.append(Spacer(1, 14))
 
-    # 5. Top 10 Clientes e Top 10 Falhas
-    elements.append(
-        Paragraph("3. Top 10 Clientes e Causas Mais Frequentes", section_style)
-    )
-    top_cli_df = (
-        df_filtered.groupby("Cliente")
-        .agg(Chamados=("Valor", "count"), Reembolso=("Valor", "sum"))
-        .sort_values(by="Chamados", ascending=False)
-        .head(10)
-        .reset_index()
-    )
-
-    t_cli_data = [[
-        Paragraph("Cliente / Conta", table_header),
-        Paragraph("Qtd. Chamados", table_header),
-        Paragraph("Impacto Financeiro (R$)", table_header),
-    ]]
-    for _, r in top_cli_df.iterrows():
-        val_f = (
-            f"R$ {r['Reembolso']:,.2f}".replace(",", "v")
-            .replace(".", ",")
-            .replace("v", ".")
-        )
-        t_cli_data.append([
-            Paragraph(str(r["Cliente"])[:38], table_cell),
-            Paragraph(f"{int(r['Chamados']):,}".replace(",", "."), table_cell),
-            Paragraph(val_f, table_cell),
-        ])
-
-    t_cli_tab = Table(t_cli_data, colWidths=[270, 110, 160])
-    t_cli_tab.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e293b")),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
-                (
-                    "ROWBACKGROUNDS",
-                    (0, 1),
-                    (-1, -1),
-                    [colors.white, colors.HexColor("#f8fafc")],
-                ),
-                ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
-                ("PADDING", (0, 0), (-1, -1), 4.5),
-            ]
-        )
-    )
-    elements.append(t_cli_tab)
-    elements.append(Spacer(1, 14))
-
-    # 6. Top 10 Locais Internos Críticos
-    elements.append(
-        Paragraph(
-            "4. Top 10 Locais Internos com Maior Volume de Demandas",
-            section_style,
-        )
-    )
-    top_loc_df = (
-        df_filtered.groupby("Local Interno")
-        .agg(Chamados=("Valor", "count"), Reembolso=("Valor", "sum"))
-        .sort_values(by="Chamados", ascending=False)
-        .head(10)
-        .reset_index()
-    )
-
-    t_loc_data = [[
-        Paragraph("Local Interno / Unidade", table_header),
-        Paragraph("Qtd. Chamados", table_header),
-        Paragraph("Total Devolvido (R$)", table_header),
-    ]]
-    for _, r in top_loc_df.iterrows():
-        val_f = (
-            f"R$ {r['Reembolso']:,.2f}".replace(",", "v")
-            .replace(".", ",")
-            .replace("v", ".")
-        )
-        t_loc_data.append([
-            Paragraph(str(r["Local Interno"])[:38], table_cell),
-            Paragraph(f"{int(r['Chamados']):,}".replace(",", "."), table_cell),
-            Paragraph(val_f, table_cell),
-        ])
-
-    t_loc_tab = Table(t_loc_data, colWidths=[270, 110, 160])
-    t_loc_tab.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e293b")),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
-                (
-                    "ROWBACKGROUNDS",
-                    (0, 1),
-                    (-1, -1),
-                    [colors.white, colors.HexColor("#f8fafc")],
-                ),
-                ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
-                ("PADDING", (0, 0), (-1, -1), 4.5),
-            ]
-        )
-    )
-    elements.append(t_loc_tab)
-    elements.append(Spacer(1, 14))
-
-    # 7. Detalhamento Operacional de Registros (Amostra dos 25 mais recentes)
-    elements.append(
-        Paragraph(
-            "5. Amostra Analítica dos Registros Filtrados (Últimos 25 Itens)",
-            section_style,
-        )
-    )
-    sample_df = df_filtered.head(25)
-    t_sample_data = [[
-        Paragraph("Data", table_header),
-        Paragraph("Cliente", table_header),
-        Paragraph("Local Interno", table_header),
-        Paragraph("Problema", table_header),
-        Paragraph("Valor (R$)", table_header),
-    ]]
-    for _, r in sample_df.iterrows():
-        val_f = (
-            f"R$ {r['Valor']:,.2f}".replace(",", "v")
-            .replace(".", ",")
-            .replace("v", ".")
-        )
-        t_sample_data.append([
-            Paragraph(str(r["Data_Str"])[:10], table_cell),
-            Paragraph(str(r["Cliente"])[:18], table_cell),
-            Paragraph(str(r["Local Interno"])[:20], table_cell),
-            Paragraph(str(r["Problemas"])[:20], table_cell),
-            Paragraph(val_f, table_cell),
-        ])
-
-    t_sample_tab = Table(t_sample_data, colWidths=[65, 120, 145, 130, 80])
-    t_sample_tab.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
-                (
-                    "ROWBACKGROUNDS",
-                    (0, 1),
-                    (-1, -1),
-                    [colors.white, colors.HexColor("#f8fafc")],
-                ),
-                ("ALIGN", (4, 0), (-1, -1), "RIGHT"),
-                ("PADDING", (0, 0), (-1, -1), 4),
-            ]
-        )
-    )
-    elements.append(t_sample_tab)
-
     # Constrói o PDF com canvas de numeração de páginas
     doc.build(elements, canvasmaker=NumberedCanvas)
     buffer.seek(0)
@@ -609,9 +454,13 @@ def load_data():
         df["Data_Str"] = df["Data_Date"].apply(
             lambda d: d.strftime("%d/%m/%Y") if pd.notna(d) and d is not None else ""
         )
+        df["Ano"] = df["Data_Date"].apply(
+            lambda d: str(d.year) if pd.notna(d) and d is not None else "Não informado"
+        )
     else:
         df["Data_Date"] = None
         df["Data_Str"] = ""
+        df["Ano"] = "Não informado"
 
     month_map = {
         "Janeiro": "Janeiro",
@@ -722,85 +571,26 @@ months_order = [
     "Dezembro",
 ]
 
-# Índice padrão para os filtros específicos de Mês Atual
+# Índice padrão para os seletores com Mês Atual
 if mes_atual_nome in months_order:
     idx_mes_atual = months_order.index(mes_atual_nome)
 else:
     idx_mes_atual = len(months_order) - 1
 
-# --- FILTROS GLOBAIS NA BARRA LATERAL ---
+# --- FILTROS EXECUTIVOS NA BARRA LATERAL (APENAS O ANO) ---
 st.sidebar.title("⚙️ Filtros Executivos")
 
-# Barra lateral inicia com "Todos" para exibir o ano todo por padrão
-selected_month = st.sidebar.selectbox(
-    "Mês do Ano", 
-    months_order, 
-    index=0
+anos_disponiveis = sorted(
+    [str(a) for a in df["Ano"].unique() if str(a) not in ["Não informado", "nan", "None", ""]],
+    reverse=True,
 )
+anos_opcoes = ["Todos"] + anos_disponiveis
+selected_year = st.sidebar.selectbox("Ano de Referência", anos_opcoes, index=0)
 
-clients_list = ["Todos"] + sorted(
-    [
-        str(c).strip()
-        for c in df["Cliente"].dropna().unique()
-        if str(c).strip() not in ["Não informado", "nan", "None", ""]
-    ]
-)
-selected_client = st.sidebar.selectbox("Cliente", clients_list)
-
-locals_list = ["Todos"] + sorted(
-    [
-        str(l).strip()
-        for l in df["Local Interno"].dropna().unique()
-        if str(l).strip() not in ["Não informado", "nan", "None", ""]
-    ]
-)
-selected_local = st.sidebar.selectbox("Local Interno", locals_list)
-
-problems_list = ["Todos"] + sorted(
-    [
-        str(p).strip()
-        for p in df["Problemas"].dropna().unique()
-        if str(p).strip() not in ["nan", "None", ""]
-    ]
-)
-selected_problem = st.sidebar.selectbox("Tipo de Ocorrência", problems_list)
-
-st.sidebar.markdown("---")
-filtrar_dia_global = st.sidebar.checkbox(
-    "Filtrar por Dia Específico",
-    value=False,
-    help="Ative para filtrar todos os painéis por uma data específica no calendário.",
-)
-
-if filtrar_dia_global:
-    selected_day = st.sidebar.date_input(
-        "📅 Selecionar Dia",
-        value=hoje,
-        min_value=min_data_calendario,
-        max_value=max_data_calendario,
-        format="DD/MM/YYYY",
-        key="global_day_picker",
-    )
-    dia_relatorio_str = selected_day.strftime("%d/%m/%Y")
-else:
-    selected_day = None
-    dia_relatorio_str = "Todos"
-
-# Filtragem Dinâmica Global
+# Filtragem Global pelo Ano
 filtered_df = df.copy()
-if selected_month != "Todos":
-    filtered_df = filtered_df[filtered_df["Mês_Clean"] == selected_month]
-if selected_client != "Todos":
-    filtered_df = filtered_df[filtered_df["Cliente"] == selected_client]
-if selected_local != "Todos":
-    filtered_df = filtered_df[filtered_df["Local Interno"] == selected_local]
-if selected_problem != "Todos":
-    filtered_df = filtered_df[filtered_df["Problemas"] == selected_problem]
-if selected_day is not None:
-    filtered_df = filtered_df[
-        (filtered_df["Data_Date"] == selected_day)
-        | (filtered_df["Data_Str"] == dia_relatorio_str)
-    ]
+if selected_year != "Todos":
+    filtered_df = filtered_df[filtered_df["Ano"] == selected_year]
 
 # --- CABEÇALHO & BOTÃO GERAR RELATÓRIO COMPLETO EM PDF ---
 col_head, col_btn = st.columns([3.3, 1.2])
@@ -830,11 +620,7 @@ top_problema = (
 )
 
 active_filters_dict = {
-    "mes": selected_month,
-    "cliente": selected_client,
-    "local": selected_local,
-    "problema": selected_problem,
-    "dia": dia_relatorio_str,
+    "ano": selected_year,
 }
 
 pdf_full_bytes = generate_full_pdf_report(
@@ -851,9 +637,9 @@ with col_btn:
     st.download_button(
         label="📥 Gerar Relatório Completo (PDF)",
         data=pdf_full_bytes,
-        file_name=f"Relatorio_Executivo_SAC_MasterCafe_{selected_month}.pdf",
+        file_name=f"Relatorio_Executivo_SAC_MasterCafe_{selected_year}.pdf",
         mime="application/pdf",
-        help="Exportar dados completos consolidados em formato PDF multipáginas com tabelas e KPIs",
+        help="Exportar dados completos consolidados em formato PDF",
         use_container_width=True,
     )
 
@@ -939,7 +725,7 @@ ca, cs, ct3 = st.columns([1, 1, 1.2])
 
 with ca:
     df_a = (
-        df[df["Mês_Clean"] == mes_comp_a]["Local Interno"]
+        filtered_df[filtered_df["Mês_Clean"] == mes_comp_a]["Local Interno"]
         .value_counts()
         .head(5)
         .reset_index()
@@ -962,7 +748,7 @@ with ca:
 
 with cs:
     df_b = (
-        df[df["Mês_Clean"] == mes_comp_b]["Local Interno"]
+        filtered_df[filtered_df["Mês_Clean"] == mes_comp_b]["Local Interno"]
         .value_counts()
         .head(5)
         .reset_index()
@@ -985,7 +771,7 @@ with cs:
 
 with ct3:
     top3_mes_b = (
-        df[df["Mês_Clean"] == mes_comp_b]["Local Interno"]
+        filtered_df[filtered_df["Mês_Clean"] == mes_comp_b]["Local Interno"]
         .value_counts()
         .head(3)
         .index.tolist()
@@ -993,8 +779,8 @@ with ct3:
 
     items_html = ""
     for idx, loc in enumerate(top3_mes_b, 1):
-        loc_data = df[
-            (df["Mês_Clean"] == mes_comp_b) & (df["Local Interno"] == loc)
+        loc_data = filtered_df[
+            (filtered_df["Mês_Clean"] == mes_comp_b) & (filtered_df["Local Interno"] == loc)
         ]
         main_prob = (
             loc_data["Problemas"].value_counts().index[0]
@@ -1048,13 +834,12 @@ with ct3:
 
 st.markdown("---")
 
-# --- 4. VALORES E CHAMADOS MENSAL (ANO TODO) ---
+# --- 4. VALORES E CHAMADOS MENSAL (HISTÓRICO COMPLETO) ---
 g1, g2 = st.columns(2)
 
 with g1:
-    # Mostra o histórico anual completo
     ch_mes = (
-        df.groupby("Mês_Clean")["Problemas"]
+        filtered_df.groupby("Mês_Clean")["Problemas"]
         .count()
         .reindex(months_choices)
         .fillna(0)
@@ -1070,16 +855,15 @@ with g1:
     )
     fig_ch.update_traces(marker=dict(line=dict(width=0)))
     fig_ch = apply_powerbi_theme(
-        fig_ch, title="Chamados por Mês (Ano Todo)", height=320
+        fig_ch, title="Chamados por Mês", height=320
     )
     fig_ch.update_xaxes(title_text="")
     fig_ch.update_yaxes(title_text="Chamados")
     st.plotly_chart(fig_ch, use_container_width=True)
 
 with g2:
-    # Mostra o histórico anual completo
     val_mes = (
-        df.groupby("Mês_Clean")["Valor"]
+        filtered_df.groupby("Mês_Clean")["Valor"]
         .sum()
         .reindex(months_choices)
         .fillna(0)
@@ -1094,7 +878,7 @@ with g2:
     )
     fig_val.update_traces(marker=dict(line=dict(width=0)))
     fig_val = apply_powerbi_theme(
-        fig_val, title="Valores Devolvidos por Mês em R$ (Ano Todo)", height=320
+        fig_val, title="Valores Devolvidos por Mês em R$", height=320
     )
     fig_val.update_xaxes(title_text="")
     fig_val.update_yaxes(title_text="Reembolso (R$)")
@@ -1117,7 +901,7 @@ with r1:
     fig_cli.update_traces(marker=dict(line=dict(width=0)))
     fig_cli.update_layout(yaxis=dict(autorange="reversed"))
     fig_cli = apply_powerbi_theme(
-        fig_cli, title="Top 10 Clientes do Ano", height=350
+        fig_cli, title="Top 10 Clientes do Período", height=350
     )
     st.plotly_chart(fig_cli, use_container_width=True)
 
@@ -1135,58 +919,135 @@ with r2:
     fig_loc.update_traces(marker=dict(line=dict(width=0)))
     fig_loc.update_layout(yaxis=dict(autorange="reversed"))
     fig_loc = apply_powerbi_theme(
-        fig_loc, title="Top 10 Locais Internos do Ano", height=350
+        fig_loc, title="Top 10 Locais Internos do Período", height=350
     )
     st.plotly_chart(fig_loc, use_container_width=True)
 
 # --- 6. FILTROS DINÂMICOS LOCAIS ---
 st.markdown("---")
-d1, d2 = st.columns(2)
 
-with d1:
+# PARTE 6.1: TOP DEVOLUÇÕES (R$) — MÊS E DIA LADO A LADO
+dev_col1, dev_col2 = st.columns(2)
+
+with dev_col1:
     st.markdown("**Top Devoluções (R$) - Filtro de Mês Dinâmico**")
-    # Inicia com o MÊS ATUAL selecionado
     dev_month_selected = st.selectbox(
-        "Mudar Mês (Top Devoluções)",
+        "Mudar Mês (Top Devoluções R$)",
         months_order,
         index=idx_mes_atual,
         key="dev_month_filter",
     )
 
-    dev_df = df.copy()
+    dev_df_m = filtered_df.copy()
     if dev_month_selected != "Todos":
-        dev_df = dev_df[dev_df["Mês_Clean"] == dev_month_selected]
+        dev_df_m = dev_df_m[dev_df_m["Mês_Clean"] == dev_month_selected]
 
-    dev_loc = (
-        dev_df.groupby("Local Interno")["Valor"]
+    dev_loc_m = (
+        dev_df_m.groupby("Local Interno")["Valor"]
         .sum()
         .sort_values(ascending=False)
         .head(10)
         .reset_index()
     )
-    fig_dev = px.bar(
-        dev_loc,
+    fig_dev_m = px.bar(
+        dev_loc_m,
         x="Valor",
         y="Local Interno",
         orientation="h",
         text_auto=".2f",
         color_discrete_sequence=["#10b981"],
     )
-    fig_dev.update_traces(marker=dict(line=dict(width=0)))
-    fig_dev.update_layout(yaxis=dict(autorange="reversed"))
-    fig_dev = apply_powerbi_theme(
-        fig_dev,
-        title=f"Top Devoluções — {dev_month_selected}",
+    fig_dev_m.update_traces(marker=dict(line=dict(width=0)))
+    fig_dev_m.update_layout(yaxis=dict(autorange="reversed"))
+    fig_dev_m = apply_powerbi_theme(
+        fig_dev_m,
+        title=f"Top Devoluções (R$) — {dev_month_selected}",
         height=320,
     )
-    st.plotly_chart(fig_dev, use_container_width=True)
+    st.plotly_chart(fig_dev_m, use_container_width=True)
 
-with d2:
-    st.markdown(
-        "**Top 10 Locais Internos - Filtro de Dia (Calendário)**"
+with dev_col2:
+    st.markdown("**Top Devoluções (R$) - Filtro de Dia Dinâmico**")
+    day_dev_selected = st.date_input(
+        "Mudar Dia (Top Devoluções R$):",
+        value=hoje,
+        min_value=min_data_calendario,
+        max_value=max_data_calendario,
+        format="DD/MM/YYYY",
+        key="day_dev_calendar",
     )
+
+    dev_df_d = filtered_df.copy()
+    day_dev_str = day_dev_selected.strftime("%d/%m/%Y")
+    dev_df_d = dev_df_d[
+        (dev_df_d["Data_Date"] == day_dev_selected)
+        | (dev_df_d["Data_Str"] == day_dev_str)
+    ]
+
+    dev_loc_d = (
+        dev_df_d.groupby("Local Interno")["Valor"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(10)
+        .reset_index()
+    )
+    fig_dev_d = px.bar(
+        dev_loc_d,
+        x="Valor",
+        y="Local Interno",
+        orientation="h",
+        text_auto=".2f",
+        color_discrete_sequence=["#10b981"],
+    )
+    fig_dev_d.update_traces(marker=dict(line=dict(width=0)))
+    fig_dev_d.update_layout(yaxis=dict(autorange="reversed"))
+    fig_dev_d = apply_powerbi_theme(
+        fig_dev_d,
+        title=f"Top Devoluções (R$) — {day_dev_str}",
+        height=320,
+    )
+    st.plotly_chart(fig_dev_d, use_container_width=True)
+
+# PARTE 6.2: TOP LOCAIS POR NÚMERO DE CHAMADOS — MÊS E DIA LADO A LADO
+loc_col1, loc_col2 = st.columns(2)
+
+with loc_col1:
+    st.markdown("**Top 10 Locais Internos - Filtro de Mês (Chamados)**")
+    ch_month_selected = st.selectbox(
+        "Mudar Mês (Top Locais Chamados)",
+        months_order,
+        index=idx_mes_atual,
+        key="ch_loc_month_filter",
+    )
+
+    ch_df_m = filtered_df.copy()
+    if ch_month_selected != "Todos":
+        ch_df_m = ch_df_m[ch_df_m["Mês_Clean"] == ch_month_selected]
+
+    dia_loc_m = ch_df_m["Local Interno"].value_counts().head(10).reset_index()
+    dia_loc_m.columns = ["Local Interno", "Chamados"]
+
+    fig_loc_m = px.bar(
+        dia_loc_m,
+        x="Chamados",
+        y="Local Interno",
+        orientation="h",
+        text="Chamados",
+        color_discrete_sequence=["#38bdf8"],
+    )
+    fig_loc_m.update_traces(marker=dict(line=dict(width=0)))
+    fig_loc_m.update_layout(yaxis=dict(autorange="reversed"))
+    fig_loc_m = apply_powerbi_theme(
+        fig_loc_m,
+        title=f"Top 10 Locais no Mês — {ch_month_selected}",
+        height=320,
+    )
+    st.plotly_chart(fig_loc_m, use_container_width=True)
+
+with loc_col2:
+    st.markdown("**Top 10 Locais Internos - Filtro de Dia (Calendário)**")
     day_selected_loc = st.date_input(
-        "Mudar Dia (Top Locais):",
+        "Mudar Dia (Top Locais Chamados):",
         value=hoje,
         min_value=min_data_calendario,
         max_value=max_data_calendario,
@@ -1194,7 +1055,7 @@ with d2:
         key="day_loc_calendar",
     )
 
-    day_df = df.copy()
+    day_df = filtered_df.copy()
     day_str_target = day_selected_loc.strftime("%d/%m/%Y")
     day_df = day_df[
         (day_df["Data_Date"] == day_selected_loc)
@@ -1221,35 +1082,141 @@ with d2:
     )
     st.plotly_chart(fig_dia, use_container_width=True)
 
-# --- 7. TABELAS DETALHADAS ---
+# --- 7. TABELAS DETALHADAS OPERACIONAIS ---
 st.markdown("---")
 st.markdown("### 📅 Detalhamento Operacional de Registros")
 
-tab_mes_view, tab_dia_view = st.tabs(
-    ["Por Mês (Top 3 Locais)", "Por Dia (Top 3 Locais)"]
+lista_clientes_dinamica = ["Todos"] + sorted(
+    [
+        str(c).strip()
+        for c in filtered_df["Cliente"].dropna().unique()
+        if str(c).strip() not in ["Não informado", "nan", "None", ""]
+    ]
 )
 
-with tab_mes_view:
-    c_m1, c_m2 = st.columns([1, 2])
+tab_mes_cli, tab_dia_cli, tab_mes_top3, tab_dia_top3 = st.tabs(
+    [
+        "Por Mês e Cliente", 
+        "Por Data e Cliente", 
+        "Por Mês (Top 3 Locais)", 
+        "Por Dia (Top 3 Locais)"
+    ]
+)
+
+# --- ABA 1: POR MÊS E CLIENTE ---
+with tab_mes_cli:
+    c_m1, c_m2 = st.columns([1, 1.5])
     with c_m1:
-        # Inicia com o MÊS ATUAL selecionado
-        month_for_table = st.selectbox(
+        sel_tb_mes = st.selectbox(
             "📅 Selecionar Mês:",
             months_order,
             index=idx_mes_atual,
-            key="tb_month_filter",
+            key="tb_cli_mes_filter",
+        )
+    with c_m2:
+        sel_tb_cli_m = st.selectbox(
+            "👤 Selecionar Cliente:",
+            lista_clientes_dinamica,
+            index=0,
+            key="tb_cli_mes_client_filter",
         )
 
-    month_df = df.copy()
-    if month_for_table != "Todos":
-        month_df = month_df[month_df["Mês_Clean"] == month_for_table]
+    df_tab_mes = filtered_df.copy()
+    if sel_tb_mes != "Todos":
+        df_tab_mes = df_tab_mes[df_tab_mes["Mês_Clean"] == sel_tb_mes]
+    if sel_tb_cli_m != "Todos":
+        df_tab_mes = df_tab_mes[df_tab_mes["Cliente"] == sel_tb_cli_m]
+
+    if not df_tab_mes.empty:
+        tabela_mes_agrupada = (
+            df_tab_mes.groupby(["Problemas", "Descrição"])
+            .size()
+            .reset_index(name="Quantidade de Chamados")
+            .sort_values(by="Quantidade de Chamados", ascending=False)
+            .rename(columns={"Problemas": "Problema"})
+        )
+        st.markdown(
+            f"**Exibindo chamados para:** Mês `'{sel_tb_mes}'` | Cliente `'{sel_tb_cli_m}'` "
+            f"*(Total: {tabela_mes_agrupada['Quantidade de Chamados'].sum()} ocorrências)*"
+        )
+        st.dataframe(
+            tabela_mes_agrupada[["Problema", "Descrição", "Quantidade de Chamados"]],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.warning(f"Nenhum registro encontrado para o mês '{sel_tb_mes}' e cliente '{sel_tb_cli_m}'.")
+
+# --- ABA 2: POR DATA (CALENDÁRIO) E CLIENTE ---
+with tab_dia_cli:
+    c_d1, c_d2 = st.columns([1, 1.5])
+    with c_d1:
+        sel_tb_data = st.date_input(
+            "📆 Selecionar Data no Calendário:",
+            value=hoje,
+            min_value=min_data_calendario,
+            max_value=max_data_calendario,
+            format="DD/MM/YYYY",
+            key="tb_cli_dia_calendar",
+        )
+    with c_d2:
+        sel_tb_cli_d = st.selectbox(
+            "👤 Selecionar Cliente:",
+            lista_clientes_dinamica,
+            index=0,
+            key="tb_cli_dia_client_filter",
+        )
+
+    df_tab_dia = filtered_df.copy()
+    data_alvo_str = sel_tb_data.strftime("%d/%m/%Y")
+    df_tab_dia = df_tab_dia[
+        (df_tab_dia["Data_Date"] == sel_tb_data)
+        | (df_tab_dia["Data_Str"] == data_alvo_str)
+    ]
+    if sel_tb_cli_d != "Todos":
+        df_tab_dia = df_tab_dia[df_tab_dia["Cliente"] == sel_tb_cli_d]
+
+    if not df_tab_dia.empty:
+        tabela_dia_agrupada = (
+            df_tab_dia.groupby(["Problemas", "Descrição"])
+            .size()
+            .reset_index(name="Quantidade de Chamados")
+            .sort_values(by="Quantidade de Chamados", ascending=False)
+            .rename(columns={"Problemas": "Problema"})
+        )
+        st.markdown(
+            f"**Exibindo chamados para:** Data `'{data_alvo_str}'` | Cliente `'{sel_tb_cli_d}'` "
+            f"*(Total: {tabela_dia_agrupada['Quantidade de Chamados'].sum()} ocorrências)*"
+        )
+        st.dataframe(
+            tabela_dia_agrupada[["Problema", "Descrição", "Quantidade de Chamados"]],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.warning(f"Nenhum registro encontrado para a data '{data_alvo_str}' e cliente '{sel_tb_cli_d}'.")
+
+# --- ABA 3: POR MÊS (TOP 3 LOCAIS) ---
+with tab_mes_top3:
+    c_m3_1, c_m3_2 = st.columns([1, 2])
+    with c_m3_1:
+        month_for_top3 = st.selectbox(
+            "📅 Selecionar Mês:",
+            months_order,
+            index=idx_mes_atual,
+            key="tb_top3_month_filter",
+        )
+
+    month_df_top3 = filtered_df.copy()
+    if month_for_top3 != "Todos":
+        month_df_top3 = month_df_top3[month_df_top3["Mês_Clean"] == month_for_top3]
 
     top_3_month_locals = (
-        month_df["Local Interno"].value_counts().head(3).index.tolist()
+        month_df_top3["Local Interno"].value_counts().head(3).index.tolist()
     )
 
     if top_3_month_locals:
-        with c_m2:
+        with c_m3_2:
             selected_top_local_m = st.selectbox(
                 "🎯 Filtrar Local Interno (Mês):",
                 ["Exibir em Abas Separadas (Top 3)"] + top_3_month_locals,
@@ -1257,7 +1224,7 @@ with tab_mes_view:
             )
 
         def get_month_local_table(local_name):
-            c_df = month_df[month_df["Local Interno"] == local_name]
+            c_df = month_df_top3[month_df_top3["Local Interno"] == local_name]
             tb = (
                 c_df.groupby(["Problemas", "Descrição"])
                 .size()
@@ -1273,58 +1240,49 @@ with tab_mes_view:
                 with tab:
                     local_item = top_3_month_locals[idx]
                     tb_local = get_month_local_table(local_item)
-                    st.markdown(
-                        f"**Registros do Local no Mês ({month_for_table}):**"
-                        f" `{local_item}`"
-                    )
+                    st.markdown(f"**Registros do Local no Mês ({month_for_top3}):** `{local_item}`")
                     st.dataframe(
-                        tb_local[
-                            ["Problema", "Descrição", "Quantidade de Chamados"]
-                        ],
+                        tb_local[["Problema", "Descrição", "Quantidade de Chamados"]],
                         use_container_width=True,
                         hide_index=True,
                     )
         else:
             tb_single_m = get_month_local_table(selected_top_local_m)
-            st.markdown(
-                f"**Registros do Local no Mês ({month_for_table}):**"
-                f" `{selected_top_local_m}`"
-            )
+            st.markdown(f"**Registros do Local no Mês ({month_for_top3}):** `{selected_top_local_m}`")
             st.dataframe(
                 tb_single_m[["Problema", "Descrição", "Quantidade de Chamados"]],
                 use_container_width=True,
                 hide_index=True,
             )
     else:
-        st.warning(f"Nenhum registro encontrado para o mês de {month_for_table}.")
+        st.warning(f"Nenhum registro encontrado para o mês de {month_for_top3}.")
 
-with tab_dia_view:
-    c_d1, c_d2 = st.columns([1.2, 1.8])
-
-    with c_d1:
-        # Calendário com data atual selecionada por padrão
-        chosen_calendar_date = st.date_input(
+# --- ABA 4: POR DIA (TOP 3 LOCAIS) ---
+with tab_dia_top3:
+    c_d3_1, c_d3_2 = st.columns([1.2, 1.8])
+    with c_d3_1:
+        chosen_date_top3 = st.date_input(
             "📆 Selecionar Data no Calendário:",
             value=hoje,
             min_value=min_data_calendario,
             max_value=max_data_calendario,
             format="DD/MM/YYYY",
-            key="tb_day_calendar",
+            key="tb_top3_day_calendar",
         )
 
-    day_df_tb = df.copy()
-    day_str_operacional = chosen_calendar_date.strftime("%d/%m/%Y")
-    day_df_tb = day_df_tb[
-        (day_df_tb["Data_Date"] == chosen_calendar_date)
-        | (day_df_tb["Data_Str"] == day_str_operacional)
+    day_df_top3 = filtered_df.copy()
+    day_str_op_top3 = chosen_date_top3.strftime("%d/%m/%Y")
+    day_df_top3 = day_df_top3[
+        (day_df_top3["Data_Date"] == chosen_date_top3)
+        | (day_df_top3["Data_Str"] == day_str_op_top3)
     ]
 
     top_3_day_locals = (
-        day_df_tb["Local Interno"].value_counts().head(3).index.tolist()
+        day_df_top3["Local Interno"].value_counts().head(3).index.tolist()
     )
 
     if top_3_day_locals:
-        with c_d2:
+        with c_d3_2:
             selected_top_local_d = st.selectbox(
                 "🎯 Filtrar Local Interno (Dia):",
                 ["Exibir em Abas Separadas (Top 3)"] + top_3_day_locals,
@@ -1332,7 +1290,7 @@ with tab_dia_view:
             )
 
         def get_day_local_table(local_name):
-            c_df = day_df_tb[day_df_tb["Local Interno"] == local_name]
+            c_df = day_df_top3[day_df_top3["Local Interno"] == local_name]
             tb = (
                 c_df.groupby(["Problemas", "Descrição"])
                 .size()
@@ -1348,27 +1306,19 @@ with tab_dia_view:
                 with tab:
                     local_item = top_3_day_locals[idx]
                     tb_local_d = get_day_local_table(local_item)
-                    st.markdown(
-                        f"**Registros do Local na Data ({day_str_operacional}):**"
-                        f" `{local_item}`"
-                    )
+                    st.markdown(f"**Registros do Local na Data ({day_str_op_top3}):** `{local_item}`")
                     st.dataframe(
-                        tb_local_d[
-                            ["Problema", "Descrição", "Quantidade de Chamados"]
-                        ],
+                        tb_local_d[["Problema", "Descrição", "Quantidade de Chamados"]],
                         use_container_width=True,
                         hide_index=True,
                     )
         else:
             tb_single_d = get_day_local_table(selected_top_local_d)
-            st.markdown(
-                f"**Registros do Local na Data ({day_str_operacional}):**"
-                f" `{selected_top_local_d}`"
-            )
+            st.markdown(f"**Registros do Local na Data ({day_str_op_top3}):** `{selected_top_local_d}`")
             st.dataframe(
                 tb_single_d[["Problema", "Descrição", "Quantidade de Chamados"]],
                 use_container_width=True,
                 hide_index=True,
             )
     else:
-        st.warning(f"Nenhum registro encontrado para a data {day_str_operacional}.")
+        st.warning(f"Nenhum registro encontrado para a data {day_str_op_top3}.")
