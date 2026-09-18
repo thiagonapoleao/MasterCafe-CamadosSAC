@@ -65,7 +65,6 @@ st.markdown(
         border-radius: 8px !important; 
         border: 1px solid #334155 !important;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-         
     }
     div[data-testid="stMetricValue"] { 
         color: #38bdf8 !important; 
@@ -202,7 +201,6 @@ def generate_full_pdf_report(
     elements = []
     styles = getSampleStyleSheet()
 
-    # Estilos Tipográficos Customizados
     title_style = ParagraphStyle(
         name="DocTitle",
         parent=styles["Heading1"],
@@ -351,15 +349,8 @@ def generate_full_pdf_report(
         Paragraph("2. Demonstrativo Mensal Consolidado", section_style)
     )
     months_valid = [
-        "Janeiro",
-        "Fevereiro",
-        "Março",
-        "Abril",
-        "Maio",
-        "Junho",
-        "Julho",
-        "Agosto",
-        "Setembro",
+        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
     ]
     summary_mes = (
         df_filtered.groupby("Mês_Clean")
@@ -569,9 +560,59 @@ def generate_full_pdf_report(
     return buffer.getvalue()
 
 
-@st.cache_data
+# --- CARREGAMENTO E PARSER UNIVERSAL DE DATA ---
+@st.cache_data(ttl=600)
 def load_data():
-    df = pd.read_excel("Sac Master Café.xlsx")
+    sheet_id = "18flfeGQHTFhYNpECgQ1QZcuTQ8P7hUDS-379vQAD2Mc"
+    gid = "1403362399"
+    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+
+    df = pd.read_csv(url)
+
+    # Parser inteligente de datas
+    def parse_smart_date(val):
+        if pd.isna(val):
+            return None
+        val_str = str(val).strip()
+        if not val_str or val_str.lower() in ["nan", "none", "nat", ""]:
+            return None
+
+        # 1. Se for número de série do Excel
+        try:
+            val_num = float(val_str)
+            if 35000 <= val_num <= 65000:
+                return pd.to_datetime(val_num, unit="D", origin="1899-12-30").date()
+        except (ValueError, TypeError):
+            pass
+
+        # 2. Se for texto, limpa horário
+        data_pura = val_str.split(" ")[0].split("T")[0].strip()
+
+        for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d/%m/%y", "%d-%m-%Y"):
+            try:
+                return datetime.strptime(data_pura, fmt).date()
+            except ValueError:
+                continue
+
+        # 3. Fallback com o pandas
+        try:
+            dt = pd.to_datetime(data_pura, dayfirst=True, errors="coerce")
+            if pd.notna(dt):
+                return dt.date()
+        except Exception:
+            pass
+
+        return None
+
+    if "Data" in df.columns:
+        df["Data_Date"] = df["Data"].apply(parse_smart_date)
+        df["Data_Str"] = df["Data_Date"].apply(
+            lambda d: d.strftime("%d/%m/%Y") if pd.notna(d) and d is not None else ""
+        )
+    else:
+        df["Data_Date"] = None
+        df["Data_Str"] = ""
+
     month_map = {
         "Janeiro": "Janeiro",
         "janeiro": "Janeiro",
@@ -584,30 +625,86 @@ def load_data():
         "Agosto": "Agosto",
         "Setembro": "Setembro",
         "setembro": "Setembro",
+        "Outubro": "Outubro",
+        "Novembro": "Novembro",
+        "Dezembro": "Dezembro",
     }
-    df["Mês_Clean"] = (
-        df["Mês"].astype(str).str.capitalize().str.strip().map(month_map)
+
+    if "Mês" in df.columns:
+        df["Mês_Clean"] = (
+            df["Mês"]
+            .fillna("")
+            .astype(str)
+            .str.capitalize()
+            .str.strip()
+            .map(month_map)
+        )
+    else:
+        df["Mês_Clean"] = "Não informado"
+
+    if "$" in df.columns:
+        df["Valor"] = pd.to_numeric(
+            df["$"]
+            .astype(str)
+            .str.replace("R$", "", regex=False)
+            .str.replace(",", ".")
+            .str.strip(),
+            errors="coerce",
+        ).fillna(0)
+    else:
+        df["Valor"] = 0.0
+
+    df["Cliente"] = (
+        df["Cliente"].fillna("Não informado").astype(str)
+        if "Cliente" in df.columns
+        else "Não informado"
     )
-    df["Valor"] = pd.to_numeric(
-        df["$"]
-        .astype(str)
-        .str.replace("R$", "", regex=False)
-        .str.replace(",", ".")
-        .str.strip(),
-        errors="coerce",
-    ).fillna(0)
-    df["Cliente"] = df["Cliente"].fillna("Não informado").astype(str)
-    df["Local Interno"] = df["Local Interno"].fillna("Não informado").astype(str)
-    df["Problemas"] = df["Problemas"].fillna("Outros").astype(str)
-    df["Descrição"] = df["Descrição"].fillna("Sem descrição").astype(str)
-    df["Data_Str"] = df["Data"].astype(str)
+    df["Local Interno"] = (
+        df["Local Interno"].fillna("Não informado").astype(str)
+        if "Local Interno" in df.columns
+        else "Não informado"
+    )
+    df["Problemas"] = (
+        df["Problemas"].fillna("Outros").astype(str)
+        if "Problemas" in df.columns
+        else "Outros"
+    )
+    df["Descrição"] = (
+        df["Descrição"].fillna("Sem descrição").astype(str)
+        if "Descrição" in df.columns
+        else "Sem descrição"
+    )
+
     return df
 
 
 df = load_data()
 
-# --- FILTROS GLOBAIS NA BARRA LATERAL ---
-st.sidebar.title("⚙️ Filtros Executivos")
+# Data atual e limites seguros de navegação no calendário
+hoje = datetime.now().date()
+datas_validas = df["Data_Date"].dropna()
+min_data_calendario = min(datas_validas.min(), hoje) if not datas_validas.empty else hoje
+max_data_calendario = max(datas_validas.max(), hoje) if not datas_validas.empty else hoje
+
+# --- MAPEAMENTO E CÁLCULO DO MÊS ATUAL E ANTERIOR ---
+meses_do_ano = {
+    1: "Janeiro",
+    2: "Fevereiro",
+    3: "Março",
+    4: "Abril",
+    5: "Maio",
+    6: "Junho",
+    7: "Julho",
+    8: "Agosto",
+    9: "Setembro",
+    10: "Outubro",
+    11: "Novembro",
+    12: "Dezembro",
+}
+mes_atual_num = datetime.now().month
+mes_atual_nome = meses_do_ano.get(mes_atual_num, "Janeiro")
+mes_anterior_num = 12 if mes_atual_num == 1 else mes_atual_num - 1
+mes_anterior_nome = meses_do_ano.get(mes_anterior_num, "Dezembro")
 
 months_order = [
     "Todos",
@@ -620,20 +717,74 @@ months_order = [
     "Julho",
     "Agosto",
     "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
 ]
-selected_month = st.sidebar.selectbox("Mês do Ano", months_order)
+
+# Índice padrão para os filtros específicos de Mês Atual
+if mes_atual_nome in months_order:
+    idx_mes_atual = months_order.index(mes_atual_nome)
+else:
+    idx_mes_atual = len(months_order) - 1
+
+# --- FILTROS GLOBAIS NA BARRA LATERAL ---
+st.sidebar.title("⚙️ Filtros Executivos")
+
+# Barra lateral inicia com "Todos" para exibir o ano todo por padrão
+selected_month = st.sidebar.selectbox(
+    "Mês do Ano", 
+    months_order, 
+    index=0
+)
+
 clients_list = ["Todos"] + sorted(
-    [c for c in df["Cliente"].unique() if c != "Não informado"]
+    [
+        str(c).strip()
+        for c in df["Cliente"].dropna().unique()
+        if str(c).strip() not in ["Não informado", "nan", "None", ""]
+    ]
 )
 selected_client = st.sidebar.selectbox("Cliente", clients_list)
+
 locals_list = ["Todos"] + sorted(
-    [l for l in df["Local Interno"].unique() if l != "Não informado"]
+    [
+        str(l).strip()
+        for l in df["Local Interno"].dropna().unique()
+        if str(l).strip() not in ["Não informado", "nan", "None", ""]
+    ]
 )
 selected_local = st.sidebar.selectbox("Local Interno", locals_list)
-problems_list = ["Todos"] + sorted([p for p in df["Problemas"].unique()])
+
+problems_list = ["Todos"] + sorted(
+    [
+        str(p).strip()
+        for p in df["Problemas"].dropna().unique()
+        if str(p).strip() not in ["nan", "None", ""]
+    ]
+)
 selected_problem = st.sidebar.selectbox("Tipo de Ocorrência", problems_list)
-days_list = ["Todos"] + sorted([d for d in df["Data_Str"].unique() if d != "nan"])
-selected_day = st.sidebar.selectbox("Dia Específico", days_list)
+
+st.sidebar.markdown("---")
+filtrar_dia_global = st.sidebar.checkbox(
+    "Filtrar por Dia Específico",
+    value=False,
+    help="Ative para filtrar todos os painéis por uma data específica no calendário.",
+)
+
+if filtrar_dia_global:
+    selected_day = st.sidebar.date_input(
+        "📅 Selecionar Dia",
+        value=hoje,
+        min_value=min_data_calendario,
+        max_value=max_data_calendario,
+        format="DD/MM/YYYY",
+        key="global_day_picker",
+    )
+    dia_relatorio_str = selected_day.strftime("%d/%m/%Y")
+else:
+    selected_day = None
+    dia_relatorio_str = "Todos"
 
 # Filtragem Dinâmica Global
 filtered_df = df.copy()
@@ -645,8 +796,11 @@ if selected_local != "Todos":
     filtered_df = filtered_df[filtered_df["Local Interno"] == selected_local]
 if selected_problem != "Todos":
     filtered_df = filtered_df[filtered_df["Problemas"] == selected_problem]
-if selected_day != "Todos":
-    filtered_df = filtered_df[filtered_df["Data_Str"] == selected_day]
+if selected_day is not None:
+    filtered_df = filtered_df[
+        (filtered_df["Data_Date"] == selected_day)
+        | (filtered_df["Data_Str"] == dia_relatorio_str)
+    ]
 
 # --- CABEÇALHO & BOTÃO GERAR RELATÓRIO COMPLETO EM PDF ---
 col_head, col_btn = st.columns([3.3, 1.2])
@@ -675,16 +829,14 @@ top_problema = (
     else "-"
 )
 
-# Empacota os filtros ativos para impressão no relatório
 active_filters_dict = {
     "mes": selected_month,
     "cliente": selected_client,
     "local": selected_local,
     "problema": selected_problem,
-    "dia": selected_day,
+    "dia": dia_relatorio_str,
 }
 
-# Geração de binário do Relatório Completo em PDF
 pdf_full_bytes = generate_full_pdf_report(
     filtered_df,
     total_chamados,
@@ -756,38 +908,30 @@ with i3:
         unsafe_allow_html=True,
     )
 
-# --- 3. DESTAQUES MÊS A MÊS COM FILTROS DE COMPARAÇÃO & LOCAIS CRÍTICOS ---
+# --- 3. DESTAQUES MÊS A MÊS COM FILTROS DE COMPARAÇÃO (MÊS ANTERIOR VS ATUAL) ---
 st.markdown("### 📌 Destaques Mês a Mês & Locais Críticos")
 
-# Controles para escolha dinâmica dos meses comparados
 months_choices = [
-    "Janeiro",
-    "Fevereiro",
-    "Março",
-    "Abril",
-    "Maio",
-    "Junho",
-    "Julho",
-    "Agosto",
-    "Setembro",
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ]
+
+default_idx_a = months_choices.index(mes_anterior_nome) if mes_anterior_nome in months_choices else len(months_choices) - 2
+default_idx_b = months_choices.index(mes_atual_nome) if mes_atual_nome in months_choices else len(months_choices) - 1
+
 f_c1, f_c2, _ = st.columns([1, 1, 1.2])
 with f_c1:
     mes_comp_a = st.selectbox(
-        "Mês A:",
+        "Mês A (Mês Anterior):",
         months_choices,
-        index=months_choices.index("Agosto")
-        if "Agosto" in months_choices
-        else 0,
+        index=default_idx_a,
         key="comp_mes_a",
     )
 with f_c2:
     mes_comp_b = st.selectbox(
-        "Mês B (Referência Crítica):",
+        "Mês B (Mês Atual - Referência Crítica):",
         months_choices,
-        index=months_choices.index("Setembro")
-        if "Setembro" in months_choices
-        else 1,
+        index=default_idx_b,
         key="comp_mes_b",
     )
 
@@ -879,7 +1023,7 @@ with ct3:
         """
 
     if not items_html:
-        items_html = "<p style='color:#94a3b8; font-size:12px; margin-top:20px;'>Nenhum registro encontrado para o mês selecionado.</p>"
+        items_html = f"<p style='color:#94a3b8; font-size:12px; margin-top:20px;'>Nenhum registro encontrado para o mês de {mes_comp_b}.</p>"
 
     st.markdown(
         f"""
@@ -904,25 +1048,15 @@ with ct3:
 
 st.markdown("---")
 
-# --- 4. VALORES E CHAMADOS MENSAL ---
+# --- 4. VALORES E CHAMADOS MENSAL (ANO TODO) ---
 g1, g2 = st.columns(2)
-months_valid = [
-    "Janeiro",
-    "Fevereiro",
-    "Março",
-    "Abril",
-    "Maio",
-    "Junho",
-    "Julho",
-    "Agosto",
-    "Setembro",
-]
 
 with g1:
+    # Mostra o histórico anual completo
     ch_mes = (
-        filtered_df.groupby("Mês_Clean")["Problemas"]
+        df.groupby("Mês_Clean")["Problemas"]
         .count()
-        .reindex(months_valid)
+        .reindex(months_choices)
         .fillna(0)
         .reset_index()
     )
@@ -936,17 +1070,18 @@ with g1:
     )
     fig_ch.update_traces(marker=dict(line=dict(width=0)))
     fig_ch = apply_powerbi_theme(
-        fig_ch, title="Chamados por Mês", height=320
+        fig_ch, title="Chamados por Mês (Ano Todo)", height=320
     )
     fig_ch.update_xaxes(title_text="")
     fig_ch.update_yaxes(title_text="Chamados")
     st.plotly_chart(fig_ch, use_container_width=True)
 
 with g2:
+    # Mostra o histórico anual completo
     val_mes = (
-        filtered_df.groupby("Mês_Clean")["Valor"]
+        df.groupby("Mês_Clean")["Valor"]
         .sum()
-        .reindex(months_valid)
+        .reindex(months_choices)
         .fillna(0)
         .reset_index()
     )
@@ -959,7 +1094,7 @@ with g2:
     )
     fig_val.update_traces(marker=dict(line=dict(width=0)))
     fig_val = apply_powerbi_theme(
-        fig_val, title="Valores Devolvidos por Mês em R$", height=320
+        fig_val, title="Valores Devolvidos por Mês em R$ (Ano Todo)", height=320
     )
     fig_val.update_xaxes(title_text="")
     fig_val.update_yaxes(title_text="Reembolso (R$)")
@@ -1010,10 +1145,11 @@ d1, d2 = st.columns(2)
 
 with d1:
     st.markdown("**Top Devoluções (R$) - Filtro de Mês Dinâmico**")
+    # Inicia com o MÊS ATUAL selecionado
     dev_month_selected = st.selectbox(
         "Mudar Mês (Top Devoluções)",
         months_order,
-        index=0,
+        index=idx_mes_atual,
         key="dev_month_filter",
     )
 
@@ -1047,18 +1183,27 @@ with d1:
 
 with d2:
     st.markdown(
-        "**Top 10 Locais Internos - Filtro de Dia Dinâmico**"
+        "**Top 10 Locais Internos - Filtro de Dia (Calendário)**"
     )
-    day_selected_loc = st.selectbox(
-        "Mudar Dia (Top Locais)", days_list, index=0, key="day_loc_filter"
+    day_selected_loc = st.date_input(
+        "Mudar Dia (Top Locais):",
+        value=hoje,
+        min_value=min_data_calendario,
+        max_value=max_data_calendario,
+        format="DD/MM/YYYY",
+        key="day_loc_calendar",
     )
 
     day_df = df.copy()
-    if day_selected_loc != "Todos":
-        day_df = day_df[day_df["Data_Str"] == day_selected_loc]
+    day_str_target = day_selected_loc.strftime("%d/%m/%Y")
+    day_df = day_df[
+        (day_df["Data_Date"] == day_selected_loc)
+        | (day_df["Data_Str"] == day_str_target)
+    ]
 
     dia_loc = day_df["Local Interno"].value_counts().head(10).reset_index()
     dia_loc.columns = ["Local Interno", "Chamados"]
+
     fig_dia = px.bar(
         dia_loc,
         x="Chamados",
@@ -1071,7 +1216,7 @@ with d2:
     fig_dia.update_layout(yaxis=dict(autorange="reversed"))
     fig_dia = apply_powerbi_theme(
         fig_dia,
-        title=f"Top 10 Locais no Dia — {day_selected_loc}",
+        title=f"Top 10 Locais no Dia — {day_str_target}",
         height=320,
     )
     st.plotly_chart(fig_dia, use_container_width=True)
@@ -1087,8 +1232,12 @@ tab_mes_view, tab_dia_view = st.tabs(
 with tab_mes_view:
     c_m1, c_m2 = st.columns([1, 2])
     with c_m1:
+        # Inicia com o MÊS ATUAL selecionado
         month_for_table = st.selectbox(
-            "📅 Selecionar Mês:", months_order, index=9, key="tb_month_filter"
+            "📅 Selecionar Mês:",
+            months_order,
+            index=idx_mes_atual,
+            key="tb_month_filter",
         )
 
     month_df = df.copy()
@@ -1147,18 +1296,28 @@ with tab_mes_view:
                 hide_index=True,
             )
     else:
-        st.warning("Nenhum registro encontrado para o mês selecionado.")
+        st.warning(f"Nenhum registro encontrado para o mês de {month_for_table}.")
 
 with tab_dia_view:
-    c_d1, c_d2 = st.columns([1, 2])
+    c_d1, c_d2 = st.columns([1.2, 1.8])
+
     with c_d1:
-        day_for_table = st.selectbox(
-            "📆 Selecionar Dia:", days_list, index=0, key="tb_day_filter"
+        # Calendário com data atual selecionada por padrão
+        chosen_calendar_date = st.date_input(
+            "📆 Selecionar Data no Calendário:",
+            value=hoje,
+            min_value=min_data_calendario,
+            max_value=max_data_calendario,
+            format="DD/MM/YYYY",
+            key="tb_day_calendar",
         )
 
     day_df_tb = df.copy()
-    if day_for_table != "Todos":
-        day_df_tb = day_df_tb[day_df_tb["Data_Str"] == day_for_table]
+    day_str_operacional = chosen_calendar_date.strftime("%d/%m/%Y")
+    day_df_tb = day_df_tb[
+        (day_df_tb["Data_Date"] == chosen_calendar_date)
+        | (day_df_tb["Data_Str"] == day_str_operacional)
+    ]
 
     top_3_day_locals = (
         day_df_tb["Local Interno"].value_counts().head(3).index.tolist()
@@ -1190,7 +1349,7 @@ with tab_dia_view:
                     local_item = top_3_day_locals[idx]
                     tb_local_d = get_day_local_table(local_item)
                     st.markdown(
-                        f"**Registros do Local no Dia ({day_for_table}):**"
+                        f"**Registros do Local na Data ({day_str_operacional}):**"
                         f" `{local_item}`"
                     )
                     st.dataframe(
@@ -1203,7 +1362,7 @@ with tab_dia_view:
         else:
             tb_single_d = get_day_local_table(selected_top_local_d)
             st.markdown(
-                f"**Registros do Local no Dia ({day_for_table}):**"
+                f"**Registros do Local na Data ({day_str_operacional}):**"
                 f" `{selected_top_local_d}`"
             )
             st.dataframe(
@@ -1212,4 +1371,4 @@ with tab_dia_view:
                 hide_index=True,
             )
     else:
-        st.warning("Nenhum registro encontrado para o dia selecionado.")
+        st.warning(f"Nenhum registro encontrado para a data {day_str_operacional}.")
