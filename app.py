@@ -580,7 +580,7 @@ top_problema = (
     else "-"
 )
 
-# --- BOTÃO DE GERAR RELATÓRIO PDF MOVIDO PARA A BARRA LATERAL ---
+# --- BOTÃO DE GERAR RELATÓRIO PDF NA BARRA LATERAL ---
 st.sidebar.markdown("---")
 st.sidebar.subheader("📄 Relatório Executivo")
 
@@ -862,14 +862,26 @@ with g2:
     fig_val.update_yaxes(title_text="Reembolso (R$)")
     st.plotly_chart(fig_val, use_container_width=True)
 
-# --- 5. GRÁFICOS DIÁRIOS (CHAMADOS E VALORES POR DIA) ---
+# --- 5. GRÁFICOS DIÁRIOS (CHAMADOS E VALORES POR DIA COM FILTRO DINÂMICO DE MÊS) ---
 st.markdown("---")
 st.markdown("### 📈 Evolução Diária de Chamados e Valores")
 
-col_dia_graf1, col_dia_graf2 = st.columns(2)
+# Filtro Dinâmico de Mês para os Gráficos Diários com o Mês Atual pré-selecionado
+c_filtro_m1, _ = st.columns([1.2, 2.8])
+with c_filtro_m1:
+    mes_graf_diario = st.selectbox(
+        "📅 Filtrar Mês dos Gráficos Diários:",
+        months_order,
+        index=idx_mes_atual,
+        key="filtro_mes_graficos_diarios"
+    )
 
-# Agrupamento temporal diário
+# Filtra a base temporal conforme o mês selecionado
 df_datas_validas = filtered_df[filtered_df["Data_Date"].notna()].copy()
+if mes_graf_diario != "Todos":
+    df_datas_validas = df_datas_validas[df_datas_validas["Mês_Clean"] == mes_graf_diario]
+
+col_dia_graf1, col_dia_graf2 = st.columns(2)
 
 with col_dia_graf1:
     if not df_datas_validas.empty:
@@ -881,6 +893,8 @@ with col_dia_graf1:
         )
         ch_por_dia["Data_Formatada"] = ch_por_dia["Data_Date"].apply(lambda d: d.strftime("%d/%m/%Y"))
 
+        titulo_ch_dia = f"Quantidade de Chamados por Dia ({mes_graf_diario})" if mes_graf_diario != "Todos" else "Quantidade de Chamados por Dia (Período Completo)"
+
         fig_dia_ch = px.bar(
             ch_por_dia,
             x="Data_Formatada",
@@ -890,13 +904,13 @@ with col_dia_graf1:
         )
         fig_dia_ch.update_traces(marker=dict(line=dict(width=0)))
         fig_dia_ch = apply_powerbi_theme(
-            fig_dia_ch, title="Quantidade de Chamados por Dia", height=340
+            fig_dia_ch, title=titulo_ch_dia, height=340
         )
         fig_dia_ch.update_xaxes(title_text="Data", tickangle=-45)
         fig_dia_ch.update_yaxes(title_text="Qtd Chamados")
         st.plotly_chart(fig_dia_ch, use_container_width=True)
     else:
-        st.info("Sem dados com datas válidas para exibir o gráfico diário.")
+        st.info(f"Sem dados de chamados registrados para o mês de {mes_graf_diario}.")
 
 with col_dia_graf2:
     if not df_datas_validas.empty:
@@ -908,6 +922,8 @@ with col_dia_graf2:
         )
         val_por_dia["Data_Formatada"] = val_por_dia["Data_Date"].apply(lambda d: d.strftime("%d/%m/%Y"))
 
+        titulo_val_dia = f"Valores Devolvidos por Dia em R$ ({mes_graf_diario})" if mes_graf_diario != "Todos" else "Valores Devolvidos por Dia em R$ (Período Completo)"
+
         fig_dia_val = px.bar(
             val_por_dia,
             x="Data_Formatada",
@@ -917,13 +933,13 @@ with col_dia_graf2:
         )
         fig_dia_val.update_traces(marker=dict(line=dict(width=0)))
         fig_dia_val = apply_powerbi_theme(
-            fig_dia_val, title="Valores Devolvidos por Dia (R$)", height=340
+            fig_dia_val, title=titulo_val_dia, height=340
         )
         fig_dia_val.update_xaxes(title_text="Data", tickangle=-45)
         fig_dia_val.update_yaxes(title_text="Total Reembolsado (R$)")
         st.plotly_chart(fig_dia_val, use_container_width=True)
     else:
-        st.info("Sem dados com datas válidas para exibir o gráfico diário.")
+        st.info(f"Sem valores devolvidos registrados para o mês de {mes_graf_diario}.")
 
 # --- 6. RANKINGS ANUAIS ---
 r1, r2 = st.columns(2)
@@ -1143,7 +1159,7 @@ tab_chamados_dia, tab_mes_cli, tab_dia_cli, tab_mes_top3, tab_dia_top3 = st.tabs
     ]
 )
 
-# --- ABA NOVA: TABELA DE CHAMADOS POR DIA (COM LOCAIS, DESCRIÇÃO, PROBLEMA E QUANTIDADE) ---
+# --- ABA: TABELA DE CHAMADOS POR DIA (COM LOCAIS, DESCRIÇÃO, PROBLEMA E QUANTIDADE) ---
 with tab_chamados_dia:
     st.markdown("#### Chamados por Dia — Detalhamento por Local Interno, Descrição e Problema")
     
