@@ -862,7 +862,7 @@ with g2:
     fig_val.update_yaxes(title_text="Reembolso (R$)")
     st.plotly_chart(fig_val, use_container_width=True)
 
-# --- 5. GRÁFICOS DIÁRIOS (CHAMADOS E VALORES POR DIA COM FILTRO DINÂMICO DE MÊS) ---
+# --- 5. GRÁFICOS DIÁRIOS (CHAMADOS E VALORES POR DIA COM ORDENAÇÃO CRONOLÓGICA PERFEITA) ---
 st.markdown("---")
 st.markdown("### 📈 Evolução Diária de Chamados e Valores")
 
@@ -885,13 +885,15 @@ col_dia_graf1, col_dia_graf2 = st.columns(2)
 
 with col_dia_graf1:
     if not df_datas_validas.empty:
+        # Agrupamento rigorosamente ordenado pela data real
         ch_por_dia = (
             df_datas_validas.groupby("Data_Date")
             .size()
             .reset_index(name="Quantidade de Chamados")
-            .sort_values(by="Data_Date")
+            .sort_values(by="Data_Date", ascending=True)
         )
         ch_por_dia["Data_Formatada"] = ch_por_dia["Data_Date"].apply(lambda d: d.strftime("%d/%m/%Y"))
+        ordem_cronologica_dias = ch_por_dia["Data_Formatada"].tolist()
 
         titulo_ch_dia = f"Quantidade de Chamados por Dia ({mes_graf_diario})" if mes_graf_diario != "Todos" else "Quantidade de Chamados por Dia (Período Completo)"
 
@@ -901,12 +903,20 @@ with col_dia_graf1:
             y="Quantidade de Chamados",
             text="Quantidade de Chamados",
             color_discrete_sequence=["#38bdf8"],
+            category_orders={"Data_Formatada": ordem_cronologica_dias},
         )
         fig_dia_ch.update_traces(marker=dict(line=dict(width=0)))
         fig_dia_ch = apply_powerbi_theme(
             fig_dia_ch, title=titulo_ch_dia, height=340
         )
-        fig_dia_ch.update_xaxes(title_text="Data", tickangle=-45)
+        # Fixa a ordem das categorias como lista ordenada exata
+        fig_dia_ch.update_xaxes(
+            title_text="Data",
+            tickangle=-45,
+            type="category",
+            categoryorder="array",
+            categoryarray=ordem_cronologica_dias
+        )
         fig_dia_ch.update_yaxes(title_text="Qtd Chamados")
         st.plotly_chart(fig_dia_ch, use_container_width=True)
     else:
@@ -914,13 +924,15 @@ with col_dia_graf1:
 
 with col_dia_graf2:
     if not df_datas_validas.empty:
+        # Agrupamento rigorosamente ordenado pela data real
         val_por_dia = (
             df_datas_validas.groupby("Data_Date")["Valor"]
             .sum()
             .reset_index(name="Valor Devolvido")
-            .sort_values(by="Data_Date")
+            .sort_values(by="Data_Date", ascending=True)
         )
         val_por_dia["Data_Formatada"] = val_por_dia["Data_Date"].apply(lambda d: d.strftime("%d/%m/%Y"))
+        ordem_cronologica_dias_val = val_por_dia["Data_Formatada"].tolist()
 
         titulo_val_dia = f"Valores Devolvidos por Dia em R$ ({mes_graf_diario})" if mes_graf_diario != "Todos" else "Valores Devolvidos por Dia em R$ (Período Completo)"
 
@@ -930,12 +942,20 @@ with col_dia_graf2:
             y="Valor Devolvido",
             text_auto=".2f",
             color_discrete_sequence=["#10b981"],
+            category_orders={"Data_Formatada": ordem_cronologica_dias_val},
         )
         fig_dia_val.update_traces(marker=dict(line=dict(width=0)))
         fig_dia_val = apply_powerbi_theme(
             fig_dia_val, title=titulo_val_dia, height=340
         )
-        fig_dia_val.update_xaxes(title_text="Data", tickangle=-45)
+        # Fixa a ordem das categorias como lista ordenada exata
+        fig_dia_val.update_xaxes(
+            title_text="Data",
+            tickangle=-45,
+            type="category",
+            categoryorder="array",
+            categoryarray=ordem_cronologica_dias_val
+        )
         fig_dia_val.update_yaxes(title_text="Total Reembolsado (R$)")
         st.plotly_chart(fig_dia_val, use_container_width=True)
     else:
