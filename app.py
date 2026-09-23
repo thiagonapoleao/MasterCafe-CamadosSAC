@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
 import io
+import os
 import pandas as pd
 import plotly.express as px
 from reportlab.lib import colors
@@ -60,7 +61,7 @@ st.markdown(
 
     /* Cards de KPI no padrão Power BI Card Visual */
     .stMetric { 
-        background-color: #ffffff !important; 
+        background-color: #1e293b !important; 
         padding: 18px !important; 
         border-radius: 8px !important; 
         border: 1px solid #334155 !important;
@@ -399,7 +400,6 @@ def generate_full_pdf_report(
     elements.append(t_mes_tab)
     elements.append(Spacer(1, 14))
 
-    # Constrói o PDF com canvas de numeração de páginas
     doc.build(elements, canvasmaker=NumberedCanvas)
     buffer.seek(0)
     return buffer.getvalue()
@@ -414,7 +414,6 @@ def load_data():
 
     df = pd.read_csv(url)
 
-    # Parser inteligente de datas
     def parse_smart_date(val):
         if pd.isna(val):
             return None
@@ -422,7 +421,7 @@ def load_data():
         if not val_str or val_str.lower() in ["nan", "none", "nat", ""]:
             return None
 
-        # 1. Se for número de série do Excel
+        # 1. Número de série do Excel
         try:
             val_num = float(val_str)
             if 35000 <= val_num <= 65000:
@@ -430,7 +429,7 @@ def load_data():
         except (ValueError, TypeError):
             pass
 
-        # 2. Se for texto, limpa horário
+        # 2. String de data
         data_pura = val_str.split(" ")[0].split("T")[0].strip()
 
         for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d/%m/%y", "%d-%m-%Y"):
@@ -439,7 +438,7 @@ def load_data():
             except ValueError:
                 continue
 
-        # 3. Fallback com o pandas
+        # 3. Fallback Pandas
         try:
             dt = pd.to_datetime(data_pura, dayfirst=True, errors="coerce")
             if pd.notna(dt):
@@ -529,26 +528,16 @@ def load_data():
 
 df = load_data()
 
-# Data atual e limites seguros de navegação no calendário
+# Limites seguros do calendário
 hoje = datetime.now().date()
 datas_validas = df["Data_Date"].dropna()
 min_data_calendario = min(datas_validas.min(), hoje) if not datas_validas.empty else hoje
 max_data_calendario = max(datas_validas.max(), hoje) if not datas_validas.empty else hoje
 
-# --- MAPEAMENTO E CÁLCULO DO MÊS ATUAL E ANTERIOR ---
+# Mapeamento do Mês Atual e Anterior
 meses_do_ano = {
-    1: "Janeiro",
-    2: "Fevereiro",
-    3: "Março",
-    4: "Abril",
-    5: "Maio",
-    6: "Junho",
-    7: "Julho",
-    8: "Agosto",
-    9: "Setembro",
-    10: "Outubro",
-    11: "Novembro",
-    12: "Dezembro",
+    1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril", 5: "Maio", 6: "Junho",
+    7: "Julho", 8: "Agosto", 9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro",
 }
 mes_atual_num = datetime.now().month
 mes_atual_nome = meses_do_ano.get(mes_atual_num, "Janeiro")
@@ -556,29 +545,14 @@ mes_anterior_num = 12 if mes_atual_num == 1 else mes_atual_num - 1
 mes_anterior_nome = meses_do_ano.get(mes_anterior_num, "Dezembro")
 
 months_order = [
-    "Todos",
-    "Janeiro",
-    "Fevereiro",
-    "Março",
-    "Abril",
-    "Maio",
-    "Junho",
-    "Julho",
-    "Agosto",
-    "Setembro",
-    "Outubro",
-    "Novembro",
-    "Dezembro",
+    "Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ]
 
-# Índice padrão para os seletores com Mês Atual
-if mes_atual_nome in months_order:
-    idx_mes_atual = months_order.index(mes_atual_nome)
-else:
-    idx_mes_atual = len(months_order) - 1
+idx_mes_atual = months_order.index(mes_atual_nome) if mes_atual_nome in months_order else len(months_order) - 1
 
-# --- FILTROS EXECUTIVOS NA BARRA LATERAL (APENAS O ANO) ---
-st.sidebar.title("⚙️ Filtros Executivos")
+# --- FILTROS EXECUTIVOS NA BARRA LATERAL ---
+st.sidebar.title("⚙️ Filtros & Ações")
 
 anos_disponiveis = sorted(
     [str(a) for a in df["Ano"].unique() if str(a) not in ["Não informado", "nan", "None", ""]],
@@ -592,20 +566,7 @@ filtered_df = df.copy()
 if selected_year != "Todos":
     filtered_df = filtered_df[filtered_df["Ano"] == selected_year]
 
-# --- CABEÇALHO & BOTÃO GERAR RELATÓRIO COMPLETO EM PDF ---
-col_head, col_btn = st.columns([3.3, 1.2])
-
-with col_head:
-    st.markdown(
-        """
-        <div class="header-card">
-            <div class="header-title">☕ Master Café — Dashboard Executivo SAC</div>
-            <div class="header-subtitle">Painel de Gestão da Qualidade, Atendimento e Reembolsos Financeiros</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
+# Variáveis globais de métricas
 total_chamados = len(filtered_df)
 total_devolvido = filtered_df["Valor"].sum()
 top_cliente = (
@@ -618,6 +579,10 @@ top_problema = (
     if len(filtered_df) > 0
     else "-"
 )
+
+# --- BOTÃO DE GERAR RELATÓRIO PDF MOVIDO PARA A BARRA LATERAL ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("📄 Relatório Executivo")
 
 active_filters_dict = {
     "ano": selected_year,
@@ -632,16 +597,29 @@ pdf_full_bytes = generate_full_pdf_report(
     active_filters_dict,
 )
 
-with col_btn:
-    st.write("")
-    st.download_button(
-        label="📥 Gerar Relatório Completo (PDF)",
-        data=pdf_full_bytes,
-        file_name=f"Relatorio_Executivo_SAC_MasterCafe_{selected_year}.pdf",
-        mime="application/pdf",
-        help="Exportar dados completos consolidados em formato PDF",
-        use_container_width=True,
-    )
+st.sidebar.download_button(
+    label="📥 Gerar Relatório Completo (PDF)",
+    data=pdf_full_bytes,
+    file_name=f"Relatorio_Executivo_SAC_MasterCafe_{selected_year}.pdf",
+    mime="application/pdf",
+    help="Exportar dados consolidados em formato PDF",
+    use_container_width=True,
+)
+
+if st.sidebar.button("🔄 Atualizar Dados", use_container_width=True):
+    st.cache_data.clear()
+    st.rerun()
+
+# --- CABEÇALHO PRINCIPAL ---
+st.markdown(
+    """
+    <div class="header-card">
+        <div class="header-title">☕ Master Café — Dashboard Executivo SAC</div>
+        <div class="header-subtitle">Painel de Gestão da Qualidade, Atendimento e Reembolsos Financeiros</div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # --- 1. CARDS DE KPIS ---
 c1, c2, c3, c4 = st.columns(4)
@@ -694,7 +672,7 @@ with i3:
         unsafe_allow_html=True,
     )
 
-# --- 3. DESTAQUES MÊS A MÊS COM FILTROS DE COMPARAÇÃO (MÊS ANTERIOR VS ATUAL) ---
+# --- 3. DESTAQUES MÊS A MÊS COM FILTROS DE COMPARAÇÃO ---
 st.markdown("### 📌 Destaques Mês a Mês & Locais Críticos")
 
 months_choices = [
@@ -884,7 +862,70 @@ with g2:
     fig_val.update_yaxes(title_text="Reembolso (R$)")
     st.plotly_chart(fig_val, use_container_width=True)
 
-# --- 5. RANKINGS ANUAIS ---
+# --- 5. GRÁFICOS DIÁRIOS (CHAMADOS E VALORES POR DIA) ---
+st.markdown("---")
+st.markdown("### 📈 Evolução Diária de Chamados e Valores")
+
+col_dia_graf1, col_dia_graf2 = st.columns(2)
+
+# Agrupamento temporal diário
+df_datas_validas = filtered_df[filtered_df["Data_Date"].notna()].copy()
+
+with col_dia_graf1:
+    if not df_datas_validas.empty:
+        ch_por_dia = (
+            df_datas_validas.groupby("Data_Date")
+            .size()
+            .reset_index(name="Quantidade de Chamados")
+            .sort_values(by="Data_Date")
+        )
+        ch_por_dia["Data_Formatada"] = ch_por_dia["Data_Date"].apply(lambda d: d.strftime("%d/%m/%Y"))
+
+        fig_dia_ch = px.bar(
+            ch_por_dia,
+            x="Data_Formatada",
+            y="Quantidade de Chamados",
+            text="Quantidade de Chamados",
+            color_discrete_sequence=["#38bdf8"],
+        )
+        fig_dia_ch.update_traces(marker=dict(line=dict(width=0)))
+        fig_dia_ch = apply_powerbi_theme(
+            fig_dia_ch, title="Quantidade de Chamados por Dia", height=340
+        )
+        fig_dia_ch.update_xaxes(title_text="Data", tickangle=-45)
+        fig_dia_ch.update_yaxes(title_text="Qtd Chamados")
+        st.plotly_chart(fig_dia_ch, use_container_width=True)
+    else:
+        st.info("Sem dados com datas válidas para exibir o gráfico diário.")
+
+with col_dia_graf2:
+    if not df_datas_validas.empty:
+        val_por_dia = (
+            df_datas_validas.groupby("Data_Date")["Valor"]
+            .sum()
+            .reset_index(name="Valor Devolvido")
+            .sort_values(by="Data_Date")
+        )
+        val_por_dia["Data_Formatada"] = val_por_dia["Data_Date"].apply(lambda d: d.strftime("%d/%m/%Y"))
+
+        fig_dia_val = px.bar(
+            val_por_dia,
+            x="Data_Formatada",
+            y="Valor Devolvido",
+            text_auto=".2f",
+            color_discrete_sequence=["#10b981"],
+        )
+        fig_dia_val.update_traces(marker=dict(line=dict(width=0)))
+        fig_dia_val = apply_powerbi_theme(
+            fig_dia_val, title="Valores Devolvidos por Dia (R$)", height=340
+        )
+        fig_dia_val.update_xaxes(title_text="Data", tickangle=-45)
+        fig_dia_val.update_yaxes(title_text="Total Reembolsado (R$)")
+        st.plotly_chart(fig_dia_val, use_container_width=True)
+    else:
+        st.info("Sem dados com datas válidas para exibir o gráfico diário.")
+
+# --- 6. RANKINGS ANUAIS ---
 r1, r2 = st.columns(2)
 
 with r1:
@@ -923,10 +964,9 @@ with r2:
     )
     st.plotly_chart(fig_loc, use_container_width=True)
 
-# --- 6. FILTROS DINÂMICOS LOCAIS ---
+# --- 7. FILTROS DINÂMICOS LOCAIS ---
 st.markdown("---")
 
-# PARTE 6.1: TOP DEVOLUÇÕES (R$) — MÊS E DIA LADO A LADO
 dev_col1, dev_col2 = st.columns(2)
 
 with dev_col1:
@@ -1008,7 +1048,6 @@ with dev_col2:
     )
     st.plotly_chart(fig_dev_d, use_container_width=True)
 
-# PARTE 6.2: TOP LOCAIS POR NÚMERO DE CHAMADOS — MÊS E DIA LADO A LADO
 loc_col1, loc_col2 = st.columns(2)
 
 with loc_col1:
@@ -1082,7 +1121,7 @@ with loc_col2:
     )
     st.plotly_chart(fig_dia, use_container_width=True)
 
-# --- 7. TABELAS DETALHADAS OPERACIONAIS ---
+# --- 8. TABELAS DETALHADAS OPERACIONAIS ---
 st.markdown("---")
 st.markdown("### 📅 Detalhamento Operacional de Registros")
 
@@ -1094,14 +1133,75 @@ lista_clientes_dinamica = ["Todos"] + sorted(
     ]
 )
 
-tab_mes_cli, tab_dia_cli, tab_mes_top3, tab_dia_top3 = st.tabs(
+tab_chamados_dia, tab_mes_cli, tab_dia_cli, tab_mes_top3, tab_dia_top3 = st.tabs(
     [
+        "📋 Chamados por Dia (Completa)",
         "Por Mês e Cliente", 
         "Por Data e Cliente", 
         "Por Mês (Top 3 Locais)", 
         "Por Dia (Top 3 Locais)"
     ]
 )
+
+# --- ABA NOVA: TABELA DE CHAMADOS POR DIA (COM LOCAIS, DESCRIÇÃO, PROBLEMA E QUANTIDADE) ---
+with tab_chamados_dia:
+    st.markdown("#### Chamados por Dia — Detalhamento por Local Interno, Descrição e Problema")
+    
+    col_d_sel1, col_d_sel2 = st.columns([1, 2])
+    with col_d_sel1:
+        data_analitica_sel = st.date_input(
+            "📆 Escolha o Dia para Detalhar:",
+            value=hoje,
+            min_value=min_data_calendario,
+            max_value=max_data_calendario,
+            format="DD/MM/YYYY",
+            key="tb_dia_detalhado_calendar"
+        )
+    with col_d_sel2:
+        filtro_opc_loc = st.selectbox(
+            "Filtrar Local Interno (Opcional):",
+            ["Todos"] + sorted(filtered_df["Local Interno"].dropna().unique().tolist()),
+            key="tb_dia_detalhado_loc_filtro"
+        )
+
+    df_analitico_dia = filtered_df.copy()
+    data_analitica_str = data_analitica_sel.strftime("%d/%m/%Y")
+    
+    df_analitico_dia = df_analitico_dia[
+        (df_analitico_dia["Data_Date"] == data_analitica_sel) |
+        (df_analitico_dia["Data_Str"] == data_analitica_str)
+    ]
+    
+    if filtro_opc_loc != "Todos":
+        df_analitico_dia = df_analitico_dia[df_analitico_dia["Local Interno"] == filtro_opc_loc]
+
+    if not df_analitico_dia.empty:
+        tabela_detalhada = (
+            df_analitico_dia.groupby(["Local Interno", "Descrição", "Problemas"])
+            .agg(
+                Quantidade=("Valor", "count"),
+                Total_Reembolso=("Valor", "sum")
+            )
+            .reset_index()
+            .sort_values(by="Quantidade", ascending=False)
+            .rename(columns={"Problemas": "Problema", "Quantidade": "Quantidade de Chamados"})
+        )
+        
+        tabela_detalhada.insert(0, "Data", data_analitica_str)
+
+        st.markdown(
+            f"**Exibindo registros da data:** `{data_analitica_str}` | "
+            f"**Total de chamados no dia:** `{tabela_detalhada['Quantidade de Chamados'].sum()}` | "
+            f"**Total reembolsado:** `R$ {tabela_detalhada['Total_Reembolso'].sum():,.2f}`".replace(",", "v").replace(".", ",").replace("v", ".")
+        )
+
+        st.dataframe(
+            tabela_detalhada[["Data", "Local Interno", "Descrição", "Problema", "Quantidade de Chamados"]],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.warning(f"Nenhum chamado encontrado para a data '{data_analitica_str}'.")
 
 # --- ABA 1: POR MÊS E CLIENTE ---
 with tab_mes_cli:
