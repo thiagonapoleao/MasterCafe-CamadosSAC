@@ -862,7 +862,50 @@ with g2:
     fig_val.update_yaxes(title_text="Reembolso (R$)")
     st.plotly_chart(fig_val, use_container_width=True)
 
-# --- 5. GRÁFICOS DIÁRIOS (CHAMADOS E VALORES POR DIA COM ORDENAÇÃO CRONOLÓGICA PERFEITA) ---
+
+
+# --- 5. RANKINGS ANUAIS ---
+st.markdown("---")
+r1, r2 = st.columns(2)
+
+with r1:
+    t10_cli = filtered_df["Cliente"].value_counts().head(10).reset_index()
+    t10_cli.columns = ["Cliente", "Chamados"]
+    fig_cli = px.bar(
+        t10_cli,
+        x="Chamados",
+        y="Cliente",
+        orientation="h",
+        text="Chamados",
+        color_discrete_sequence=["#6366f1"],
+    )
+    fig_cli.update_traces(marker=dict(line=dict(width=0)))
+    fig_cli.update_layout(yaxis=dict(autorange="reversed"))
+    fig_cli = apply_powerbi_theme(
+        fig_cli, title="Top 10 Clientes do Período", height=350
+    )
+    st.plotly_chart(fig_cli, use_container_width=True)
+
+with r2:
+    t10_loc = filtered_df["Local Interno"].value_counts().head(10).reset_index()
+    t10_loc.columns = ["Local Interno", "Chamados"]
+    fig_loc = px.bar(
+        t10_loc,
+        x="Chamados",
+        y="Local Interno",
+        orientation="h",
+        text="Chamados",
+        color_discrete_sequence=["#14b8a6"],
+    )
+    fig_loc.update_traces(marker=dict(line=dict(width=0)))
+    fig_loc.update_layout(yaxis=dict(autorange="reversed"))
+    fig_loc = apply_powerbi_theme(
+        fig_loc, title="Top 10 Locais Internos do Período", height=350
+    )
+    st.plotly_chart(fig_loc, use_container_width=True)
+
+
+# --- 6. GRÁFICOS DIÁRIOS (CHAMADOS E VALORES POR DIA COM ORDENAÇÃO CRONOLÓGICA PERFEITA) ---
 st.markdown("---")
 
 # Filtro Dinâmico de Mês para os Gráficos Diários com o Mês Atual pré-selecionado
@@ -959,45 +1002,6 @@ with col_dia_graf2:
         st.plotly_chart(fig_dia_val, use_container_width=True)
     else:
         st.info(f"Sem valores devolvidos registrados para o mês de {mes_graf_diario}.")
-
-# --- 6. RANKINGS ANUAIS ---
-r1, r2 = st.columns(2)
-
-with r1:
-    t10_cli = filtered_df["Cliente"].value_counts().head(10).reset_index()
-    t10_cli.columns = ["Cliente", "Chamados"]
-    fig_cli = px.bar(
-        t10_cli,
-        x="Chamados",
-        y="Cliente",
-        orientation="h",
-        text="Chamados",
-        color_discrete_sequence=["#6366f1"],
-    )
-    fig_cli.update_traces(marker=dict(line=dict(width=0)))
-    fig_cli.update_layout(yaxis=dict(autorange="reversed"))
-    fig_cli = apply_powerbi_theme(
-        fig_cli, title="Top 10 Clientes do Período", height=350
-    )
-    st.plotly_chart(fig_cli, use_container_width=True)
-
-with r2:
-    t10_loc = filtered_df["Local Interno"].value_counts().head(10).reset_index()
-    t10_loc.columns = ["Local Interno", "Chamados"]
-    fig_loc = px.bar(
-        t10_loc,
-        x="Chamados",
-        y="Local Interno",
-        orientation="h",
-        text="Chamados",
-        color_discrete_sequence=["#14b8a6"],
-    )
-    fig_loc.update_traces(marker=dict(line=dict(width=0)))
-    fig_loc.update_layout(yaxis=dict(autorange="reversed"))
-    fig_loc = apply_powerbi_theme(
-        fig_loc, title="Top 10 Locais Internos do Período", height=350
-    )
-    st.plotly_chart(fig_loc, use_container_width=True)
 
 # --- 7. FILTROS DINÂMICOS LOCAIS ---
 st.markdown("---")
