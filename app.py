@@ -864,7 +864,6 @@ with g2:
 
 # --- 5. GRÁFICOS DIÁRIOS (CHAMADOS E VALORES POR DIA COM ORDENAÇÃO CRONOLÓGICA PERFEITA) ---
 st.markdown("---")
-st.markdown("### 📈 Evolução Diária de Chamados e Valores")
 
 # Filtro Dinâmico de Mês para os Gráficos Diários com o Mês Atual pré-selecionado
 c_filtro_m1, _ = st.columns([1.2, 2.8])
