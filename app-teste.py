@@ -265,7 +265,7 @@ def generate_full_pdf_report(
     )
 
     # 2. Quadro de Filtros Ativos
-    filtros_txt = f"<b>Filtros Atuais Aplicados:</b> Ano: <code>{active_filters.get('ano', 'Todos')}</code>"
+    filtros_txt = f"<b>Escopo do Relatório:</b> Base Geral Consolidada"
     t_filtros = Table(
         [[Paragraph(filtros_txt, table_cell)]],
         colWidths=[540],
@@ -412,11 +412,17 @@ SHEET_BASE_ID = "1vOa6QpGPZ6rZ1doT2RRU1SAXWR5usPzv"
 
 @st.cache_data(ttl=600)
 def load_auxiliary_data():
-    """Carrega dados das abas Clientes, Parâmetros/Apoio e Usuários."""
+    """Carrega dados das abas Clientes, Parâmetros/Apoio e Usuários com mapeamento direto por colunas."""
     # 1. Clientes (gid=400904478): Coluna A: Cliente, B: Local Interno, F: Cidade
     url_clientes = f"https://docs.google.com/spreadsheets/d/{SHEET_BASE_ID}/export?format=csv&gid=400904478"
     try:
-        df_clientes = pd.read_csv(url_clientes)
+        df_raw_cli = pd.read_csv(url_clientes)
+        # Padroniza nomes com base no índice de colunas A=0, B=1, F=5
+        df_clientes = pd.DataFrame()
+        df_clientes["Cliente"] = df_raw_cli.iloc[:, 0].dropna().astype(str).str.strip()
+        df_clientes["Local Interno"] = df_raw_cli.iloc[:, 1].fillna("").astype(str).str.strip() if df_raw_cli.shape[1] > 1 else ""
+        df_clientes["Cidade"] = df_raw_cli.iloc[:, 5].fillna("").astype(str).str.strip() if df_raw_cli.shape[1] > 5 else ""
+        df_clientes = df_clientes[df_clientes["Cliente"] != ""]
     except Exception:
         df_clientes = pd.DataFrame(columns=["Cliente", "Local Interno", "Cidade"])
 
@@ -424,10 +430,9 @@ def load_auxiliary_data():
     url_apoio = f"https://docs.google.com/spreadsheets/d/{SHEET_BASE_ID}/export?format=csv&gid=1833376686"
     try:
         df_apoio = pd.read_csv(url_apoio, header=None)
-        # Identificação por índice caso não haja cabeçalho nomeado
-        formas_pagamento = df_apoio.iloc[:, 0].dropna().astype(str).str.strip().unique().tolist() if df_apoio.shape[1] > 0 else []
-        problemas_list = df_apoio.iloc[:, 11].dropna().astype(str).str.strip().unique().tolist() if df_apoio.shape[1] > 11 else []
-        descricao_list = df_apoio.iloc[:, 13].dropna().astype(str).str.strip().unique().tolist() if df_apoio.shape[1] > 13 else []
+        formas_pagamento = [str(x).strip() for x in df_apoio.iloc[:, 0].dropna().unique() if str(x).strip() and str(x).strip().lower() != "nan"] if df_apoio.shape[1] > 0 else []
+        problemas_list = [str(x).strip() for x in df_apoio.iloc[:, 11].dropna().unique() if str(x).strip() and str(x).strip().lower() != "nan"] if df_apoio.shape[1] > 11 else []
+        descricao_list = [str(x).strip() for x in df_apoio.iloc[:, 13].dropna().unique() if str(x).strip() and str(x).strip().lower() != "nan"] if df_apoio.shape[1] > 13 else []
     except Exception:
         formas_pagamento, problemas_list, descricao_list = [], [], []
 
@@ -446,7 +451,6 @@ def load_auxiliary_data():
 # --- CARREGAMENTO E PARSER UNIVERSAL DE DATA DO DASHBOARD ---
 @st.cache_data(ttl=600)
 def load_data():
-    # Link atualizado conforme solicitado: aba Dashboard (gid 1236624547)
     sheet_id = SHEET_BASE_ID
     gid = "1236624547"
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
@@ -581,18 +585,30 @@ def load_data():
 df = load_data()
 df_clientes_raw, opt_formas_pagamento, opt_problemas, opt_descricao, dict_usuarios = load_auxiliary_data()
 
-# --- NAVEGAÇÃO ENTRE ABAS PRINCIPAIS ---
-st.sidebar.title("📍 Navegação")
-menu_principal = st.sidebar.radio(
-    "Ir para:",
-    ["📊 Dashboard Executivo", "📝 Lançamento de Chamados (SAC)"],
-    index=0
-)
+# --- CONTROLE DE NAVEGAÇÃO LATERAL COM BOTÕES ---
+if "pagina_ativa" not in st.session_state:
+    st.session_state.pagina_ativa = "dashboard"
+
+st.sidebar.markdown("### 🧭 Menu Principal")
+
+col_btn1, col_btn2 = st.sidebar.columns(2)
+with col_btn1:
+    btn_dash = st.button("📊 Dashboard", use_container_width=True, type="primary" if st.session_state.pagina_ativa == "dashboard" else "secondary")
+with col_btn2:
+    btn_sac = st.button("📝 SAC", use_container_width=True, type="primary" if st.session_state.pagina_ativa == "sac" else "secondary")
+
+if btn_dash:
+    st.session_state.pagina_ativa = "dashboard"
+    st.rerun()
+
+if btn_sac:
+    st.session_state.pagina_ativa = "sac"
+    st.rerun()
 
 # ==============================================================================
-# 1. ABA DE LANÇAMENTO DE OCORRÊNCIAS DO SAC (COM LOGIN E FORMULÁRIO)
+# 1. ABA DE LANÇAMENTO DE OCORRÊNCIAS DO SAC (COM LOGIN E FORMULÁRIO DINÂMICO)
 # ==============================================================================
-if menu_principal == "📝 Lançamento de Chamados (SAC)":
+if st.session_state.pagina_ativa == "sac":
     st.markdown(
         """
         <div class="header-card">
@@ -644,122 +660,142 @@ if menu_principal == "📝 Lançamento de Chamados (SAC)":
         chamados_ano_count = len(df[df["Ano"] == ano_atual_str]) + 1 if not df.empty else 1
         num_chamado_gerado = f"SAC-{ano_atual_str}-{chamados_ano_count:04d}"
 
-        # Tratamento do DataFrame de Clientes
-        col_cli_name = df_clientes_raw.columns[0] if df_clientes_raw.shape[1] > 0 else "Cliente"
-        col_loc_name = df_clientes_raw.columns[1] if df_clientes_raw.shape[1] > 1 else "Local Interno"
-        col_cid_name = df_clientes_raw.columns[5] if df_clientes_raw.shape[1] > 5 else "Cidade"
+        # Lista de Clientes (Coluna A da aba Clientes)
+        lista_clientes = [""] + sorted(list(set(df_clientes_raw["Cliente"].dropna().tolist())))
 
-        lista_clientes_cadastrados = sorted(
-            [c for c in df_clientes_raw[col_cli_name].dropna().astype(str).str.strip().unique() if c]
-        ) if not df_clientes_raw.empty else []
+        st.markdown(f"### 📋 Novo Chamado: `{num_chamado_gerado}`")
 
-        # Formulário de Inserção de Ocorrência
-        with st.form("form_novo_chamado_sac"):
-            st.markdown(f"### 📋 Novo Chamado: `{num_chamado_gerado}`")
+        # 1. Identificação Básica
+        fc1, fc2, fc3 = st.columns([1.2, 1, 1])
+        with fc1:
+            st.text_input("Chamado (Gerado Automaticamente)", value=num_chamado_gerado, disabled=True)
+        with fc2:
+            data_chamado = st.date_input("Data do Chamado", value=datetime.now().date(), format="DD/MM/YYYY")
+        with fc3:
+            produto_sel = st.selectbox("Produto", ["", "Café", "Snaky"], index=0)
 
-            fc1, fc2, fc3 = st.columns([1.2, 1, 1])
-            with fc1:
-                st.text_input("Chamado (Gerado Automaticamente)", value=num_chamado_gerado, disabled=True)
-            with fc2:
-                data_chamado = st.date_input("Data do Chamado", value=datetime.now().date(), format="DD/MM/YYYY")
-            with fc3:
-                produto_sel = st.selectbox("Produto", ["Café", "Snaky"])
+        # 2. Cliente, Local Interno e Cidade (Cascata Dinâmica em Tempo Real)
+        st.markdown("#### 🏢 Informações do Cliente e Localização")
+        fc4, fc5, fc6 = st.columns(3)
+        with fc4:
+            cliente_sel = st.selectbox("Cliente", lista_clientes, index=0, key="sac_cliente_sel")
 
-            st.markdown("#### 🏢 Informações do Cliente e Localização")
-            fc4, fc5, fc6 = st.columns(3)
-            with fc4:
-                cliente_sel = st.selectbox(
-                    "Cliente",
-                    lista_clientes_cadastrados if lista_clientes_cadastrados else ["Nenhum cadastrado"]
-                )
-            
-            # Filtra Local Interno e Cidade com base no cliente selecionado
-            df_cli_filtrado = df_clientes_raw[df_clientes_raw[col_cli_name].astype(str).str.strip() == cliente_sel] if not df_clientes_raw.empty else pd.DataFrame()
-            locais_disponiveis = sorted(df_cli_filtrado[col_loc_name].dropna().astype(str).str.strip().unique().tolist()) if not df_cli_filtrado.empty else []
-            cidades_disponiveis = sorted(df_cli_filtrado[col_cid_name].dropna().astype(str).str.strip().unique().tolist()) if not df_cli_filtrado.empty else []
+        # Filtragem precisa de Local Interno e Cidade com base no cliente selecionado
+        locais_validos = [""]
+        if cliente_sel:
+            sub_cli = df_clientes_raw[df_clientes_raw["Cliente"] == cliente_sel]
+            locais_unicos = sorted([loc for loc in sub_cli["Local Interno"].dropna().unique() if str(loc).strip()])
+            locais_validos = [""] + locais_unicos
 
-            with fc5:
-                local_interno_sel = st.selectbox(
-                    "Local Interno",
-                    locais_disponiveis if locais_disponiveis else ["Padrão / Geral"]
-                )
-            with fc6:
-                cidade_sel = st.selectbox(
-                    "Cidade",
-                    cidades_disponiveis if cidades_disponiveis else ["Não informado"]
-                )
+        with fc5:
+            local_interno_sel = st.selectbox("Local Interno", locais_validos, index=0, key="sac_local_interno_sel")
 
-            st.markdown("#### ⚙️ Detalhamento do Ocorrido")
-            fc7, fc8 = st.columns(2)
-            with fc7:
-                problema_sel = st.selectbox(
-                    "Problema",
-                    opt_problemas if opt_problemas else ["Produto Enroscado", "Bebida Não Entregue", "Outros"]
-                )
-            with fc8:
-                descricao_sel = st.selectbox(
-                    "Descrição",
-                    opt_descricao if opt_descricao else ["Café Expresso", "Refrigerante", "Salgadinho", "Outros"]
-                )
+        # Cidade vinculada ao Local Interno selecionado
+        cidade_sugerida = ""
+        if cliente_sel and local_interno_sel:
+            sub_loc = df_clientes_raw[(df_clientes_raw["Cliente"] == cliente_sel) & (df_clientes_raw["Local Interno"] == local_interno_sel)]
+            cidades_loc = [c for c in sub_loc["Cidade"].dropna().unique() if str(c).strip()]
+            cidade_sugerida = cidades_loc[0] if cidades_loc else ""
+        elif cliente_sel:
+            sub_cli_cidades = [c for c in df_clientes_raw[df_clientes_raw["Cliente"] == cliente_sel]["Cidade"].dropna().unique() if str(c).strip()]
+            cidade_sugerida = sub_cli_cidades[0] if len(sub_cli_cidades) == 1 else ""
 
-            st.markdown("#### 💳 Dados Financeiros & Transação")
-            fc9, fc10, fc11 = st.columns(3)
-            with fc9:
-                data_transacao = st.date_input("Data da Transação", value=datetime.now().date(), format="DD/MM/YYYY")
-            with fc10:
-                hora_transacao = st.time_input("Hora da Transação", value=datetime.now().time())
-            with fc11:
-                valor_transacao = st.number_input("Valor (R$)", min_value=0.00, value=5.00, step=0.50, format="%.2f")
+        with fc6:
+            cidade_sel = st.text_input("Cidade", value=cidade_sugerida, placeholder="Selecione o Cliente e Local Interno")
 
-            fc12, fc13 = st.columns(2)
-            with fc12:
-                forma_pagamento_sel = st.selectbox(
-                    "Forma de Pagamento",
-                    opt_formas_pagamento if opt_formas_pagamento else ["Pix", "Cartão de Crédito", "Cartão de Débito", "Dinheiro"]
-                )
-            with fc13:
-                pix_reembolso = st.text_input("Chave Pix para Reembolso", placeholder="CPF, E-mail, Celular ou Chave Aleatória")
+        # 3. Detalhamento do Ocorrido
+        st.markdown("#### ⚙️ Detalhamento do Ocorrido")
+        fc7, fc8 = st.columns(2)
+        with fc7:
+            problema_sel = st.selectbox(
+                "Problema",
+                [""] + opt_problemas,
+                index=0,
+                key="sac_problema_sel"
+            )
+        with fc8:
+            descricao_sel = st.selectbox(
+                "Descrição",
+                [""] + opt_descricao,
+                index=0,
+                key="sac_descricao_sel"
+            )
 
-            st.markdown("#### 👤 Dados do Solicitante")
-            fc14, fc15 = st.columns(2)
-            with fc14:
-                nome_cliente = st.text_input("Nome / Sobrenome do Cliente (Primeira letra maiúscula)")
-            with fc15:
-                celular_cliente = st.text_input("Celular do Cliente", placeholder="(00) 00000-0000")
+        # 4. Dados Financeiros & Transação
+        st.markdown("#### 💳 Dados Financeiros & Transação")
+        fc9, fc10, fc11 = st.columns(3)
+        with fc9:
+            data_transacao_txt = st.text_input("Data da Transação", placeholder="DD/MM/AAAA", key="sac_dt_transacao")
+        with fc10:
+            hora_transacao_txt = st.text_input("Hora da Transação", placeholder="HH:MM", key="sac_hr_transacao")
+        with fc11:
+            valor_transacao_txt = st.text_input("Valor (R$)", placeholder="0,00", key="sac_valor_transacao")
 
-            data_hora_lancamento = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        fc12, fc13 = st.columns(2)
+        with fc12:
+            forma_pagamento_sel = st.selectbox(
+                "Forma de Pagamento",
+                [""] + opt_formas_pagamento,
+                index=0,
+                key="sac_forma_pagamento_sel"
+            )
+        with fc13:
+            pix_reembolso = st.text_input("Pix - Reembolso", placeholder="CPF, E-mail, Celular ou Chave Aleatória", key="sac_pix_reembolso")
 
-            st.markdown("---")
-            btn_salvar_chamado = st.form_submit_button("💾 Gravar Lançamento do Chamado", use_container_width=True)
+        # 5. Dados do Solicitante
+        st.markdown("#### 👤 Dados do Solicitante")
+        fc14, fc15 = st.columns(2)
+        with fc14:
+            nome_cliente = st.text_input("Nome/Sobrenome", placeholder="Nome Completo", key="sac_nome_cliente")
+        with fc15:
+            celular_cliente = st.text_input("Celular", placeholder="(00) 00000-0000", key="sac_celular_cliente")
 
-            if btn_salvar_chamado:
+        data_hora_lancamento = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+        st.markdown("---")
+        btn_salvar_chamado = st.button("💾 Gravar Lançamento do Chamado", use_container_width=True, type="primary")
+
+        if btn_salvar_chamado:
+            # Validação simples de campos essenciais
+            if not cliente_sel:
+                st.error("Por favor, selecione um Cliente.")
+            elif not local_interno_sel:
+                st.error("Por favor, selecione um Local Interno.")
+            elif not problema_sel:
+                st.error("Por favor, selecione o Problema.")
+            elif not nome_cliente.strip():
+                st.error("Por favor, informe o Nome/Sobrenome do cliente.")
+            else:
                 nome_formatado = nome_cliente.strip().title()
-                
-                # Monta payload padronizado da ocorrência
+
+                # Tratamento do valor digitado
+                try:
+                    val_limpo = float(valor_transacao_txt.replace("R$", "").replace(".", "").replace(",", ".").strip()) if valor_transacao_txt.strip() else 0.0
+                except ValueError:
+                    val_limpo = 0.0
+
                 novo_registro = {
                     "Chamado": num_chamado_gerado,
                     "Data": data_chamado.strftime("%d/%m/%Y"),
                     "Cliente": cliente_sel,
                     "Local Interno": local_interno_sel,
-                    "Cidade": cidade_sel,
+                    "Cidade": cidade_sel.strip(),
                     "Descrição": descricao_sel,
                     "Produto": produto_sel,
-                    "Data da Transação": data_transacao.strftime("%d/%m/%Y"),
-                    "Hora da Transação": hora_transacao.strftime("%H:%M:%S"),
-                    "Valor": valor_transacao,
-                    "Nome": nome_formatado,
+                    "Data da Transação": data_transacao_txt.strip(),
+                    "Hora da Transação": hora_transacao_txt.strip(),
+                    "Valor": val_limpo,
+                    "Nome/Sobrenome": nome_formatado,
                     "Celular": celular_cliente.strip(),
                     "Problemas": problema_sel,
                     "Forma de Pagamento": forma_pagamento_sel,
                     "Pix - Reembolso": pix_reembolso.strip(),
                     "Atendente": st.session_state.atendente_logado,
-                    "Data/Hora Lançamento": data_hora_lancamento,
+                    "Data/Hora do lançamento": data_hora_lancamento,
                 }
 
-                # Envio via Webhook do Google Apps Script (se configurado em st.secrets ou script)
+                # Envio via Webhook Google Apps Script se cadastrado
                 webhook_url = st.secrets.get("GOOGLE_SHEET_WEBHOOK_URL", "")
-                sucesso_envio = False
-
                 if webhook_url:
                     try:
                         req_data = json.dumps(novo_registro).encode("utf-8")
@@ -768,20 +804,17 @@ if menu_principal == "📝 Lançamento de Chamados (SAC)":
                             data=req_data,
                             headers={"Content-Type": "application/json"}
                         )
-                        with urllib.request.urlopen(req, timeout=10) as response:
-                            if response.status in [200, 201]:
-                                sucesso_envio = True
+                        urllib.request.urlopen(req, timeout=10)
                     except Exception as err:
-                        st.warning(f"Não foi possível sincronizar automaticamente via Webhook ({err}).")
+                        st.warning(f"Aviso de sincronização webhook: {err}")
 
-                st.success(f"✅ Chamado **{num_chamado_gerado}** lançado com sucesso para **{nome_formatado}**!")
+                st.success(f"✅ Chamado **{num_chamado_gerado}** registrado com sucesso para **{nome_formatado}**!")
                 st.json(novo_registro)
-                st.info("Para sincronização automática em tempo real na aba 'Chamados', mantenha configurado o Webhook do Google Apps Script.")
 
 # ==============================================================================
 # 2. ABA DO DASHBOARD EXECUTIVO
 # ==============================================================================
-elif menu_principal == "📊 Dashboard Executivo":
+elif st.session_state.pagina_ativa == "dashboard":
 
     # Limites seguros do calendário
     hoje = datetime.now().date()
@@ -806,23 +839,10 @@ elif menu_principal == "📊 Dashboard Executivo":
 
     idx_mes_atual = months_order.index(mes_atual_nome) if mes_atual_nome in months_order else len(months_order) - 1
 
-    # --- FILTROS EXECUTIVOS NA BARRA LATERAL ---
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("⚙️ Filtros Executivos")
-
-    anos_disponiveis = sorted(
-        [str(a) for a in df["Ano"].unique() if str(a) not in ["Não informado", "nan", "None", ""]],
-        reverse=True,
-    )
-    anos_opcoes = ["Todos"] + anos_disponiveis
-    selected_year = st.sidebar.selectbox("Ano de Referência", anos_opcoes, index=0)
-
-    # Filtragem Global pelo Ano
+    # Base Geral Sem Filtro Restritivo
     filtered_df = df.copy()
-    if selected_year != "Todos":
-        filtered_df = filtered_df[filtered_df["Ano"] == selected_year]
 
-    # Variáveis globais de métricas
+    # Métricas Globais
     total_chamados = len(filtered_df)
     total_devolvido = filtered_df["Valor"].sum()
     top_cliente = (
@@ -841,7 +861,7 @@ elif menu_principal == "📊 Dashboard Executivo":
     st.sidebar.subheader("📄 Relatório Executivo")
 
     active_filters_dict = {
-        "ano": selected_year,
+        "ano": "Consolidado Geral",
     }
 
     pdf_full_bytes = generate_full_pdf_report(
@@ -856,7 +876,7 @@ elif menu_principal == "📊 Dashboard Executivo":
     st.sidebar.download_button(
         label="📥 Gerar Relatório Completo (PDF)",
         data=pdf_full_bytes,
-        file_name=f"Relatorio_Executivo_SAC_MasterCafe_{selected_year}.pdf",
+        file_name=f"Relatorio_Executivo_SAC_MasterCafe_Consolidado.pdf",
         mime="application/pdf",
         help="Exportar dados consolidados em formato PDF",
         use_container_width=True,
@@ -1158,10 +1178,9 @@ elif menu_principal == "📊 Dashboard Executivo":
         )
         st.plotly_chart(fig_loc, use_container_width=True)
 
-    # --- 6. GRÁFICOS DIÁRIOS (CHAMADOS E VALORES POR DIA COM ORDENAÇÃO CRONOLÓGICA PERFEITA) ---
+    # --- 6. GRÁFICOS DIÁRIOS ---
     st.markdown("---")
 
-    # Filtro Dinâmico de Mês para os Gráficos Diários com o Mês Atual pré-selecionado
     c_filtro_m1, _ = st.columns([1.2, 2.8])
     with c_filtro_m1:
         mes_graf_diario = st.selectbox(
@@ -1171,7 +1190,6 @@ elif menu_principal == "📊 Dashboard Executivo":
             key="filtro_mes_graficos_diarios"
         )
 
-    # Filtra a base temporal conforme o mês selecionado
     df_datas_validas = filtered_df[filtered_df["Data_Date"].notna()].copy()
     if mes_graf_diario != "Todos":
         df_datas_validas = df_datas_validas[df_datas_validas["Mês_Clean"] == mes_graf_diario]
@@ -1180,7 +1198,6 @@ elif menu_principal == "📊 Dashboard Executivo":
 
     with col_dia_graf1:
         if not df_datas_validas.empty:
-            # Agrupamento rigorosamente ordenado pela data real
             ch_por_dia = (
                 df_datas_validas.groupby("Data_Date")
                 .size()
@@ -1204,7 +1221,6 @@ elif menu_principal == "📊 Dashboard Executivo":
             fig_dia_ch = apply_powerbi_theme(
                 fig_dia_ch, title=titulo_ch_dia, height=340
             )
-            # Fixa a ordem das categorias como lista ordenada exata
             fig_dia_ch.update_xaxes(
                 title_text="Data",
                 tickangle=-45,
@@ -1219,7 +1235,6 @@ elif menu_principal == "📊 Dashboard Executivo":
 
     with col_dia_graf2:
         if not df_datas_validas.empty:
-            # Agrupamento rigorosamente ordenado pela data real
             val_por_dia = (
                 df_datas_validas.groupby("Data_Date")["Valor"]
                 .sum()
@@ -1243,7 +1258,6 @@ elif menu_principal == "📊 Dashboard Executivo":
             fig_dia_val = apply_powerbi_theme(
                 fig_dia_val, title=titulo_val_dia, height=340
             )
-            # Fixa a ordem das categorias como lista ordenada exata
             fig_dia_val.update_xaxes(
                 title_text="Data",
                 tickangle=-45,
@@ -1435,7 +1449,7 @@ elif menu_principal == "📊 Dashboard Executivo":
         ]
     )
 
-    # --- ABA: TABELA DE CHAMADOS POR DIA (COM LOCAIS, DESCRIÇÃO, PROBLEMA E QUANTIDADE) ---
+    # --- ABA: TABELA DE CHAMADOS POR DIA ---
     with tab_chamados_dia:
         st.markdown("#### Chamados por Dia — Detalhamento por Local Interno, Descrição e Problema")
         
