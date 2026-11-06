@@ -21,6 +21,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 import streamlit as st
+import streamlit.components.v1 as components
 
 st.set_page_config(
     page_title="Dashboard Executivo SAC - Master Café",
@@ -29,7 +30,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# --- CSS POWER BI EXECUTIVE THEME ---
+# --- CSS POWER BI EXECUTIVE THEME + COMPACT FORM ---
 st.markdown(
     """
 <style>
@@ -42,29 +43,29 @@ st.markdown(
     /* Header Card Power BI Style */
     .header-card {
         background: linear-gradient(90deg, #1e293b 0%, #0f172a 100%);
-        padding: 20px 24px;
+        padding: 16px 20px;
         border-radius: 8px;
         border: 1px solid #334155;
         border-left: 6px solid #0284c7;
-        margin-bottom: 20px;
+        margin-bottom: 14px;
     }
     .header-title {
         color: #ffffff !important;
         font-weight: 700;
-        font-size: 1.85rem;
-        margin-bottom: 4px;
+        font-size: 1.65rem;
+        margin-bottom: 2px;
         letter-spacing: -0.5px;
     }
     .header-subtitle {
         color: #94a3b8 !important;
-        font-size: 0.95rem;
+        font-size: 0.90rem;
         font-weight: 400;
     }
 
     /* Cards de KPI no padrão Power BI Card Visual */
     .stMetric { 
         background-color: #1e293b !important; 
-        padding: 18px !important; 
+        padding: 16px !important; 
         border-radius: 8px !important; 
         border: 1px solid #334155 !important;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
@@ -72,14 +73,14 @@ st.markdown(
     div[data-testid="stMetricValue"] { 
         color: #38bdf8 !important; 
         font-weight: 700 !important; 
-        font-size: 1.9rem !important; 
+        font-size: 1.8rem !important; 
         font-family: 'Segoe UI', sans-serif !important;
     }
     div[data-testid="stMetricLabel"], 
     div[data-testid="stMetricLabel"] > label,
     div[data-testid="stMetricLabel"] p { 
         color: #94a3b8 !important; 
-        font-size: 0.85rem !important; 
+        font-size: 0.80rem !important; 
         font-weight: 600 !important;
         text-transform: uppercase;
         letter-spacing: 0.5px;
@@ -90,9 +91,48 @@ st.markdown(
         background: #1e293b;
         border: 1px solid #334155;
         border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 12px;
+        padding: 14px;
+        margin-bottom: 10px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    }
+
+    /* --- ESTILOS COMPACTOS PARA FORMULÁRIO DO SAC --- */
+    .compact-section-title {
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: #38bdf8;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-top: 6px;
+        margin-bottom: 4px;
+        border-bottom: 1px solid #334155;
+        padding-bottom: 2px;
+    }
+
+    /* Redução de gaps e margens nos inputs */
+    div[data-testid="stVerticalBlock"] > div.element-container {
+        margin-bottom: -4px !important;
+    }
+    div[data-testid="stForm"] {
+        border: 1px solid #334155 !important;
+        background-color: #111827 !important;
+        border-radius: 8px !important;
+        padding: 16px 20px !important;
+    }
+    div[data-testid="stTextInput"] label, 
+    div[data-testid="stSelectbox"] label, 
+    div[data-testid="stDateInput"] label {
+        font-size: 0.80rem !important;
+        font-weight: 600 !important;
+        color: #cbd5e1 !important;
+        margin-bottom: -2px !important;
+    }
+    div[data-baseweb="input"] > div, 
+    div[data-baseweb="select"] > div {
+        min-height: 36px !important;
+        height: 36px !important;
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
     }
 </style>
 """,
@@ -413,11 +453,9 @@ SHEET_BASE_ID = "1vOa6QpGPZ6rZ1doT2RRU1SAXWR5usPzv"
 @st.cache_data(ttl=600)
 def load_auxiliary_data():
     """Carrega dados das abas Clientes, Parâmetros/Apoio e Usuários com mapeamento direto por colunas."""
-    # 1. Clientes (gid=400904478): Coluna A: Cliente, B: Local Interno, F: Cidade
     url_clientes = f"https://docs.google.com/spreadsheets/d/{SHEET_BASE_ID}/export?format=csv&gid=400904478"
     try:
         df_raw_cli = pd.read_csv(url_clientes)
-        # Padroniza nomes com base no índice de colunas A=0, B=1, F=5
         df_clientes = pd.DataFrame()
         df_clientes["Cliente"] = df_raw_cli.iloc[:, 0].dropna().astype(str).str.strip()
         df_clientes["Local Interno"] = df_raw_cli.iloc[:, 1].fillna("").astype(str).str.strip() if df_raw_cli.shape[1] > 1 else ""
@@ -426,7 +464,6 @@ def load_auxiliary_data():
     except Exception:
         df_clientes = pd.DataFrame(columns=["Cliente", "Local Interno", "Cidade"])
 
-    # 2. Apoio / Parâmetros (gid=1833376686): Coluna A: Forma de Pagamento, L: Problemas, N: Descrição
     url_apoio = f"https://docs.google.com/spreadsheets/d/{SHEET_BASE_ID}/export?format=csv&gid=1833376686"
     try:
         df_apoio = pd.read_csv(url_apoio, header=None)
@@ -436,7 +473,6 @@ def load_auxiliary_data():
     except Exception:
         formas_pagamento, problemas_list, descricao_list = [], [], []
 
-    # 3. Usuários (gid=772646879): Coluna A: Usuario, Coluna B: Senha
     url_usuarios = f"https://docs.google.com/spreadsheets/d/{SHEET_BASE_ID}/export?format=csv&gid=772646879"
     try:
         df_usuarios = pd.read_csv(url_usuarios, header=None)
@@ -468,7 +504,6 @@ def load_data():
         if not val_str or val_str.lower() in ["nan", "none", "nat", ""]:
             return None
 
-        # 1. Número de série do Excel
         try:
             val_num = float(val_str)
             if 35000 <= val_num <= 65000:
@@ -476,7 +511,6 @@ def load_data():
         except (ValueError, TypeError):
             pass
 
-        # 2. String de data
         data_pura = val_str.split(" ")[0].split("T")[0].strip()
 
         for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d/%m/%y", "%d-%m-%Y"):
@@ -485,7 +519,6 @@ def load_data():
             except ValueError:
                 continue
 
-        # 3. Fallback Pandas
         try:
             dt = pd.to_datetime(data_pura, dayfirst=True, errors="coerce")
             if pd.notna(dt):
@@ -509,20 +542,12 @@ def load_data():
         df["Ano"] = "Não informado"
 
     month_map = {
-        "Janeiro": "Janeiro",
-        "janeiro": "Janeiro",
-        "Fevereiro": "Fevereiro",
-        "Março": "Março",
-        "Abril": "Abril",
-        "Maio": "Maio",
-        "Junho": "Junho",
-        "Julho": "Julho",
-        "Agosto": "Agosto",
-        "Setembro": "Setembro",
-        "setembro": "Setembro",
-        "Outubro": "Outubro",
-        "Novembro": "Novembro",
-        "Dezembro": "Dezembro",
+        "Janeiro": "Janeiro", "janeiro": "Janeiro",
+        "Fevereiro": "Fevereiro", "Março": "Março",
+        "Abril": "Abril", "Maio": "Maio", "Junho": "Junho",
+        "Julho": "Julho", "Agosto": "Agosto",
+        "Setembro": "Setembro", "setembro": "Setembro",
+        "Outubro": "Outubro", "Novembro": "Novembro", "Dezembro": "Dezembro",
     }
 
     if "Mês" in df.columns:
@@ -606,14 +631,14 @@ if btn_sac:
     st.rerun()
 
 # ==============================================================================
-# 1. ABA DE LANÇAMENTO DE OCORRÊNCIAS DO SAC (COM LOGIN E FORMULÁRIO DINÂMICO)
+# 1. ABA DE LANÇAMENTO DE OCORRÊNCIAS DO SAC (COMPACTA + JS MÁSCARAS)
 # ==============================================================================
 if st.session_state.pagina_ativa == "sac":
     st.markdown(
         """
         <div class="header-card">
             <div class="header-title">📝 Central de Lançamento de Ocorrências — SAC</div>
-            <div class="header-subtitle">Registro operacional de chamados, transações e reembolsos</div>
+            <div class="header-subtitle">Registro ágil de ocorrências, transações e reembolsos</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -627,7 +652,7 @@ if st.session_state.pagina_ativa == "sac":
         st.subheader("🔐 Autenticação de Atendente")
         st.caption("Insira suas credenciais cadastradas na aba 'Usuarios' para liberar o lançamento.")
         
-        col_log1, col_log2 = st.columns([1, 1.5])
+        col_log1, _ = st.columns([1, 1.8])
         with col_log1:
             with st.form("form_login_sac"):
                 login_user = st.text_input("Usuário:")
@@ -645,7 +670,7 @@ if st.session_state.pagina_ativa == "sac":
                         st.error("Usuário ou senha inválidos. Verifique os dados cadastrados na aba 'Usuarios'.")
     else:
         # Usuário autenticado
-        col_topo1, col_topo2 = st.columns([3, 1])
+        col_topo1, col_topo2 = st.columns([3.5, 1.2])
         with col_topo1:
             st.success(f"👤 Atendente conectado: **{st.session_state.atendente_logado}**")
         with col_topo2:
@@ -653,8 +678,6 @@ if st.session_state.pagina_ativa == "sac":
                 st.session_state.atendente_logado = None
                 st.rerun()
 
-        st.markdown("---")
-        
         # Gerar número automático do chamado: SAC-AAAA-XXXX
         ano_atual_str = str(datetime.now().year)
         chamados_ano_count = len(df[df["Ano"] == ano_atual_str]) + 1 if not df.empty else 1
@@ -663,100 +686,160 @@ if st.session_state.pagina_ativa == "sac":
         # Lista de Clientes (Coluna A da aba Clientes)
         lista_clientes = [""] + sorted(list(set(df_clientes_raw["Cliente"].dropna().tolist())))
 
-        st.markdown(f"### 📋 Novo Chamado: `{num_chamado_gerado}`")
+        # INJEÇÃO DO JAVASCRIPT DE FORMATAÇÃO E MÁSCARAS
+        components.html(
+            """
+            <script>
+            (function() {
+                const parentDoc = window.parent.document;
 
-        # 1. Identificação Básica
-        fc1, fc2, fc3 = st.columns([1.2, 1, 1])
-        with fc1:
-            st.text_input("Chamado (Gerado Automaticamente)", value=num_chamado_gerado, disabled=True)
-        with fc2:
+                function applyMasks() {
+                    // Máscara de Moeda R$ 0,00
+                    const valorInputs = parentDoc.querySelectorAll('input[aria-label*="Valor"], input[placeholder*="0,00"]');
+                    valorInputs.forEach(input => {
+                        if (!input.dataset.masked) {
+                            input.dataset.masked = "true";
+                            input.addEventListener('input', function(e) {
+                                let v = e.target.value.replace(/\\D/g, '');
+                                v = (v / 100).toFixed(2) + '';
+                                v = v.replace(".", ",");
+                                v = v.replace(/(\\d)(?=(\\d{3})+(?!\\d))/g, '$1.');
+                                e.target.value = v ? 'R$ ' + v : '';
+                            });
+                        }
+                    });
+
+                    // Máscara de Celular (00) 00000-0000
+                    const telInputs = parentDoc.querySelectorAll('input[aria-label*="Celular"], input[placeholder*="(00)"]');
+                    telInputs.forEach(input => {
+                        if (!input.dataset.masked) {
+                            input.dataset.masked = "true";
+                            input.addEventListener('input', function(e) {
+                                let v = e.target.value.replace(/\\D/g, '');
+                                if (v.length > 11) v = v.slice(0, 11);
+                                if (v.length > 6) {
+                                    e.target.value = `(${v.slice(0,2)}) ${v.slice(2,7)}-${v.slice(7)}`;
+                                } else if (v.length > 2) {
+                                    e.target.value = `(${v.slice(0,2)}) ${v.slice(2)}`;
+                                } else if (v.length > 0) {
+                                    e.target.value = `(${v}`;
+                                }
+                            });
+                        }
+                    });
+
+                    // Máscara de Hora HH:MM
+                    const horaInputs = parentDoc.querySelectorAll('input[aria-label*="Hora da Transação"], input[placeholder*="HH:MM"]');
+                    horaInputs.forEach(input => {
+                        if (!input.dataset.masked) {
+                            input.dataset.masked = "true";
+                            input.addEventListener('input', function(e) {
+                                let v = e.target.value.replace(/\\D/g, '');
+                                if (v.length > 4) v = v.slice(0, 4);
+                                if (v.length > 2) {
+                                    e.target.value = `${v.slice(0,2)}:${v.slice(2)}`;
+                                } else {
+                                    e.target.value = v;
+                                }
+                            });
+                        }
+                    });
+
+                    // Máscara de Data da Transação DD/MM/AAAA
+                    const dataInputs = parentDoc.querySelectorAll('input[aria-label*="Data da Transação"], input[placeholder*="DD/MM/AAAA"]');
+                    dataInputs.forEach(input => {
+                        if (!input.dataset.masked) {
+                            input.dataset.masked = "true";
+                            input.addEventListener('input', function(e) {
+                                let v = e.target.value.replace(/\\D/g, '');
+                                if (v.length > 8) v = v.slice(0, 8);
+                                if (v.length > 4) {
+                                    e.target.value = `${v.slice(0,2)}/${v.slice(2,4)}/${v.slice(4)}`;
+                                } else if (v.length > 2) {
+                                    e.target.value = `${v.slice(0,2)}/${v.slice(2)}`;
+                                } else {
+                                    e.target.value = v;
+                                }
+                            });
+                        }
+                    });
+                }
+
+                applyMasks();
+                const observer = new MutationObserver(applyMasks);
+                observer.observe(parentDoc.body, { childList: true, subtree: true });
+            })();
+            </script>
+            """,
+            height=0,
+            width=0,
+        )
+
+        # FORMULÁRIO COMPACTO E LINEAR
+        st.markdown(f"#### 📋 Formulário de Abertura — `{num_chamado_gerado}`")
+
+        # LINHA 1: Identificação e Dados Gerais
+        st.markdown('<div class="compact-section-title">1. Dados Operacionais & Localização</div>', unsafe_allow_html=True)
+        r1_c1, r1_c2, r1_c3, r1_c4 = st.columns([1.1, 1, 1.2, 1.3])
+        with r1_c1:
+            st.text_input("Chamado", value=num_chamado_gerado, disabled=True)
+        with r1_c2:
             data_chamado = st.date_input("Data do Chamado", value=datetime.now().date(), format="DD/MM/YYYY")
-        with fc3:
+        with r1_c3:
             produto_sel = st.selectbox("Produto", ["", "Café", "Snaky"], index=0)
-
-        # 2. Cliente, Local Interno e Cidade (Cascata Dinâmica em Tempo Real)
-        st.markdown("#### 🏢 Informações do Cliente e Localização")
-        fc4, fc5, fc6 = st.columns(3)
-        with fc4:
+        with r1_c4:
             cliente_sel = st.selectbox("Cliente", lista_clientes, index=0, key="sac_cliente_sel")
 
-        # Filtragem precisa de Local Interno e Cidade com base no cliente selecionado
+        # LINHA 2: Localização e Classificação da Falha
         locais_validos = [""]
         if cliente_sel:
             sub_cli = df_clientes_raw[df_clientes_raw["Cliente"] == cliente_sel]
             locais_unicos = sorted([loc for loc in sub_cli["Local Interno"].dropna().unique() if str(loc).strip()])
             locais_validos = [""] + locais_unicos
 
-        with fc5:
-            local_interno_sel = st.selectbox("Local Interno", locais_validos, index=0, key="sac_local_interno_sel")
-
-        # Cidade vinculada ao Local Interno selecionado
         cidade_sugerida = ""
-        if cliente_sel and local_interno_sel:
-            sub_loc = df_clientes_raw[(df_clientes_raw["Cliente"] == cliente_sel) & (df_clientes_raw["Local Interno"] == local_interno_sel)]
-            cidades_loc = [c for c in sub_loc["Cidade"].dropna().unique() if str(c).strip()]
-            cidade_sugerida = cidades_loc[0] if cidades_loc else ""
-        elif cliente_sel:
-            sub_cli_cidades = [c for c in df_clientes_raw[df_clientes_raw["Cliente"] == cliente_sel]["Cidade"].dropna().unique() if str(c).strip()]
-            cidade_sugerida = sub_cli_cidades[0] if len(sub_cli_cidades) == 1 else ""
+        if cliente_sel:
+            sub_loc = df_clientes_raw[(df_clientes_raw["Cliente"] == cliente_sel)]
+            sub_loc_cidades = [c for c in sub_loc["Cidade"].dropna().unique() if str(c).strip()]
+            cidade_sugerida = sub_loc_cidades[0] if sub_loc_cidades else ""
 
-        with fc6:
-            cidade_sel = st.text_input("Cidade", value=cidade_sugerida, placeholder="Selecione o Cliente e Local Interno")
+        r2_c1, r2_c2, r2_c3, r2_c4 = st.columns([1.2, 1, 1.1, 1.3])
+        with r2_c1:
+            local_interno_sel = st.selectbox("Local Interno", locais_validos, index=0, key="sac_local_interno_sel")
+        with r2_c2:
+            cidade_sel = st.text_input("Cidade", value=cidade_sugerida, placeholder="Cidade do Local")
+        with r2_c3:
+            problema_sel = st.selectbox("Problema", [""] + opt_problemas, index=0, key="sac_problema_sel")
+        with r2_c4:
+            descricao_sel = st.selectbox("Descrição", [""] + opt_descricao, index=0, key="sac_descricao_sel")
 
-        # 3. Detalhamento do Ocorrido
-        st.markdown("#### ⚙️ Detalhamento do Ocorrido")
-        fc7, fc8 = st.columns(2)
-        with fc7:
-            problema_sel = st.selectbox(
-                "Problema",
-                [""] + opt_problemas,
-                index=0,
-                key="sac_problema_sel"
-            )
-        with fc8:
-            descricao_sel = st.selectbox(
-                "Descrição",
-                [""] + opt_descricao,
-                index=0,
-                key="sac_descricao_sel"
-            )
+        # LINHA 3: Transação e Solicitante
+        st.markdown('<div class="compact-section-title">2. Transação Financeira & Solicitante</div>', unsafe_allow_html=True)
+        r3_c1, r3_c2, r3_c3, r3_c4 = st.columns([1, 0.9, 1, 1.2])
+        with r3_c1:
+            data_transacao_txt = st.text_input("Data Transação", placeholder="DD/MM/AAAA", key="sac_dt_transacao")
+        with r3_c2:
+            hora_transacao_txt = st.text_input("Hora Transação", placeholder="HH:MM", key="sac_hr_transacao")
+        with r3_c3:
+            valor_transacao_txt = st.text_input("Valor Reembolso", placeholder="0,00", key="sac_valor_transacao")
+        with r3_c4:
+            forma_pagamento_sel = st.selectbox("Forma de Pagamento", [""] + opt_formas_pagamento, index=0, key="sac_forma_pagamento_sel")
 
-        # 4. Dados Financeiros & Transação
-        st.markdown("#### 💳 Dados Financeiros & Transação")
-        fc9, fc10, fc11 = st.columns(3)
-        with fc9:
-            data_transacao_txt = st.text_input("Data da Transação", placeholder="DD/MM/AAAA", key="sac_dt_transacao")
-        with fc10:
-            hora_transacao_txt = st.text_input("Hora da Transação", placeholder="HH:MM", key="sac_hr_transacao")
-        with fc11:
-            valor_transacao_txt = st.text_input("Valor (R$)", placeholder="0,00", key="sac_valor_transacao")
-
-        fc12, fc13 = st.columns(2)
-        with fc12:
-            forma_pagamento_sel = st.selectbox(
-                "Forma de Pagamento",
-                [""] + opt_formas_pagamento,
-                index=0,
-                key="sac_forma_pagamento_sel"
-            )
-        with fc13:
-            pix_reembolso = st.text_input("Pix - Reembolso", placeholder="CPF, E-mail, Celular ou Chave Aleatória", key="sac_pix_reembolso")
-
-        # 5. Dados do Solicitante
-        st.markdown("#### 👤 Dados do Solicitante")
-        fc14, fc15 = st.columns(2)
-        with fc14:
-            nome_cliente = st.text_input("Nome/Sobrenome", placeholder="Nome Completo", key="sac_nome_cliente")
-        with fc15:
+        # LINHA 4: Chave Pix e Contato
+        r4_c1, r4_c2, r4_c3 = st.columns([1.5, 1.3, 1.2])
+        with r4_c1:
+            pix_reembolso = st.text_input("Pix - Reembolso", placeholder="CPF, e-mail, celular ou chave aleatória", key="sac_pix_reembolso")
+        with r4_c2:
+            nome_cliente = st.text_input("Nome/Sobrenome", placeholder="Nome completo do solicitante", key="sac_nome_cliente")
+        with r4_c3:
             celular_cliente = st.text_input("Celular", placeholder="(00) 00000-0000", key="sac_celular_cliente")
 
         data_hora_lancamento = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
-        st.markdown("---")
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         btn_salvar_chamado = st.button("💾 Gravar Lançamento do Chamado", use_container_width=True, type="primary")
 
         if btn_salvar_chamado:
-            # Validação simples de campos essenciais
             if not cliente_sel:
                 st.error("Por favor, selecione um Cliente.")
             elif not local_interno_sel:
@@ -768,9 +851,13 @@ if st.session_state.pagina_ativa == "sac":
             else:
                 nome_formatado = nome_cliente.strip().title()
 
-                # Tratamento do valor digitado
                 try:
-                    val_limpo = float(valor_transacao_txt.replace("R$", "").replace(".", "").replace(",", ".").strip()) if valor_transacao_txt.strip() else 0.0
+                    val_limpo = float(
+                        valor_transacao_txt.replace("R$", "")
+                        .replace(".", "")
+                        .replace(",", ".")
+                        .strip()
+                    ) if valor_transacao_txt.strip() else 0.0
                 except ValueError:
                     val_limpo = 0.0
 
@@ -794,7 +881,6 @@ if st.session_state.pagina_ativa == "sac":
                     "Data/Hora do lançamento": data_hora_lancamento,
                 }
 
-                # Envio via Webhook Google Apps Script se cadastrado
                 webhook_url = st.secrets.get("GOOGLE_SHEET_WEBHOOK_URL", "")
                 if webhook_url:
                     try:
@@ -816,13 +902,11 @@ if st.session_state.pagina_ativa == "sac":
 # ==============================================================================
 elif st.session_state.pagina_ativa == "dashboard":
 
-    # Limites seguros do calendário
     hoje = datetime.now().date()
     datas_validas = df["Data_Date"].dropna()
     min_data_calendario = min(datas_validas.min(), hoje) if not datas_validas.empty else hoje
     max_data_calendario = max(datas_validas.max(), hoje) if not datas_validas.empty else hoje
 
-    # Mapeamento do Mês Atual e Anterior
     meses_do_ano = {
         1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril", 5: "Maio", 6: "Junho",
         7: "Julho", 8: "Agosto", 9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro",
@@ -839,10 +923,8 @@ elif st.session_state.pagina_ativa == "dashboard":
 
     idx_mes_atual = months_order.index(mes_atual_nome) if mes_atual_nome in months_order else len(months_order) - 1
 
-    # Base Geral Sem Filtro Restritivo
     filtered_df = df.copy()
 
-    # Métricas Globais
     total_chamados = len(filtered_df)
     total_devolvido = filtered_df["Valor"].sum()
     top_cliente = (
