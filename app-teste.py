@@ -30,6 +30,14 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# --- CONFIGURAÇÃO CENTRALIZADA DA PLANILHA E WEBHOOK ---
+SHEET_BASE_ID = "1YUS9AwQti0Gl79X-TGCIqZSkOfF0bE0BX5gyDClo3rc"
+GID_CHAMADOS = "0"
+GID_CLIENTES = "1332839106"
+GID_DADOS = "1815476457"
+GID_USUARIOS = "437161325"
+WEBHOOK_URL_DEFAULT = "https://script.google.com/macros/s/AKfycbyGRxQBo5j-gWQ4OEeGFqfwzgjcfQRzDKE2kKbyQeSvOKOdIMr1snR8YV766KBfE7RY9w/exec"
+
 # --- CSS POWER BI EXECUTIVE THEME + COMPACT FORM ---
 st.markdown(
     """
@@ -96,7 +104,7 @@ st.markdown(
         box-shadow: 0 2px 4px rgba(0,0,0,0.15);
     }
 
-    /* --- ESTILOS COMPACTOS PARA FORMULÁRIO DO SAC --- */
+    /* Estilos compactos para formulário do SAC */
     .compact-section-title {
         font-size: 0.88rem;
         font-weight: 700;
@@ -109,7 +117,6 @@ st.markdown(
         padding-bottom: 2px;
     }
 
-    /* Redução de gaps e margens nos inputs */
     div[data-testid="stVerticalBlock"] > div.element-container {
         margin-bottom: -4px !important;
     }
@@ -305,7 +312,7 @@ def generate_full_pdf_report(
     )
 
     # 2. Quadro de Filtros Ativos
-    filtros_txt = f"<b>Escopo do Relatório:</b> Base Geral Consolidada"
+    filtros_txt = "<b>Escopo do Relatório:</b> Base Geral Consolidada"
     t_filtros = Table(
         [[Paragraph(filtros_txt, table_cell)]],
         colWidths=[540],
@@ -447,13 +454,12 @@ def generate_full_pdf_report(
     return buffer.getvalue()
 
 
-# --- CARREGAMENTO DE DADOS AUXILIARES (CLIENTES, APOIO E USUÁRIOS) ---
-SHEET_BASE_ID = "1vOa6QpGPZ6rZ1doT2RRU1SAXWR5usPzv"
-
+# --- CARREGAMENTO DE DADOS AUXILIARES (CLIENTES, DADOS/APOIO E USUÁRIOS) ---
 @st.cache_data(ttl=600)
 def load_auxiliary_data():
-    """Carrega dados das abas Clientes, Parâmetros/Apoio e Usuários com mapeamento direto por colunas."""
-    url_clientes = f"https://docs.google.com/spreadsheets/d/{SHEET_BASE_ID}/export?format=csv&gid=400904478"
+    """Carrega dados das abas Clientes, Dados e Usuarios com os novos GIDs."""
+    # 1. Clientes (gid=1332839106): Coluna A: Cliente, B: Local Interno, F: Cidade
+    url_clientes = f"https://docs.google.com/spreadsheets/d/{SHEET_BASE_ID}/export?format=csv&gid={GID_CLIENTES}"
     try:
         df_raw_cli = pd.read_csv(url_clientes)
         df_clientes = pd.DataFrame()
@@ -464,16 +470,18 @@ def load_auxiliary_data():
     except Exception:
         df_clientes = pd.DataFrame(columns=["Cliente", "Local Interno", "Cidade"])
 
-    url_apoio = f"https://docs.google.com/spreadsheets/d/{SHEET_BASE_ID}/export?format=csv&gid=1833376686"
+    # 2. Dados / Apoio (gid=1815476457): Coluna A: Forma de Pagamento, L (índice 11): Problemas, N (índice 13): Descrição
+    url_dados = f"https://docs.google.com/spreadsheets/d/{SHEET_BASE_ID}/export?format=csv&gid={GID_DADOS}"
     try:
-        df_apoio = pd.read_csv(url_apoio, header=None)
+        df_apoio = pd.read_csv(url_dados, header=None)
         formas_pagamento = [str(x).strip() for x in df_apoio.iloc[:, 0].dropna().unique() if str(x).strip() and str(x).strip().lower() != "nan"] if df_apoio.shape[1] > 0 else []
         problemas_list = [str(x).strip() for x in df_apoio.iloc[:, 11].dropna().unique() if str(x).strip() and str(x).strip().lower() != "nan"] if df_apoio.shape[1] > 11 else []
         descricao_list = [str(x).strip() for x in df_apoio.iloc[:, 13].dropna().unique() if str(x).strip() and str(x).strip().lower() != "nan"] if df_apoio.shape[1] > 13 else []
     except Exception:
         formas_pagamento, problemas_list, descricao_list = [], [], []
 
-    url_usuarios = f"https://docs.google.com/spreadsheets/d/{SHEET_BASE_ID}/export?format=csv&gid=772646879"
+    # 3. Usuários (gid=437161325): Coluna A: Usuario, Coluna B: Senha
+    url_usuarios = f"https://docs.google.com/spreadsheets/d/{SHEET_BASE_ID}/export?format=csv&gid={GID_USUARIOS}"
     try:
         df_usuarios = pd.read_csv(url_usuarios, header=None)
         df_usuarios.columns = ["Usuario", "Senha"] + list(df_usuarios.columns[2:])
@@ -484,17 +492,16 @@ def load_auxiliary_data():
     return df_clientes, formas_pagamento, problemas_list, descricao_list, usuarios_dict
 
 
-# --- CARREGAMENTO E PARSER UNIVERSAL DE DATA DO DASHBOARD ---
+# --- CARREGAMENTO E PARSER UNIVERSAL DE DATA DO DASHBOARD (ABA CHAMADOS) ---
 @st.cache_data(ttl=600)
 def load_data():
-    sheet_id = SHEET_BASE_ID
-    gid = "1236624547"
-    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+    # Aba Chamados: gid=0
+    url = f"https://docs.google.com/spreadsheets/d/{SHEET_BASE_ID}/export?format=csv&gid={GID_CHAMADOS}"
 
     try:
         df = pd.read_csv(url)
     except Exception as e:
-        st.error(f"Erro ao carregar dados da planilha: {e}")
+        st.error(f"Erro ao carregar dados da aba Chamados: {e}")
         df = pd.DataFrame()
 
     def parse_smart_date(val):
@@ -881,7 +888,10 @@ if st.session_state.pagina_ativa == "sac":
                     "Data/Hora do lançamento": data_hora_lancamento,
                 }
 
-                webhook_url = st.secrets.get("GOOGLE_SHEET_WEBHOOK_URL", "")
+                # Prioriza a URL dos secrets se definida; caso contrário usa a URL informada
+                webhook_url = st.secrets.get("GOOGLE_SHEET_WEBHOOK_URL", WEBHOOK_URL_DEFAULT)
+                gravacao_ok = False
+
                 if webhook_url:
                     try:
                         req_data = json.dumps(novo_registro).encode("utf-8")
@@ -890,12 +900,18 @@ if st.session_state.pagina_ativa == "sac":
                             data=req_data,
                             headers={"Content-Type": "application/json"}
                         )
-                        urllib.request.urlopen(req, timeout=10)
+                        with urllib.request.urlopen(req, timeout=15) as response:
+                            res_body = response.read().decode("utf-8")
+                            st.info(f"Resposta do Webhook: {res_body}")
+                            gravacao_ok = True
                     except Exception as err:
-                        st.warning(f"Aviso de sincronização webhook: {err}")
+                        st.error(f"Erro ao disparar webhook: {err}")
+                else:
+                    st.error("URL do Webhook não encontrada.")
 
-                st.success(f"✅ Chamado **{num_chamado_gerado}** registrado com sucesso para **{nome_formatado}**!")
-                st.json(novo_registro)
+                if gravacao_ok:
+                    st.success(f"✅ Chamado **{num_chamado_gerado}** registrado com sucesso para **{nome_formatado}**!")
+                    st.json(novo_registro)
 
 # ==============================================================================
 # 2. ABA DO DASHBOARD EXECUTIVO
@@ -958,7 +974,7 @@ elif st.session_state.pagina_ativa == "dashboard":
     st.sidebar.download_button(
         label="📥 Gerar Relatório Completo (PDF)",
         data=pdf_full_bytes,
-        file_name=f"Relatorio_Executivo_SAC_MasterCafe_Consolidado.pdf",
+        file_name="Relatorio_Executivo_SAC_MasterCafe_Consolidado.pdf",
         mime="application/pdf",
         help="Exportar dados consolidados em formato PDF",
         use_container_width=True,
