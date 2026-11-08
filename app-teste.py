@@ -280,19 +280,77 @@ def carregar_dados_sac():
         pass
 
     maior_sac_ano = {}
+    chamados_salvos = []
     try:
         df_ch = pd.read_csv(URL_CSV_SAC_CHAMADOS, dtype=str)
         if df_ch is not None and not df_ch.empty:
-            col_ch = df_ch.columns[0]
-            for _, r in df_ch.iterrows():
-                val = str(r[col_ch]).strip() if pd.notna(r[col_ch]) else ""
+            cols = [c.strip() for c in df_ch.columns]
+            
+            def get_col(candidates):
+                for cand in candidates:
+                    for c in cols:
+                        if c.lower() == cand.lower():
+                            return c
+                return None
+
+            col_chamado = get_col(["Chamado", "chamado"]) or cols[0]
+            col_data = get_col(["Data", "data"]) or (cols[1] if len(cols) > 1 else "")
+            col_cli = get_col(["Cliente", "cliente"]) or (cols[2] if len(cols) > 2 else "")
+            col_loc = get_col(["Local Interno", "local interno", "localInterno"]) or (cols[3] if len(cols) > 3 else "")
+            col_cid = get_col(["Cidade", "cidade"]) or (cols[4] if len(cols) > 4 else "")
+            col_desc = get_col(["Descrição", "Descricao", "descricao"]) or (cols[5] if len(cols) > 5 else "")
+            col_prod = get_col(["Produto", "produto"]) or (cols[6] if len(cols) > 6 else "")
+            col_dt_trans = get_col(["Data da Transação", "Data da Transacao", "dataTransacao"]) or (cols[7] if len(cols) > 7 else "")
+            col_hr_trans = get_col(["Hora da Transação", "Hora da Transacao", "horaTransacao"]) or (cols[8] if len(cols) > 8 else "")
+            col_val = get_col(["Valor", "Valor(R$)", "valor"]) or (cols[9] if len(cols) > 9 else "")
+            col_nome = get_col(["Nome/Sobrenome", "Nome", "nomeSobrenome"]) or (cols[10] if len(cols) > 10 else "")
+            col_cel = get_col(["Celular", "celular"]) or (cols[11] if len(cols) > 11 else "")
+            col_prob = get_col(["Problemas", "Problema", "problemas"]) or (cols[12] if len(cols) > 12 else "")
+            col_pag = get_col(["Forma de Pagamento", "Forma Pagamento", "formaPgto"]) or (cols[13] if len(cols) > 13 else "")
+            col_reemb = get_col(["Reembolso", "reembolso", "Reebolso"])
+            col_pix = get_col(["Pix - Reembolso", "Pix", "pix"])
+            col_atend = get_col(["Atendente", "atendente"])
+            col_dthr = get_col(["Data/Hora do lançamento", "Data/Hora", "dataHoraLancamento"])
+
+            for idx, r in df_ch.iterrows():
+                val = str(r[col_chamado]).strip() if col_chamado and pd.notna(r[col_chamado]) else ""
+                if not val or val.lower() in ["nan", "chamado"]:
+                    continue
+
                 m = re.search(r'SAC-(\d{4})-(\d+)', val, re.IGNORECASE)
                 if m:
                     ano = m.group(1)
                     seq = int(m.group(2))
                     maior_sac_ano[ano] = max(maior_sac_ano.get(ano, 0), seq)
+
+                def get_val(col_name):
+                    return str(r[col_name]).strip() if col_name and col_name in r and pd.notna(r[col_name]) else ""
+
+                chamados_salvos.append({
+                    "linha": idx + 2,
+                    "chamado": val,
+                    "data": get_val(col_data),
+                    "cliente": get_val(col_cli),
+                    "localInterno": get_val(col_loc),
+                    "cidade": get_val(col_cid),
+                    "descricao": get_val(col_desc),
+                    "produto": get_val(col_prod),
+                    "dataTransacao": get_val(col_dt_trans),
+                    "horaTransacao": get_val(col_hr_trans),
+                    "valor": get_val(col_val),
+                    "nomeSobrenome": get_val(col_nome),
+                    "celular": get_val(col_cel),
+                    "problemas": get_val(col_prob),
+                    "formaPgto": get_val(col_pag),
+                    "reembolso": get_val(col_reemb),
+                    "pix": get_val(col_pix),
+                    "atendente": get_val(col_atend),
+                    "dataHoraLancamento": get_val(col_dthr)
+                })
     except Exception:
         pass
+
+    chamados_salvos.reverse()
 
     return {
         "clientes": clientes_dados,
@@ -300,7 +358,8 @@ def carregar_dados_sac():
         "problemas": sorted(problemas),
         "descricoes": sorted(descricoes),
         "usuarios": usuarios_validos,
-        "maior_sac_ano": maior_sac_ano
+        "maior_sac_ano": maior_sac_ano,
+        "chamados": chamados_salvos
     }
 
 catalogo_pecas = carregar_catalogo_planilha()
@@ -870,6 +929,20 @@ html_code = f"""
       <!-- PAINEL DO FORMULÁRIO DO SAC -->
       <div id="sacMainPanel" class="hidden space-y-6">
 
+        <!-- ALERTA DE EDIÇÃO DE CHAMADO -->
+        <div id="alertSACEditMode" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex justify-between items-center shadow-sm">
+          <div class="flex items-center gap-3">
+            <div class="p-2 bg-amber-500 text-white rounded-xl"><i data-lucide="edit-3" class="w-5 h-5"></i></div>
+            <div>
+              <p class="text-sm font-bold">Modo de Edição de Chamado: <span id="labelSACEditChamado" class="font-mono text-amber-800">SAC-0000-0000</span></p>
+              <p class="text-xs text-amber-700">Você está alterando este chamado do SAC. Ao salvar, os dados serão atualizados na planilha.</p>
+            </div>
+          </div>
+          <button type="button" onclick="cancelarEdicaoSAC()" class="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 rounded-xl text-xs font-bold text-amber-900 transition cursor-pointer">
+            Cancelar Edição ✕
+          </button>
+        </div>
+
         <div id="alertSACSuccess" class="hidden p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition">
           <div class="flex items-center gap-3">
             <div class="p-2 bg-emerald-600 text-white rounded-xl">
@@ -892,7 +965,7 @@ html_code = f"""
                 <i data-lucide="headphones" class="w-6 h-6"></i>
               </div>
               <div>
-                <h2 class="text-base font-bold text-slate-900">Lançamento de Ocorrências do SAC</h2>
+                <h2 id="sacFormTitleText" class="text-base font-bold text-slate-900">Lançamento de Ocorrências do SAC</h2>
                 <p class="text-xs text-slate-500">Registro de chamados, ressarcimentos e reembolsos · Aba: Chamados</p>
               </div>
             </div>
@@ -959,16 +1032,16 @@ html_code = f"""
                 </select>
               </div>
 
-              <!-- Data da Transação -->
+              <!-- Data da Transação (Começa Zerado/Vazio) -->
               <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Data da Transação *</label>
-                <input type="date" id="sacDataTransacao" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Data da Transação</label>
+                <input type="date" id="sacDataTransacao" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
               </div>
 
-              <!-- Hora da Transação -->
+              <!-- Hora da Transação (Começa Zerado/Vazio) -->
               <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Hora da Transação *</label>
-                <input type="time" id="sacHoraTransacao" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Hora da Transação</label>
+                <input type="time" id="sacHoraTransacao" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
               </div>
 
               <!-- Valor (R$) -->
@@ -1003,10 +1076,16 @@ html_code = f"""
                 <datalist id="listaSACFormasPgto"></datalist>
               </div>
 
+              <!-- Reembolso (Especificação da forma de devolução) -->
+              <div class="md:col-span-2">
+                <label class="block text-xs font-bold text-sky-900 mb-1">Reembolso *</label>
+                <input type="text" id="sacReembolso" placeholder="Como foi feito o reembolso (Ex: Pix, Crédito Máquina, Dinheiro)..." required class="w-full text-sm rounded-xl border border-sky-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              </div>
+
               <!-- Pix - Reembolso -->
               <div class="md:col-span-2">
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Chave Pix - Reembolso *</label>
-                <input type="text" id="sacPix" placeholder="Chave Pix (CPF, Celular, E-mail ou Aleatória)..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Pix - Reembolso</label>
+                <input type="text" id="sacPix" placeholder="Chave Pix (CPF, Celular, E-mail ou Aleatória)..." class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
               </div>
 
               <!-- Atendente -->
@@ -1034,6 +1113,54 @@ html_code = f"""
             </div>
           </form>
         </section>
+
+        <!-- LISTA DE TODOS OS CHAMADOS REALIZADOS (HISTÓRICO COM EDITAR E EXCLUIR) -->
+        <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+            <div>
+              <h2 class="text-base font-bold flex items-center gap-2 text-slate-800">
+                <i data-lucide="list-checks" class="w-4 h-4 text-sky-600"></i>
+                Chamados Realizados no SAC
+              </h2>
+              <p class="text-xs text-slate-500">Histórico completo de ocorrências registradas na aba Chamados</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="relative">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                <input type="text" id="searchSACChamados" placeholder="Buscar chamado, cliente, cliente/nome..." oninput="filtrarChamadosSAC()" class="text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 w-64">
+              </div>
+              <span id="badgeContadorSAC" class="text-xs px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 font-bold border border-sky-200">
+                0 chamado(s)
+              </span>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-600">
+              <thead class="bg-slate-50 uppercase font-semibold text-slate-500">
+                <tr>
+                  <th class="py-2.5 px-3 rounded-l-lg">Ações</th>
+                  <th class="py-2.5 px-3 font-mono">Chamado</th>
+                  <th class="py-2.5 px-3">Data</th>
+                  <th class="py-2.5 px-3">Cliente</th>
+                  <th class="py-2.5 px-3">Local</th>
+                  <th class="py-2.5 px-3">Produto</th>
+                  <th class="py-2.5 px-3 text-right">Valor</th>
+                  <th class="py-2.5 px-3">Nome Cliente</th>
+                  <th class="py-2.5 px-3">Reembolso</th>
+                  <th class="py-2.5 px-3">Atendente</th>
+                  <th class="py-2.5 px-3 rounded-r-lg">Data Lançamento</th>
+                </tr>
+              </thead>
+              <tbody id="tableSACChamadosBody" class="divide-y divide-slate-100">
+                <tr>
+                  <td colspan="11" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado registrado ainda.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
       </div>
     </div>
 
@@ -1050,6 +1177,8 @@ html_code = f"""
     let rawOrdersData = {ocs_planilha_json};
     let rawRetiradasData = {retiradas_json};
     const dadosSAC = {dados_sac_json};
+    let listaChamadosSAC = Array.isArray(dadosSAC.chamados) ? dadosSAC.chamados : [];
+    let chamadoEmEdicao = null;
     
     // Tratamento seguro de Storage
     let atendenteSACLogado = "";
@@ -1158,6 +1287,7 @@ html_code = f"""
         document.getElementById('labelSACAtendenteLogado').innerText = atendenteSACLogado;
         document.getElementById('sacAtendente').value = atendenteSACLogado;
         inicializarFormularioSAC();
+        renderizarTabelaChamadosSAC();
       }} else {{
         authScreen.classList.remove('hidden');
         mainPanel.classList.add('hidden');
@@ -1195,20 +1325,29 @@ html_code = f"""
 
     function gerarNumeroChamadoSAC(ano) {{
       let maior = dadosSAC.maior_sac_ano[ano] || 0;
+      listaChamadosSAC.forEach(c => {{
+        if (c.chamado) {{
+          const m = c.chamado.match(new RegExp('SAC-' + ano + '-(\\\\d+)', 'i'));
+          if (m) {{
+            const seq = parseInt(m[1]);
+            if (seq > maior) maior = seq;
+          }}
+        }}
+      }});
       const proximo = String(maior + 1).padStart(4, '0');
       return 'SAC-' + ano + '-' + proximo;
     }}
 
     function inicializarFormularioSAC() {{
+      if (chamadoEmEdicao) return;
+
       const anoAtual = new Date().getFullYear();
       document.getElementById('sacChamado').value = gerarNumeroChamadoSAC(anoAtual);
       document.getElementById('sacData').value = new Date().toISOString().split('T')[0];
-      document.getElementById('sacDataTransacao').value = new Date().toISOString().split('T')[0];
       
-      const now = new Date();
-      const hh = String(now.getHours()).padStart(2, '0');
-      const mm = String(now.getMinutes()).padStart(2, '0');
-      document.getElementById('sacHoraTransacao').value = `${{hh}}:${{mm}}`;
+      // Data e Hora de transação começam ZERADOS/VAZIOS
+      document.getElementById('sacDataTransacao').value = "";
+      document.getElementById('sacHoraTransacao').value = "";
 
       const dlCli = document.getElementById('listaSACClientes');
       dlCli.innerHTML = '';
@@ -1290,9 +1429,131 @@ html_code = f"""
     }}
 
     function limparFormSAC() {{
+      chamadoEmEdicao = null;
       document.getElementById('sacForm').reset();
+      document.getElementById('alertSACEditMode').classList.add('hidden');
+      document.getElementById('sacFormTitleText').innerText = "Lançamento de Ocorrências do SAC";
+      document.getElementById('btnSalvarSACText').innerText = "Lançar Ocorrência SAC";
       inicializarFormularioSAC();
       document.getElementById('sacAtendente').value = atendenteSACLogado;
+    }}
+
+    function editarChamadoSAC(numeroChamado) {{
+      const item = listaChamadosSAC.find(c => c.chamado === numeroChamado);
+      if (!item) return;
+
+      chamadoEmEdicao = item;
+      document.getElementById('sacChamado').value = item.chamado;
+      document.getElementById('sacData').value = item.data;
+      document.getElementById('sacCliente').value = item.cliente;
+      aoMudarClienteSAC();
+      document.getElementById('sacLocalInterno').value = item.localInterno;
+      document.getElementById('sacCidade').value = item.cidade;
+      document.getElementById('sacDescricao').value = item.descricao;
+      document.getElementById('sacProduto').value = item.produto || 'Café';
+      document.getElementById('sacDataTransacao').value = item.dataTransacao || '';
+      document.getElementById('sacHoraTransacao').value = item.horaTransacao || '';
+      
+      const vLimpo = parseFloat(String(item.valor).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')) || 0;
+      document.getElementById('sacValor').value = vLimpo || '';
+      document.getElementById('sacNome').value = item.nomeSobrenome;
+      document.getElementById('sacCelular').value = item.celular;
+      document.getElementById('sacProblema').value = item.problemas;
+      document.getElementById('sacFormaPgto').value = item.formaPgto;
+      document.getElementById('sacReembolso').value = item.reembolso || '';
+      document.getElementById('sacPix').value = item.pix || '';
+      document.getElementById('sacAtendente').value = item.atendente || atendenteSACLogado;
+
+      document.getElementById('alertSACEditMode').classList.remove('hidden');
+      document.getElementById('labelSACEditChamado').innerText = item.chamado;
+      document.getElementById('sacFormTitleText').innerText = 'Edição da Ocorrência: ' + item.chamado;
+      document.getElementById('btnSalvarSACText').innerText = 'Salvar Alterações';
+
+      document.getElementById('sacForm').scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+    }}
+
+    function cancelarEdicaoSAC() {{
+      limparFormSAC();
+    }}
+
+    async function excluirChamadoSAC(numeroChamado) {{
+      if (!confirm('Deseja realmente excluir o chamado ' + numeroChamado + '? Esta ação solicitará a remoção na planilha.')) {{
+        return;
+      }}
+
+      const item = listaChamadosSAC.find(c => c.chamado === numeroChamado);
+
+      const payloadExcluir = {{
+        "action": "excluir",
+        "acao": "excluir",
+        "tipo": "excluir_sac",
+        "Chamado": numeroChamado,
+        "chamado": numeroChamado,
+        "linha": item ? item.linha : ""
+      }};
+
+      await enviarParaPlanilhaGarantido(payloadExcluir, true);
+
+      listaChamadosSAC = listaChamadosSAC.filter(c => c.chamado !== numeroChamado);
+      renderizarTabelaChamadosSAC();
+
+      alert('Chamado ' + numeroChamado + ' removido do painel.');
+    }}
+
+    function filtrarChamadosSAC() {{
+      const termo = (document.getElementById('searchSACChamados')?.value || '').trim().toLowerCase();
+      if (!termo) {{
+        renderizarTabelaChamadosSAC(listaChamadosSAC);
+        return;
+      }}
+      const filtrados = listaChamadosSAC.filter(c => 
+        (c.chamado && c.chamado.toLowerCase().includes(termo)) ||
+        (c.cliente && c.cliente.toLowerCase().includes(termo)) ||
+        (c.nomeSobrenome && c.nomeSobrenome.toLowerCase().includes(termo)) ||
+        (c.localInterno && c.localInterno.toLowerCase().includes(termo)) ||
+        (c.problemas && c.problemas.toLowerCase().includes(termo))
+      );
+      renderizarTabelaChamadosSAC(filtrados);
+    }}
+
+    function renderizarTabelaChamadosSAC(lista = listaChamadosSAC) {{
+      const tbody = document.getElementById('tableSACChamadosBody');
+      const badge = document.getElementById('badgeContadorSAC');
+      if (badge) badge.innerText = lista.length + ' chamado(s)';
+
+      if (!lista || lista.length === 0) {{
+        tbody.innerHTML = '<tr><td colspan="11" class="text-center py-6 text-slate-400 font-semibold">Nenhuma ocorrência encontrada.</td></tr>';
+        return;
+      }}
+
+      tbody.innerHTML = lista.map(c => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-2 px-3 whitespace-nowrap">
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="editarChamadoSAC('${{c.chamado}}')" title="Editar chamado ${{c.chamado}}" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
+                <i data-lucide="edit-2" class="w-3 h-3"></i>
+                Editar
+              </button>
+              <button type="button" onclick="excluirChamadoSAC('${{c.chamado}}')" title="Excluir chamado ${{c.chamado}}" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition cursor-pointer">
+                <i data-lucide="trash-2" class="w-3 h-3"></i>
+                Excluir
+              </button>
+            </div>
+          </td>
+          <td class="py-2.5 px-3 font-mono font-bold text-sky-700">${{c.chamado}}</td>
+          <td class="py-2.5 px-3">${{c.data || '-'}}</td>
+          <td class="py-2.5 px-3 font-semibold text-slate-800">${{c.cliente || '-'}}</td>
+          <td class="py-2.5 px-3 text-slate-600">${{c.localInterno || '-'}}</td>
+          <td class="py-2.5 px-3 font-medium text-slate-700">${{c.produto || '-'}}</td>
+          <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
+          <td class="py-2.5 px-3 font-medium text-slate-800">${{c.nomeSobrenome || '-'}}</td>
+          <td class="py-2.5 px-3 text-sky-900 font-semibold">${{c.reembolso || '-'}}</td>
+          <td class="py-2.5 px-3 font-medium text-slate-600">${{c.atendente || '-'}}</td>
+          <td class="py-2.5 px-3 text-slate-400 text-[11px]">${{c.dataHoraLancamento || '-'}}</td>
+        </tr>
+      `).join('');
+
+      lucide.createIcons();
     }}
 
     let enviandoSAC = false;
@@ -1314,6 +1575,7 @@ html_code = f"""
       const celular = document.getElementById('sacCelular').value.trim();
       const problemas = document.getElementById('sacProblema').value.trim();
       const formaPgto = document.getElementById('sacFormaPgto').value.trim();
+      const reembolso = document.getElementById('sacReembolso').value.trim();
       const pix = document.getElementById('sacPix').value.trim();
       const atendente = atendenteSACLogado || document.getElementById('sacAtendente').value;
       
@@ -1325,8 +1587,13 @@ html_code = f"""
       btn.disabled = true;
       document.getElementById('btnSalvarSACText').innerText = 'Gravando na planilha...';
 
-      // Payload espelhado com as chaves exatas esperadas pelo seu Apps Script:
+      const ehEdicao = (chamadoEmEdicao !== null);
+
+      // Payload espelhado com as chaves exatas esperadas pelo Apps Script
       const payloadSAC = {{
+        "acao": ehEdicao ? "editar" : "inserir",
+        "action": ehEdicao ? "editar" : "inserir",
+        "linha": ehEdicao && chamadoEmEdicao.linha ? chamadoEmEdicao.linha : "",
         "Chamado": chamado,
         "Data": data,
         "Cliente": cliente,
@@ -1341,12 +1608,41 @@ html_code = f"""
         "Celular": celular,
         "Problemas": problemas,
         "Forma de Pagamento": formaPgto,
+        "Reembolso": reembolso,
         "Pix - Reembolso": pix,
         "Atendente": atendente,
         "Data/Hora do lançamento": dataHoraLancamento
       }};
 
       await enviarParaPlanilhaGarantido(payloadSAC, true);
+
+      const novoItem = {{
+        linha: ehEdicao && chamadoEmEdicao.linha ? chamadoEmEdicao.linha : listaChamadosSAC.length + 2,
+        chamado,
+        data,
+        cliente,
+        localInterno,
+        cidade,
+        descricao,
+        produto,
+        dataTransacao,
+        horaTransacao,
+        valor: formatCurrency(valor),
+        nomeSobrenome,
+        celular,
+        problemas,
+        formaPgto,
+        reembolso,
+        pix,
+        atendente,
+        dataHoraLancamento
+      }};
+
+      if (ehEdicao) {{
+        listaChamadosSAC = listaChamadosSAC.map(c => c.chamado === chamado ? novoItem : c);
+      }} else {{
+        listaChamadosSAC.unshift(novoItem);
+      }}
 
       const m = chamado.match(/SAC-(\d{{4}})-(\d+)/i);
       if (m) {{
@@ -1360,9 +1656,12 @@ html_code = f"""
       document.getElementById('btnSalvarSACText').innerText = 'Lançar Ocorrência SAC';
 
       limparFormSAC();
+      renderizarTabelaChamadosSAC();
 
       const alertBox = document.getElementById('alertSACSuccess');
-      document.getElementById('alertSACSuccessTitle').innerText = '✅ Ocorrência ' + chamado + ' lançada com sucesso!';
+      document.getElementById('alertSACSuccessTitle').innerText = ehEdicao ?
+        '✅ Ocorrência ' + chamado + ' atualizada com sucesso!' :
+        '✅ Ocorrência ' + chamado + ' lançada com sucesso!';
       document.getElementById('alertSACSuccessSub').innerText = 'Cliente: ' + cliente + ' (' + localInterno + ') · Atendente: ' + atendente + ' · Valor: ' + formatCurrency(valor);
       alertBox.classList.remove('hidden');
       alertBox.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
@@ -1370,8 +1669,562 @@ html_code = f"""
     }}
 
     // =========================================================================
-    // INICIALIZAÇÃO DA ABA ATIVA
+    // DASHBOARD RETIRADAS
     // =========================================================================
+    const filterRetTecnico = document.getElementById('filterRetiradaTecnico');
+    const filterRetDevolvida = document.getElementById('filterRetiradaDevolvida');
+    const filterRetCondicao = document.getElementById('filterRetiradaCondicao');
+
+    function getHorizontalRetiradaBarOptions() {{
+      const textColor = '#475569';
+      const gridColor = 'rgba(226, 232, 240, 0.7)';
+      return {{
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {{ padding: {{ right: 40, left: 10, top: 10, bottom: 10 }} }},
+        plugins: {{
+          legend: {{ display: false }},
+          tooltip: {{
+            backgroundColor: '#ffffff',
+            titleColor: '#0f172a',
+            bodyColor: '#334155',
+            borderColor: '#e2e8f0',
+            borderWidth: 1,
+            padding: 10,
+            callbacks: {{
+              label: (context) => 'Quantidade: ' + context.raw.toLocaleString('pt-BR') + ' un'
+            }}
+          }},
+          datalabels: {{
+            anchor: 'end',
+            align: 'right',
+            offset: 4,
+            color: '#0f172a',
+            font: {{ family: 'Inter', weight: 'bold', size: 10 }},
+            formatter: (v) => v ? v.toLocaleString('pt-BR') : ''
+          }}
+        }},
+        scales: {{
+          x: {{
+            grid: {{ color: gridColor }},
+            ticks: {{ color: textColor, font: {{ size: 10 }} }},
+            beginAtZero: true
+          }},
+          y: {{
+            grid: {{ display: false }},
+            ticks: {{ color: textColor, font: {{ size: 10, weight: '600' }} }}
+          }}
+        }}
+      }};
+    }}
+
+    const chartTopPecasRetiradas = new Chart(document.getElementById('chartTopPecasRetiradas').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(217, 119, 6, 0.85)', borderRadius: 6 }}] }},
+      options: getHorizontalRetiradaBarOptions()
+    }});
+
+    const chartRetiradasPorTecnico = new Chart(document.getElementById('chartRetiradasPorTecnico').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(2, 132, 199, 0.85)', borderRadius: 6 }}] }},
+      options: getHorizontalRetiradaBarOptions()
+    }});
+
+    function inicializarFiltrosRetiradas() {{
+      const tecnicosUnicos = [...new Set(rawRetiradasData.map(r => r.tecnico).filter(Boolean))].sort();
+      filterRetTecnico.innerHTML = '<option value="ALL">Todos os Técnicos</option>';
+      tecnicosUnicos.forEach(t => {{
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        filterRetTecnico.appendChild(opt);
+      }});
+    }}
+    inicializarFiltrosRetiradas();
+
+    function atualizarDashboardRetiradas() {{
+      const tecVal = filterRetTecnico.value;
+      const devVal = filterRetDevolvida.value;
+      const condVal = filterRetCondicao.value;
+      const searchVal = (document.getElementById('searchRetiradasGeral')?.value || '').trim().toLowerCase();
+
+      const filtrados = rawRetiradasData.filter(item => {{
+        const matchTec = (tecVal === 'ALL' || item.tecnico === tecVal);
+        const matchDev = (devVal === 'ALL' || item.devolvida.toLowerCase() === devVal.toLowerCase());
+        const matchCond = (condVal === 'ALL' || item.novaUsada.toLowerCase() === condVal.toLowerCase());
+        const matchSearch = !searchVal || (
+          (item.tecnico && item.tecnico.toLowerCase().includes(searchVal)) ||
+          (item.os && item.os.toLowerCase().includes(searchVal)) ||
+          (item.cliente && item.cliente.toLowerCase().includes(searchVal)) ||
+          (item.codigo && item.codigo.toLowerCase().includes(searchVal)) ||
+          (item.descricao && item.descricao.toLowerCase().includes(searchVal))
+        );
+        return matchTec && matchDev && matchCond && matchSearch;
+      }});
+
+      document.getElementById('badgeFiltroRetirada').innerText = 'Filtrando: Técnico [' + tecVal + '] · Status [' + devVal + '] · Condição [' + condVal + ']';
+
+      const totalRegistrosRetirada = filtrados.length;
+      let totalPecas = 0;
+      let naoDevolvidas = 0;
+      let devolvidas = 0;
+      let instalacoes = 0;
+
+      filtrados.forEach(r => {{
+        const q = parseInt(r.quantidade) || 1;
+        totalPecas += q;
+        const stLower = (r.devolvida || '').toLowerCase();
+        if (stLower === 'não' || stLower === 'nao') naoDevolvidas += q;
+        else if (stLower === 'sim') devolvidas += q;
+        else if (stLower.includes('instalação') || stLower.includes('instalacao')) instalacoes += q;
+      }});
+
+      const pctNaoDevolvidas = totalPecas > 0 ? Math.round((naoDevolvidas / totalPecas) * 100) : 0;
+      const pctDevolvidas = totalPecas > 0 ? Math.round((devolvidas / totalPecas) * 100) : 0;
+
+      document.getElementById('kpiRetiradaTotal').innerText = totalRegistrosRetirada.toLocaleString('pt-BR');
+      document.getElementById('kpiRetiradaTotalSub').innerText = 'Total: ' + totalPecas.toLocaleString('pt-BR') + ' peças retiradas';
+
+      document.getElementById('kpiRetiradaNaoDevolvidas').innerText = naoDevolvidas.toLocaleString('pt-BR') + ' un';
+      document.getElementById('kpiRetiradaNaoDevolvidasPct').innerText = pctNaoDevolvidas + '%';
+      document.getElementById('kpiRetiradaDevolvidas').innerText = devolvidas.toLocaleString('pt-BR') + ' un';
+      document.getElementById('kpiRetiradaDevolvidasPct').innerText = pctDevolvidas + '%';
+      document.getElementById('kpiRetiradaInstalacao').innerText = instalacoes.toLocaleString('pt-BR') + ' un';
+      document.getElementById('kpiRetiradaTecnicos').innerText = new Set(filtrados.map(r => r.tecnico)).size;
+      document.getElementById('kpiRetiradaClientes').innerText = new Set(filtrados.map(r => r.cliente)).size;
+
+      const pecasContagem = {{}};
+      filtrados.forEach(r => {{
+        const nome = (r.descricao || r.codigo || 'Peça').trim();
+        pecasContagem[nome] = (pecasContagem[nome] || 0) + (parseInt(r.quantidade) || 1);
+      }});
+      const truncar = (t, max = 28) => t.length > max ? t.substring(0, max) + '...' : t;
+      const top10Pecas = Object.entries(pecasContagem).map(([nome, qt]) => ({{ nome, qt }})).sort((a,b) => b.qt - a.qt).slice(0, 10);
+      chartTopPecasRetiradas.data.labels = top10Pecas.map(p => truncar(p.nome));
+      chartTopPecasRetiradas.data.datasets[0].data = top10Pecas.map(p => p.qt);
+      chartTopPecasRetiradas.update();
+
+      const tecContagem = {{}};
+      filtrados.forEach(r => {{
+        const t = (r.tecnico || 'Indefinido').trim();
+        tecContagem[t] = (tecContagem[t] || 0) + (parseInt(r.quantidade) || 1);
+      }});
+      const topTecnicos = Object.entries(tecContagem).map(([nome, qt]) => ({{ nome, qt }})).sort((a,b) => b.qt - a.qt).slice(0, 10);
+      chartRetiradasPorTecnico.data.labels = topTecnicos.map(t => truncar(t.nome));
+      chartRetiradasPorTecnico.data.datasets[0].data = topTecnicos.map(t => t.qt);
+      chartRetiradasPorTecnico.update();
+
+      const tbGeral = document.getElementById('tableRetiradasGeralBody');
+      if (filtrados.length === 0) {{
+        tbGeral.innerHTML = '<tr><td colspan="9" class="text-center py-6 text-slate-400 font-semibold">Nenhuma retirada encontrada.</td></tr>';
+      }} else {{
+        tbGeral.innerHTML = filtrados.map(item => {{
+          const dLower = (item.devolvida || '').toLowerCase();
+          let badgeClass = 'bg-rose-100 text-rose-800';
+          if (dLower === 'sim') badgeClass = 'bg-emerald-100 text-emerald-800';
+          else if (dLower.includes('instalação') || dLower.includes('instalacao')) badgeClass = 'bg-indigo-100 text-indigo-800';
+
+          return `
+            <tr class="hover:bg-slate-50 transition">
+              <td class="py-2.5 px-3">${{item.data}}</td>
+              <td class="py-2.5 px-3 font-semibold text-slate-800">${{item.tecnico}}</td>
+              <td class="py-2.5 px-3">${{item.cliente}}</td>
+              <td class="py-2.5 px-3 font-mono font-bold text-blue-700">${{item.os}}</td>
+              <td class="py-2.5 px-3 font-mono text-slate-600">${{item.codigo}}</td>
+              <td class="py-2.5 px-3 font-medium text-slate-800">${{item.descricao}}</td>
+              <td class="py-2.5 px-3 text-center"><span class="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-700 font-semibold">${{item.novaUsada}}</span></td>
+              <td class="py-2.5 px-3 text-center font-bold text-slate-800">${{item.quantidade}} un</td>
+              <td class="py-2.5 px-3 text-center"><span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${{badgeClass}}">${{item.devolvida}}</span></td>
+            </tr>
+          `;
+        }}).join('');
+      }}
+      lucide.createIcons();
+    }}
+
+    [filterRetTecnico, filterRetDevolvida, filterRetCondicao].forEach(el => el.addEventListener('change', atualizarDashboardRetiradas));
+    document.getElementById('btnLimparFiltrosRetirada').addEventListener('click', () => {{
+      filterRetTecnico.value = 'ALL';
+      filterRetDevolvida.value = 'ALL';
+      filterRetCondicao.value = 'ALL';
+      document.getElementById('searchRetiradasGeral').value = '';
+      atualizarDashboardRetiradas();
+    }});
+
+    // =========================================================================
+    // DASHBOARD SOLICITAÇÕES
+    // =========================================================================
+    function formatCurrency(val) {{
+      return (val || 0).toLocaleString('pt-BR', {{ style: 'currency', currency: 'BRL' }});
+    }}
+
+    const filterYear = document.getElementById('filterYear');
+    const filterMonth = document.getElementById('filterMonth');
+    const filterCategory = document.getElementById('filterCategory');
+    const filterRequester = document.getElementById('filterRequester');
+    const resetFiltersBtn = document.getElementById('resetFilters');
+    const activeFilterBadge = document.getElementById('activeFilterBadge');
+
+    const kpiTotalCost = document.getElementById('kpiTotalCost');
+    const kpiTotalRequests = document.getElementById('kpiTotalRequests');
+    const kpiItemsQty = document.getElementById('kpiItemsQty');
+    const kpiApprovedQty = document.getElementById('kpiApprovedQty');
+    const kpiApprovedPercent = document.getElementById('kpiApprovedPercent');
+    const kpiUnapprovedQty = document.getElementById('kpiUnapprovedQty');
+    const kpiUnapprovedPercent = document.getElementById('kpiUnapprovedPercent');
+    const kpiAvgCost = document.getElementById('kpiAvgCost');
+
+    const tableBody = document.getElementById('tableBody');
+    const tableSearch = document.getElementById('tableSearch');
+    const tableCountBadge = document.getElementById('tableCountBadge');
+
+    function populateDropdowns() {{
+      filterYear.innerHTML = '<option value="ALL">Todos os Anos</option>';
+      filterMonth.innerHTML = '<option value="ALL">Todos os Meses</option>';
+      filterCategory.innerHTML = '<option value="ALL">Todas as Categorias</option>';
+      filterRequester.innerHTML = '<option value="ALL">Todos os Solicitantes</option>';
+
+      const years = [...new Set(rawOrdersData.map(d => d.ano).filter(Boolean))].sort();
+      const months = [...new Set(rawOrdersData.map(d => d.mes).filter(Boolean))];
+      const categories = [...new Set(rawOrdersData.map(d => d.categoria).filter(Boolean))].sort();
+      const requesters = [...new Set(rawOrdersData.map(d => d.solicitante).filter(Boolean))].sort();
+
+      years.forEach(y => {{ const opt = document.createElement('option'); opt.value = y; opt.textContent = y; filterYear.appendChild(opt); }});
+      months.forEach(m => {{ const opt = document.createElement('option'); opt.value = m; opt.textContent = m; filterMonth.appendChild(opt); }});
+      categories.forEach(c => {{ const opt = document.createElement('option'); opt.value = c; opt.textContent = c; filterCategory.appendChild(opt); }});
+      requesters.forEach(r => {{ const opt = document.createElement('option'); opt.value = r; opt.textContent = r; filterRequester.appendChild(opt); }});
+    }}
+    populateDropdowns();
+
+    function getHorizontalBarOptions(isCurrency = false) {{
+      const textColor = '#475569';
+      const gridColor = 'rgba(226, 232, 240, 0.7)';
+      return {{
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {{ padding: {{ right: 40, left: 10, top: 10, bottom: 10 }} }},
+        plugins: {{
+          legend: {{ display: false }},
+          tooltip: {{
+            backgroundColor: '#ffffff',
+            titleColor: '#0f172a',
+            bodyColor: '#334155',
+            borderColor: '#e2e8f0',
+            borderWidth: 1,
+            padding: 10,
+            callbacks: {{
+              label: (context) => isCurrency ? 'Custo: ' + formatCurrency(context.raw) : 'Quantidade: ' + context.raw.toLocaleString('pt-BR') + ' un'
+            }}
+          }},
+          datalabels: {{
+            anchor: 'end',
+            align: 'right',
+            offset: 4,
+            color: '#0f172a',
+            font: {{ family: 'Inter', weight: 'bold', size: 10 }},
+            formatter: (v) => {{
+              if (!v) return '';
+              return isCurrency ? formatCurrency(v) : v.toLocaleString('pt-BR');
+            }}
+          }}
+        }},
+        scales: {{
+          x: {{
+            grid: {{ color: gridColor }},
+            ticks: {{ color: textColor, font: {{ size: 10 }} }},
+            beginAtZero: true
+          }},
+          y: {{
+            grid: {{ display: false }},
+            ticks: {{ color: textColor, font: {{ size: 10, weight: '600' }} }}
+          }}
+        }}
+      }};
+    }}
+
+    const chartPecasPorMesQt = new Chart(document.getElementById('chartPecasPorMesQt').getContext('2d'), {{
+      type: 'bar',
+      data: {{
+        labels: [],
+        datasets: [
+          {{ label: 'Qt Solicitada', data: [], backgroundColor: 'rgba(2, 132, 199, 0.85)', borderRadius: 6 }},
+          {{ label: 'Qt Atendida', data: [], backgroundColor: 'rgba(16, 185, 129, 0.85)', borderRadius: 6 }}
+        ]
+      }},
+      options: {{
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {{ padding: {{ top: 22, bottom: 6, left: 6, right: 6 }} }},
+        plugins: {{
+          legend: {{ display: true, position: 'top', labels: {{ font: {{ family: 'Inter', size: 11, weight: '600' }}, color: '#334155', boxWidth: 12 }} }},
+          datalabels: {{
+            anchor: 'end',
+            align: 'top',
+            offset: 2,
+            color: '#0f172a',
+            font: {{ family: 'Inter', weight: 'bold', size: 10 }},
+            formatter: (v) => v ? v.toLocaleString('pt-BR') : ''
+          }}
+        }},
+        scales: {{
+          x: {{ grid: {{ color: 'rgba(226, 232, 240, 0.8)' }}, ticks: {{ color: '#64748b', font: {{ size: 10 }} }} }},
+          y: {{ grid: {{ color: 'rgba(226, 232, 240, 0.8)' }}, ticks: {{ color: '#64748b', font: {{ size: 10 }} }}, beginAtZero: true }}
+        }}
+      }}
+    }});
+
+    const chartPecasPorMesValor = new Chart(document.getElementById('chartPecasPorMesValor').getContext('2d'), {{
+      type: 'bar',
+      data: {{
+        labels: [],
+        datasets: [{{ label: 'Valor Total (R$)', data: [], backgroundColor: 'rgba(16, 185, 129, 0.85)', borderRadius: 8 }}]
+      }},
+      options: {{
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {{ padding: {{ top: 22, bottom: 6, left: 6, right: 6 }} }},
+        plugins: {{
+          legend: {{ display: false }},
+          datalabels: {{
+            anchor: 'end',
+            align: 'top',
+            offset: 2,
+            color: '#0f172a',
+            font: {{ family: 'Inter', weight: 'bold', size: 10 }},
+            formatter: (v) => v ? formatCurrency(v) : ''
+          }}
+        }},
+        scales: {{
+          x: {{ grid: {{ color: 'rgba(226, 232, 240, 0.8)' }}, ticks: {{ color: '#64748b', font: {{ size: 10 }} }} }},
+          y: {{ grid: {{ color: 'rgba(226, 232, 240, 0.8)' }}, ticks: {{ color: '#64748b', font: {{ size: 10 }} }}, beginAtZero: true }}
+        }}
+      }}
+    }});
+
+    const chartTopPecasQt = new Chart(document.getElementById('chartTopPecasQt').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(2, 132, 199, 0.85)', borderRadius: 6 }}] }},
+      options: getHorizontalBarOptions(false)
+    }});
+
+    const chartTopPecasCusto = new Chart(document.getElementById('chartTopPecasCusto').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(16, 185, 129, 0.85)', borderRadius: 6 }}] }},
+      options: getHorizontalBarOptions(true)
+    }});
+
+    const chartCategory = new Chart(document.getElementById('chartCategoryDist').getContext('2d'), {{
+      type: 'doughnut',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: ['#0284c7', '#06b6d4', '#f59e0b', '#6366f1', '#10b981'], borderWidth: 2, borderColor: '#ffffff' }}] }},
+      options: {{ responsive: true, maintainAspectRatio: false, cutout: '62%' }}
+    }});
+
+    const chartSupplier = new Chart(document.getElementById('chartSupplierCost').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(245, 158, 11, 0.85)', borderRadius: 8 }}] }},
+      options: {{
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {{ padding: {{ top: 22, bottom: 6, left: 6, right: 6 }} }},
+        plugins: {{
+          legend: {{ display: false }},
+          datalabels: {{
+            anchor: 'end',
+            align: 'top',
+            offset: 2,
+            color: '#0f172a',
+            font: {{ family: 'Inter', weight: 'bold', size: 11 }},
+            formatter: (v) => v ? formatCurrency(v) : ''
+          }}
+        }},
+        scales: {{
+          x: {{ grid: {{ color: 'rgba(226, 232, 240, 0.8)' }}, ticks: {{ color: '#64748b', font: {{ size: 10 }} }} }},
+          y: {{ grid: {{ color: 'rgba(226, 232, 240, 0.8)' }}, ticks: {{ color: '#64748b', font: {{ size: 10 }} }}, beginAtZero: true }}
+        }}
+      }}
+    }});
+
+    function normalizarMes(item) {{
+      if (item.mes && item.mes.trim()) return item.mes.trim();
+      if (item.data) {{
+        const partes = item.data.split(/[-/]/);
+        if (partes.length >= 2) {{
+          let m = parseInt(partes[1], 10);
+          const nomes = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+          if (!isNaN(m) && m >= 1 && m <= 12) return nomes[m - 1];
+        }}
+      }}
+      return "Outros";
+    }}
+
+    function updateDashboard() {{
+      const yearVal = filterYear.value;
+      const monthVal = filterMonth.value;
+      const catVal = filterCategory.value;
+      const reqVal = filterRequester.value;
+      const searchVal = tableSearch.value.trim().toLowerCase();
+
+      const filtered = rawOrdersData.filter(item => {{
+        const matchYear = (yearVal === 'ALL' || item.ano === yearVal);
+        const matchMonth = (monthVal === 'ALL' || item.mes === monthVal);
+        const matchCat = (catVal === 'ALL' || item.categoria === catVal);
+        const matchReq = (reqVal === 'ALL' || item.solicitante === reqVal);
+        return matchYear && matchMonth && matchCat && matchReq;
+      }});
+
+      activeFilterBadge.innerText = 'Filtrando: Ano [' + yearVal + '] · Mês [' + monthVal + '] · Categoria [' + catVal + ']';
+
+      const totalCusto = filtered.reduce((acc, cur) => acc + (cur.custoTotal || 0), 0);
+      const totalItens = filtered.reduce((acc, cur) => acc + (cur.qt || 0), 0);
+      const totalAtendidas = filtered.reduce((acc, cur) => acc + (cur.qtAprovada || 0), 0);
+      const totalNaoAtendidas = filtered.reduce((acc, cur) => acc + (cur.qtNaoAprovada || 0), 0);
+      
+      const ocsUnicas = new Set(filtered.map(f => f.oc)).size;
+      const avgCost = ocsUnicas > 0 ? (totalCusto / ocsUnicas) : 0;
+
+      const pctAtendidas = totalItens > 0 ? Math.round((totalAtendidas / totalItens) * 100) : 0;
+      const pctNaoAtendidas = totalItens > 0 ? (100 - pctAtendidas) : 0;
+
+      kpiTotalCost.innerText = formatCurrency(totalCusto);
+      kpiTotalRequests.innerText = ocsUnicas;
+      kpiItemsQty.innerText = totalItens.toLocaleString('pt-BR') + ' un';
+      kpiApprovedQty.innerText = totalAtendidas.toLocaleString('pt-BR') + ' un';
+      kpiApprovedPercent.innerText = pctAtendidas + '%';
+      kpiUnapprovedQty.innerText = totalNaoAtendidas.toLocaleString('pt-BR') + ' un';
+      kpiUnapprovedPercent.innerText = pctNaoAtendidas + '%';
+      kpiAvgCost.innerText = formatCurrency(avgCost);
+
+      const mesesOrdem = [
+        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+      ];
+      const dadosPorMes = {{}};
+      mesesOrdem.forEach(m => {{ dadosPorMes[m] = {{ qtTotal: 0, qtAtendida: 0, valorTotal: 0 }}; }});
+
+      filtered.forEach(item => {{
+        const m = normalizarMes(item);
+        if (!dadosPorMes[m]) dadosPorMes[m] = {{ qtTotal: 0, qtAtendida: 0, valorTotal: 0 }};
+        dadosPorMes[m].qtTotal += (item.qt || 0);
+        dadosPorMes[m].qtAtendida += (item.qtAprovada || 0);
+        dadosPorMes[m].valorTotal += (item.custoTotal || 0);
+      }});
+
+      let mesesAtivos = mesesOrdem.filter(m => (dadosPorMes[m].qtTotal > 0 || dadosPorMes[m].valorTotal > 0));
+      if (mesesAtivos.length === 0) mesesAtivos = mesesOrdem.slice(0, 6);
+
+      chartPecasPorMesQt.data.labels = mesesAtivos;
+      chartPecasPorMesQt.data.datasets[0].data = mesesAtivos.map(m => dadosPorMes[m].qtTotal);
+      chartPecasPorMesQt.data.datasets[1].data = mesesAtivos.map(m => dadosPorMes[m].qtAtendida);
+      chartPecasPorMesQt.update();
+
+      chartPecasPorMesValor.data.labels = mesesAtivos;
+      chartPecasPorMesValor.data.datasets[0].data = mesesAtivos.map(m => dadosPorMes[m].valorTotal);
+      chartPecasPorMesValor.update();
+
+      const pecasAgrupadas = {{}};
+      filtered.forEach(item => {{
+        const nomePeca = (item.peca || item.codigoPeca || 'Indefinida').trim();
+        if (!pecasAgrupadas[nomePeca]) pecasAgrupadas[nomePeca] = {{ qt: 0, custo: 0 }};
+        pecasAgrupadas[nomePeca].qt += (item.qt || 0);
+        pecasAgrupadas[nomePeca].custo += (item.custoTotal || 0);
+      }});
+
+      const listaAgrupada = Object.entries(pecasAgrupadas).map(([nome, vals]) => ({{ nome, qt: vals.qt, custo: vals.custo }}));
+      const truncarTexto = (txt, max = 28) => txt.length > max ? txt.substring(0, max) + '...' : txt;
+
+      const top10Qt = [...listaAgrupada].sort((a, b) => b.qt - a.qt).slice(0, 10);
+      chartTopPecasQt.data.labels = top10Qt.map(p => truncarTexto(p.nome));
+      chartTopPecasQt.data.datasets[0].data = top10Qt.map(p => p.qt);
+      chartTopPecasQt.update();
+
+      const top10Custo = [...listaAgrupada].sort((a, b) => b.custo - a.custo).slice(0, 10);
+      chartTopPecasCusto.data.labels = top10Custo.map(p => truncarTexto(p.nome));
+      chartTopPecasCusto.data.datasets[0].data = top10Custo.map(p => p.custo);
+      chartTopPecasCusto.update();
+
+      const catCounts = {{}};
+      filtered.forEach(d => {{ if(d.categoria) catCounts[d.categoria] = (catCounts[d.categoria] || 0) + (d.qt || 0); }});
+      chartCategory.data.labels = Object.keys(catCounts);
+      chartCategory.data.datasets[0].data = Object.values(catCounts);
+      chartCategory.update();
+
+      const supplierCosts = {{}};
+      filtered.forEach(d => {{ if(d.fornecedor) supplierCosts[d.fornecedor] = (supplierCosts[d.fornecedor] || 0) + (d.custoTotal || 0); }});
+      chartSupplier.data.labels = Object.keys(supplierCosts);
+      chartSupplier.data.datasets[0].data = Object.values(supplierCosts);
+      chartSupplier.update();
+
+      renderTable(filtered, searchVal);
+    }}
+
+    function renderTable(dataList, searchTerm) {{
+      const grouped = {{}};
+      dataList.forEach(item => {{
+        const key = item.codigoPeca || item.peca;
+        if (!grouped[key]) {{
+          grouped[key] = {{
+            codigoPeca: item.codigoPeca || '—',
+            peca: item.peca,
+            categoria: item.categoria,
+            qtTotal: 0,
+            qtAtendida: 0,
+            qtNaoAtendida: 0,
+            pedidosCount: 0,
+            custoTotal: 0
+          }};
+        }}
+        grouped[key].qtTotal += (item.qt || 0);
+        grouped[key].qtAtendida += (item.qtAprovada || 0);
+        grouped[key].qtNaoAtendida += (item.qtNaoAprovada || 0);
+        grouped[key].pedidosCount += 1;
+        grouped[key].custoTotal += (item.custoTotal || 0);
+      }});
+
+      let itemsArray = Object.values(grouped);
+      if (searchTerm) {{
+        itemsArray = itemsArray.filter(i => 
+          (i.peca && i.peca.toLowerCase().includes(searchTerm)) || 
+          (i.codigoPeca && i.codigoPeca.toLowerCase().includes(searchTerm)) || 
+          (i.categoria && i.categoria.toLowerCase().includes(searchTerm))
+        );
+      }}
+
+      itemsArray.sort((a, b) => b.custoTotal - a.custoTotal);
+      tableCountBadge.innerText = itemsArray.length + ' itens';
+
+      if (itemsArray.length === 0) {{
+        tableBody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400">Nenhuma peça encontrada.</td></tr>';
+        return;
+      }}
+
+      tableBody.innerHTML = itemsArray.map(item => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-3 px-4 font-mono font-semibold text-blue-600">${{item.codigoPeca}}</td>
+          <td class="py-3 px-4 font-semibold text-slate-800">${{item.peca}}</td>
+          <td class="py-3 px-4"><span class="inline-block px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700">${{item.categoria}}</span></td>
+          <td class="py-3 px-4 text-center font-bold text-slate-700">${{item.qtTotal.toLocaleString('pt-BR')}} un</td>
+          <td class="py-3 px-4 text-center font-semibold text-emerald-600">${{item.qtAtendida.toLocaleString('pt-BR')}} un</td>
+          <td class="py-3 px-4 text-center font-semibold text-rose-500">${{item.qtNaoAtendida.toLocaleString('pt-BR')}} un</td>
+          <td class="py-3 px-4 text-center text-slate-500">${{item.pedidosCount}}</td>
+          <td class="py-3 px-4 text-right font-bold text-amber-600">${{formatCurrency(item.custoTotal)}}</td>
+        </tr>
+      `).join('');
+    }}
+
+    [filterYear, filterMonth, filterCategory, filterRequester].forEach(select => select.addEventListener('change', updateDashboard));
+    tableSearch.addEventListener('input', updateDashboard);
+    resetFiltersBtn.addEventListener('click', () => {{
+      filterYear.value = 'ALL';
+      filterMonth.value = 'ALL';
+      filterCategory.value = 'ALL';
+      filterRequester.value = 'ALL';
+      tableSearch.value = '';
+      updateDashboard();
+    }});
+
+    // Inicialização da primeira aba
     let abaInicial = 'dashboardRetiradas';
     try {{
       abaInicial = sessionStorage.getItem('aba_ativa_atual') || 'dashboardRetiradas';
