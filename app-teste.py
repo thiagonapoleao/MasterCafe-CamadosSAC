@@ -6,8 +6,9 @@ import re
 import os
 import base64
 
-# Link oficial do Web App do Google Apps Script
+# Links oficiais dos Web Apps do Google Apps Script
 APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyEr_l9ulBrh04iFybET96bMlLRydzF3epQSMZXBBr5rAbqBm2M4jW_zPrR3dDcqiUZGg/exec"
+APPS_SCRIPT_SAC_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyGRxQBo5j-gWQ4OEeGFqfwzgjcfQRzDKE2kKbyQeSvOKOdIMr1snR8YV766KBfE7RY9w/exec"
 
 st.set_page_config(
     page_title="Painel Executivo de Gestão & SAC",
@@ -64,8 +65,12 @@ GID_BASE_PECAS = "270834817"
 GID_ORDEM_COMPRA = "643448898"
 GID_RETIRADA_PECAS = "1232857188"
 
-SPREADSHEET_SAC_ID = "1vOa6QpGPZ6rZ1doT2RRU1SAXWR5usPzv"
-GID_SAC_CHAMADOS = "1236624547"
+# Planilha de Destino das Ocorrências do SAC
+SPREADSHEET_SAC_ID = "1YUS9AwQti0Gl79X-TGCIqZSkOfF0bE0BX5gyDClo3rc"
+GID_SAC_CHAMADOS = "0"
+
+# Planilha de Apoio para Pré-listas e Usuários do SAC
+SPREADSHEET_SAC_CONFIG_ID = "1vOa6QpGPZ6rZ1doT2RRU1SAXWR5usPzv"
 GID_SAC_CLIENTES = "400904478"
 GID_SAC_CONFIGS = "1833376686"
 GID_SAC_USUARIOS = "772646879"
@@ -75,9 +80,9 @@ URL_CSV_ORDENS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/expor
 URL_CSV_RETIRADAS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid={GID_RETIRADA_PECAS}"
 
 URL_CSV_SAC_CHAMADOS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_CHAMADOS}"
-URL_CSV_SAC_CLIENTES = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_CLIENTES}"
-URL_CSV_SAC_CONFIGS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_CONFIGS}"
-URL_CSV_SAC_USUARIOS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_USUARIOS}"
+URL_CSV_SAC_CLIENTES = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_CONFIG_ID}/export?format=csv&gid={GID_SAC_CLIENTES}"
+URL_CSV_SAC_CONFIGS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_CONFIG_ID}/export?format=csv&gid={GID_SAC_CONFIGS}"
+URL_CSV_SAC_USUARIOS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_CONFIG_ID}/export?format=csv&gid={GID_SAC_USUARIOS}"
 
 @st.cache_data(ttl=5)
 def carregar_catalogo_planilha():
@@ -353,6 +358,11 @@ html_code = f"""
   <iframe name="target_post_frame" id="target_post_frame" style="display:none; width:0; height:0; border:0;"></iframe>
   <form id="hiddenSubmissionForm" action="{APPS_SCRIPT_WEBAPP_URL}" method="POST" target="target_post_frame" style="display:none;">
     <input type="hidden" name="data" id="hiddenSubmissionData">
+  </form>
+
+  <!-- FORMULÁRIO DEDICADO DO SAC COM O ENDPOINT OFICIAL DO SAC -->
+  <form id="hiddenSACSubmissionForm" action="{APPS_SCRIPT_SAC_WEBAPP_URL}" method="POST" target="target_post_frame" style="display:none;">
+    <input type="hidden" name="data" id="hiddenSACSubmissionData">
   </form>
 
   <!-- Header Superior -->
@@ -1034,6 +1044,9 @@ html_code = f"""
     Chart.register(ChartDataLabels);
 
     const APPS_SCRIPT_URL = "{APPS_SCRIPT_WEBAPP_URL}";
+    const APPS_SCRIPT_SAC_URL = "{APPS_SCRIPT_SAC_WEBAPP_URL}";
+    const SPREADSHEET_SAC_ID = "{SPREADSHEET_SAC_ID}";
+
     let rawOrdersData = {ocs_planilha_json};
     let rawRetiradasData = {retiradas_json};
     const dadosSAC = {dados_sac_json};
@@ -1044,10 +1057,10 @@ html_code = f"""
       atendenteSACLogado = sessionStorage.getItem('sac_atendente_conectado') || "";
     }} catch(e) {{}}
 
-    function enviarParaPlanilhaGarantido(payload) {{
+    function enviarParaPlanilhaGarantido(payload, isSAC = false) {{
       return new Promise((resolve) => {{
-        const form = document.getElementById('hiddenSubmissionForm');
-        const input = document.getElementById('hiddenSubmissionData');
+        const form = document.getElementById(isSAC ? 'hiddenSACSubmissionForm' : 'hiddenSubmissionForm');
+        const input = document.getElementById(isSAC ? 'hiddenSACSubmissionData' : 'hiddenSubmissionData');
         const iframe = document.getElementById('target_post_frame');
 
         input.value = JSON.stringify(payload);
@@ -1302,6 +1315,8 @@ html_code = f"""
       const payloadSAC = {{
         tipo: "ocorrencia_sac",
         action: "ocorrencia_sac",
+        spreadsheetId: SPREADSHEET_SAC_ID,
+        aba: "Chamados",
         registro: {{
           chamado,
           data,
@@ -1323,7 +1338,7 @@ html_code = f"""
         }}
       }};
 
-      await enviarParaPlanilhaGarantido(payloadSAC);
+      await enviarParaPlanilhaGarantido(payloadSAC, true);
 
       const m = chamado.match(/SAC-(\d{{4}})-(\d+)/i);
       if (m) {{
@@ -1533,10 +1548,6 @@ html_code = f"""
     // =========================================================================
     // DASHBOARD SOLICITAÇÕES
     // =========================================================================
-    function formatCurrency(val) {{
-      return (val || 0).toLocaleString('pt-BR', {{ style: 'currency', currency: 'BRL' }});
-    }}
-
     const filterYear = document.getElementById('filterYear');
     const filterMonth = document.getElementById('filterMonth');
     const filterCategory = document.getElementById('filterCategory');
