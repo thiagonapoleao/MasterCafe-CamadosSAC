@@ -58,14 +58,26 @@ def obter_logo_base64():
 
 logo_base64_src = obter_logo_base64()
 
+# IDs e GIDs de Planilhas
 SPREADSHEET_ID = "1iWjdaZLAp5hi9YIhmfSO4cPBn6fkfDjef8PAdZp1nsY"
 GID_BASE_PECAS = "270834817"
 GID_ORDEM_COMPRA = "643448898"
 GID_RETIRADA_PECAS = "1232857188"
 
+SPREADSHEET_SAC_ID = "1vOa6QpGPZ6rZ1doT2RRU1SAXWR5usPzv"
+GID_SAC_CHAMADOS = "1236624547"
+GID_SAC_CLIENTES = "400904478"
+GID_SAC_CONFIGS = "1833376686"
+GID_SAC_USUARIOS = "772646879"
+
 URL_CSV_CATALOGO = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid={GID_BASE_PECAS}"
 URL_CSV_ORDENS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid={GID_ORDEM_COMPRA}"
 URL_CSV_RETIRADAS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid={GID_RETIRADA_PECAS}"
+
+URL_CSV_SAC_CHAMADOS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_CHAMADOS}"
+URL_CSV_SAC_CLIENTES = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_CLIENTES}"
+URL_CSV_SAC_CONFIGS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_CONFIGS}"
+URL_CSV_SAC_USUARIOS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_USUARIOS}"
 
 @st.cache_data(ttl=5)
 def carregar_catalogo_planilha():
@@ -224,6 +236,88 @@ def obter_dados_retiradas():
     retiradas.reverse()
     return retiradas
 
+@st.cache_data(ttl=5)
+def carregar_dados_sac():
+    # 1. Carregar Clientes, Locais Internos e Cidades
+    clientes_dados = []
+    try:
+        df_cli = pd.read_csv(URL_CSV_SAC_CLIENTES, dtype=str)
+        if df_cli is not None and not df_cli.empty:
+            col_a = df_cli.columns[0]
+            col_b = df_cli.columns[1] if len(df_cli.columns) > 1 else col_a
+            col_f = df_cli.columns[5] if len(df_cli.columns) > 5 else df_cli.columns[-1]
+            for _, r in df_cli.iterrows():
+                cli = str(r[col_a]).strip() if pd.notna(r[col_a]) else ""
+                loc = str(r[col_b]).strip() if pd.notna(r[col_b]) else ""
+                cid = str(r[col_f]).strip() if pd.notna(r[col_f]) else ""
+                if cli and cli.lower() not in ["nan", "cliente"]:
+                    clientes_dados.append({
+                        "cliente": cli,
+                        "local": loc,
+                        "cidade": cid
+                    })
+    except Exception:
+        pass
+
+    # 2. Carregar Configurações (Forma Pgto col A, Problemas col L, Descrição col N)
+    formas_pagamento = []
+    problemas = []
+    descricoes = []
+    try:
+        df_cfg = pd.read_csv(URL_CSV_SAC_CONFIGS, dtype=str)
+        if df_cfg is not None and not df_cfg.empty:
+            if len(df_cfg.columns) > 0:
+                col_a = df_cfg.columns[0]
+                formas_pagamento = [str(x).strip() for x in df_cfg[col_a].dropna().unique() if str(x).strip() and str(x).lower() not in ["nan", "forma de pagamento", "forma"]]
+            if len(df_cfg.columns) > 11:
+                col_l = df_cfg.columns[11]
+                problemas = [str(x).strip() for x in df_cfg[col_l].dropna().unique() if str(x).strip() and str(x).lower() not in ["nan", "problemas", "problema"]]
+            if len(df_cfg.columns) > 13:
+                col_n = df_cfg.columns[13]
+                descricoes = [str(x).strip() for x in df_cfg[col_n].dropna().unique() if str(x).strip() and str(x).lower() not in ["nan", "descrição", "descricao"]]
+    except Exception:
+        pass
+
+    # 3. Carregar Usuários (Col A: Usuário, Col B: Senha)
+    usuarios_validos = []
+    try:
+        df_usr = pd.read_csv(URL_CSV_SAC_USUARIOS, dtype=str)
+        if df_usr is not None and not df_usr.empty:
+            col_u = df_usr.columns[0]
+            col_s = df_usr.columns[1] if len(df_usr.columns) > 1 else col_u
+            for _, r in df_usr.iterrows():
+                u = str(r[col_u]).strip() if pd.notna(r[col_u]) else ""
+                s = str(r[col_s]).strip() if pd.notna(r[col_s]) else ""
+                if u and u.lower() not in ["nan", "usuario", "usuário"]:
+                    usuarios_validos.append({"usuario": u, "senha": s})
+    except Exception:
+        pass
+
+    # 4. Carregar Chamados para sequencial automático SAC-AAAA-XXXX
+    maior_sac_ano = {}
+    try:
+        df_ch = pd.read_csv(URL_CSV_SAC_CHAMADOS, dtype=str)
+        if df_ch is not None and not df_ch.empty:
+            col_ch = df_ch.columns[0]
+            for _, r in df_ch.iterrows():
+                val = str(r[col_ch]).strip() if pd.notna(r[col_ch]) else ""
+                m = re.search(r'SAC-(\d{4})-(\d+)', val, re.IGNORECASE)
+                if m:
+                    ano = m.group(1)
+                    seq = int(m.group(2))
+                    maior_sac_ano[ano] = max(maior_sac_ano.get(ano, 0), seq)
+    except Exception:
+        pass
+
+    return {
+        "clientes": clientes_dados,
+        "formas_pagamento": sorted(formas_pagamento),
+        "problemas": sorted(problemas),
+        "descricoes": sorted(descricoes),
+        "usuarios": usuarios_validos,
+        "maior_sac_ano": maior_sac_ano
+    }
+
 catalogo_pecas, lista_nomes_coluna_i = carregar_catalogo_planilha()
 catalogo_json = json.dumps(catalogo_pecas, ensure_ascii=False)
 nomes_coluna_i_json = json.dumps(lista_nomes_coluna_i, ensure_ascii=False)
@@ -235,6 +329,9 @@ max_seq_anos_json = json.dumps(max_seq_anos, ensure_ascii=False)
 
 retiradas_planilha = obter_dados_retiradas()
 retiradas_json = json.dumps(retiradas_planilha, ensure_ascii=False)
+
+dados_sac = carregar_dados_sac()
+dados_sac_json = json.dumps(dados_sac, ensure_ascii=False)
 
 html_code = f"""
 <!DOCTYPE html>
@@ -307,9 +404,9 @@ html_code = f"""
         </div>
         <div>
           <h1 class="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            Painel de Gestão de Peças & Compras
+            Painel de Gestão de Peças & Operações
           </h1>
-          <p class="text-xs text-slate-500">Controle Operacional, Ordens de Serviço & Estoque · {total_itens_carregados} peças na base</p>
+          <p class="text-xs text-slate-500">Controle Operacional, Ordens de Serviço & SAC · {total_itens_carregados} peças na base</p>
         </div>
       </div>
       
@@ -329,6 +426,10 @@ html_code = f"""
         <button id="navRetirada" class="nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('retirada')">
           <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
           Retirada de Peças
+        </button>
+        <button id="navSAC" class="nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('sac')">
+          <i data-lucide="headphones" class="w-4 h-4"></i>
+          Lançamento SAC
         </button>
         <button onclick="executarRefresh()" title="Clique para recarregar da planilha" class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 cursor-pointer transition">
           <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span> Sincronizar 🔄
@@ -388,7 +489,6 @@ html_code = f"""
 
     <!-- PÁGINA 0: DASHBOARD DE RETIRADAS -->
     <div id="pageDashboardRetiradas" class="space-y-6">
-
       <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
@@ -610,12 +710,10 @@ html_code = f"""
           </table>
         </div>
       </section>
-
     </div>
 
     <!-- PÁGINA 1: DASHBOARD SOLICITAÇÕES -->
     <div id="pageDashboard" class="hidden space-y-6">
-
       <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
@@ -850,12 +948,10 @@ html_code = f"""
           </table>
         </div>
       </section>
-
     </div>
 
     <!-- PÁGINA 2: FORMULÁRIO DE LANÇAMENTO / EDIÇÃO OC -->
     <div id="pageFormulario" class="hidden space-y-6">
-
       <div id="alertEditMode" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex justify-between items-center shadow-sm">
         <div class="flex items-center gap-3">
           <div class="p-2 bg-amber-500 text-white rounded-xl"><i data-lucide="edit-3" class="w-5 h-5"></i></div>
@@ -1137,12 +1233,10 @@ html_code = f"""
           </table>
         </div>
       </section>
-
     </div>
 
     <!-- PÁGINA 3: FORMULÁRIO DE RETIRADA DE PEÇAS -->
     <div id="pageRetirada" class="hidden space-y-6">
-
       <div id="alertRetiradaSuccess" class="hidden p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition">
         <div class="flex items-center gap-3">
           <div class="p-2 bg-emerald-600 text-white rounded-xl">
@@ -1241,6 +1335,209 @@ html_code = f"""
           </div>
         </form>
       </section>
+    </div>
+
+    <!-- PÁGINA 4: LANÇAMENTO SAC (NOVA ABA) -->
+    <div id="pageSAC" class="hidden space-y-6">
+
+      <!-- TELA DE LOGIN / AUTENTICAÇÃO -->
+      <div id="sacAuthScreen" class="max-w-md mx-auto my-8 bg-white p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6">
+        <div class="text-center space-y-2">
+          <div class="w-14 h-14 bg-sky-100 text-sky-700 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
+            <i data-lucide="lock" class="w-7 h-7"></i>
+          </div>
+          <h2 class="text-xl font-black text-slate-900">Acesso Restrito ao SAC</h2>
+          <p class="text-xs text-slate-500">Validação oficial na aba "Usuarios" (Colunas A e B)</p>
+        </div>
+
+        <form id="sacLoginForm" onsubmit="realizarLoginSAC(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Usuário *</label>
+            <input type="text" id="sacLoginUser" placeholder="Digite seu usuário..." required class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Senha *</label>
+            <input type="password" id="sacLoginPass" placeholder="••••••••" required class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          </div>
+          <div id="sacLoginErro" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+            <i data-lucide="alert-circle" class="w-4 h-4"></i>
+            <span>Usuário ou senha incorretos!</span>
+          </div>
+          <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-md shadow-sky-600/25 transition flex items-center justify-center gap-2">
+            <i data-lucide="log-in" class="w-4 h-4"></i>
+            Acessar Formulário do SAC
+          </button>
+        </form>
+      </div>
+
+      <!-- PAINEL DO FORMULÁRIO DO SAC (EXIBIDO APÓS AUTENTICAÇÃO) -->
+      <div id="sacMainPanel" class="hidden space-y-6">
+
+        <div id="alertSACSuccess" class="hidden p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition">
+          <div class="flex items-center gap-3">
+            <div class="p-2 bg-emerald-600 text-white rounded-xl">
+              <i data-lucide="check-circle" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <p id="alertSACSuccessTitle" class="text-sm font-bold">Ocorrência SAC lançada com sucesso!</p>
+              <p id="alertSACSuccessSub" class="text-xs text-emerald-700">Gravado na aba Chamados da planilha oficial.</p>
+            </div>
+          </div>
+          <button type="button" onclick="document.getElementById('alertSACSuccess').classList.add('hidden')" class="px-3 py-2 rounded-xl hover:bg-emerald-100 text-xs font-semibold text-emerald-800 transition">
+            Fechar
+          </button>
+        </div>
+
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-6 border-b border-slate-100 gap-4">
+            <div class="flex items-center gap-3">
+              <div class="p-2.5 bg-sky-600 text-white rounded-xl shadow-lg shadow-sky-500/25">
+                <i data-lucide="headphones" class="w-6 h-6"></i>
+              </div>
+              <div>
+                <h2 class="text-base font-bold text-slate-900">Lançamento de Ocorrências do SAC</h2>
+                <p class="text-xs text-slate-500">Registro de chamados, ressarcimentos e reembolsos · Aba: Chamados</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="text-right">
+                <span class="text-[10px] uppercase font-bold text-slate-400 block">Atendente Conectado</span>
+                <span id="labelSACAtendenteLogado" class="text-xs font-bold text-sky-800 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200">Operador</span>
+              </div>
+              <button type="button" onclick="realizarLogoutSAC()" title="Sair do SAC" class="p-2 rounded-xl border border-slate-200 hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition">
+                <i data-lucide="log-out" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <form id="sacForm" onsubmit="handleSACSubmit(event)" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-5 rounded-2xl bg-slate-50/90 border border-slate-200">
+              
+              <!-- Chamado Automático -->
+              <div>
+                <label class="block text-xs font-bold text-sky-900 mb-1">Chamado (Automático) *</label>
+                <input type="text" id="sacChamado" readonly class="w-full text-sm font-mono font-black rounded-xl border border-sky-300 bg-white px-3.5 py-2 text-sky-700 cursor-not-allowed shadow-inner">
+              </div>
+
+              <!-- Data do Chamado -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Data *</label>
+                <input type="date" id="sacData" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              </div>
+
+              <!-- Cliente -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Cliente *</label>
+                <input list="listaSACClientes" id="sacCliente" placeholder="Selecione o cliente..." required onchange="aoMudarClienteSAC()" oninput="aoMudarClienteSAC()" class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <datalist id="listaSACClientes"></datalist>
+              </div>
+
+              <!-- Local Interno (Cascata por cliente) -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Local Interno *</label>
+                <select id="sacLocalInterno" required onchange="aoMudarLocalInternoSAC()" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                  <option value="">Selecione primeiro o Cliente...</option>
+                </select>
+              </div>
+
+              <!-- Cidade (Preenchida pelo local ou seleção) -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Cidade *</label>
+                <input type="text" id="sacCidade" placeholder="Cidade correspondente" required class="w-full text-sm rounded-xl border border-slate-300 bg-slate-100 px-3.5 py-2 text-slate-800">
+              </div>
+
+              <!-- Descrição -->
+              <div class="md:col-span-2 lg:col-span-3">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Descrição *</label>
+                <input list="listaSACDescricoes" id="sacDescricao" placeholder="Selecione ou digite a descrição do ocorrido..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <datalist id="listaSACDescricoes"></datalist>
+              </div>
+
+              <!-- Produto -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Produto *</label>
+                <select id="sacProduto" required class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                  <option value="Café">Café</option>
+                  <option value="Snaky">Snaky</option>
+                </select>
+              </div>
+
+              <!-- Data da Transação -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Data da Transação *</label>
+                <input type="date" id="sacDataTransacao" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              </div>
+
+              <!-- Hora da Transação -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Hora da Transação *</label>
+                <input type="time" id="sacHoraTransacao" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              </div>
+
+              <!-- Valor (R$) -->
+              <div>
+                <label class="block text-xs font-semibold text-emerald-800 mb-1">Valor (R$) *</label>
+                <input type="number" step="0.01" min="0" id="sacValor" placeholder="0,00" required class="w-full text-sm font-bold rounded-xl border border-emerald-300 bg-white px-3 py-2 text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              </div>
+
+              <!-- Nome / Sobrenome (Primeira Maiúscula) -->
+              <div class="md:col-span-2">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Nome / Sobrenome *</label>
+                <input type="text" id="sacNome" placeholder="Ex: João Da Silva" required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              </div>
+
+              <!-- Celular -->
+              <div class="md:col-span-2">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Celular *</label>
+                <input type="text" id="sacCelular" placeholder="(00) 00000-0000" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              </div>
+
+              <!-- Problemas -->
+              <div class="md:col-span-2">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Problemas *</label>
+                <input list="listaSACProblemas" id="sacProblema" placeholder="Selecione ou digite o problema..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <datalist id="listaSACProblemas"></datalist>
+              </div>
+
+              <!-- Forma de Pagamento -->
+              <div class="md:col-span-2">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Forma de Pagamento *</label>
+                <input list="listaSACFormasPgto" id="sacFormaPgto" placeholder="Selecione a forma de pagamento..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <datalist id="listaSACFormasPgto"></datalist>
+              </div>
+
+              <!-- Pix - Reembolso -->
+              <div class="md:col-span-2">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Chave Pix - Reembolso *</label>
+                <input type="text" id="sacPix" placeholder="Chave Pix do cliente (CPF, Celular, E-mail, Aleatória)..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              </div>
+
+              <!-- Atendente (Preenchimento Automático) -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Atendente *</label>
+                <input type="text" id="sacAtendente" readonly class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-slate-700 cursor-not-allowed">
+              </div>
+
+              <!-- Data/Hora Lançamento (Automático) -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Data/Hora Lançamento</label>
+                <input type="text" id="sacDataHoraAuto" readonly value="Automático no Envio" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-slate-500 cursor-not-allowed">
+              </div>
+
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <button type="button" onclick="limparFormSAC()" class="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 transition">
+                Limpar Campos
+              </button>
+              <button type="submit" id="btnSalvarSAC" class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-sky-600 text-white text-xs font-bold shadow-lg shadow-sky-500/25 hover:bg-sky-700 transition">
+                <i data-lucide="send" class="w-4 h-4"></i>
+                <span id="btnSalvarSACText">Lançar Ocorrência SAC</span>
+              </button>
+            </div>
+          </form>
+        </section>
+      </div>
 
     </div>
 
@@ -1323,6 +1620,9 @@ html_code = f"""
     let rawOrdersData = {ocs_planilha_json};
     let maxSeqAnosPlanilha = {max_seq_anos_json};
     let rawRetiradasData = {retiradas_json};
+
+    const dadosSAC = {dados_sac_json};
+    let atendenteSACLogado = sessionStorage.getItem('sac_atendente_conectado') || "";
 
     document.getElementById('formData').value = new Date().toISOString().split('T')[0];
     if (document.getElementById('retiradaData')) {{
@@ -1433,13 +1733,15 @@ html_code = f"""
       const pageDash = document.getElementById('pageDashboard');
       const pageForm = document.getElementById('pageFormulario');
       const pageRetirada = document.getElementById('pageRetirada');
+      const pageSAC = document.getElementById('pageSAC');
 
       const btnDashRetiradas = document.getElementById('navDashboardRetiradas');
       const btnDash = document.getElementById('navDashboard');
       const btnForm = document.getElementById('navForm');
       const btnRetirada = document.getElementById('navRetirada');
+      const btnSAC = document.getElementById('navSAC');
 
-      [btnDashRetiradas, btnDash, btnForm, btnRetirada].forEach(b => {{
+      [btnDashRetiradas, btnDash, btnForm, btnRetirada, btnSAC].forEach(b => {{
         if (b) {{
           b.classList.remove('active');
           b.classList.add('inactive');
@@ -1450,6 +1752,7 @@ html_code = f"""
       pageDash.classList.add('hidden');
       pageForm.classList.add('hidden');
       pageRetirada.classList.add('hidden');
+      if (pageSAC) pageSAC.classList.add('hidden');
 
       if (page === 'dashboardRetiradas') {{
         pageDashRetiradas.classList.remove('hidden');
@@ -1472,7 +1775,242 @@ html_code = f"""
         btnRetirada.classList.add('active');
         btnRetirada.classList.remove('inactive');
         inicializarNomesColunaI();
+      }} else if (page === 'sac') {{
+        if (pageSAC) pageSAC.classList.remove('hidden');
+        if (btnSAC) {{
+          btnSAC.classList.add('active');
+          btnSAC.classList.remove('inactive');
+        }}
+        verificarSessaoSAC();
       }}
+      lucide.createIcons();
+    }}
+
+    // =========================================================================
+    // LÓGICA E CONTROLES DA ABA LANÇAMENTO SAC
+    // =========================================================================
+    function verificarSessaoSAC() {{
+      const authScreen = document.getElementById('sacAuthScreen');
+      const mainPanel = document.getElementById('sacMainPanel');
+
+      if (atendenteSACLogado) {{
+        authScreen.classList.add('hidden');
+        mainPanel.classList.remove('hidden');
+        document.getElementById('labelSACAtendenteLogado').innerText = atendenteSACLogado;
+        document.getElementById('sacAtendente').value = atendenteSACLogado;
+        inicializarFormularioSAC();
+      }} else {{
+        authScreen.classList.remove('hidden');
+        mainPanel.classList.add('hidden');
+      }}
+    }}
+
+    function realizarLoginSAC(e) {{
+      e.preventDefault();
+      const u = (document.getElementById('sacLoginUser').value || '').trim();
+      const p = (document.getElementById('sacLoginPass').value || '').trim();
+      const erroBox = document.getElementById('sacLoginErro');
+
+      const userValido = dadosSAC.usuarios.find(x => x.usuario.toLowerCase() === u.toLowerCase() && x.senha === p);
+
+      if (userValido) {{
+        erroBox.classList.add('hidden');
+        atendenteSACLogado = userValido.usuario;
+        sessionStorage.setItem('sac_atendente_conectado', atendenteSACLogado);
+        verificarSessaoSAC();
+      }} else {{
+        erroBox.classList.remove('hidden');
+      }}
+    }}
+
+    function realizarLogoutSAC() {{
+      atendenteSACLogado = "";
+      sessionStorage.removeItem('sac_atendente_conectado');
+      document.getElementById('sacLoginForm').reset();
+      verificarSessaoSAC();
+    }}
+
+    function gerarNumeroChamadoSAC(ano) {{
+      let maior = dadosSAC.maior_sac_ano[ano] || 0;
+      const proximo = String(maior + 1).padStart(4, '0');
+      return 'SAC-' + ano + '-' + proximo;
+    }}
+
+    function inicializarFormularioSAC() {{
+      const anoAtual = new Date().getFullYear();
+      document.getElementById('sacChamado').value = gerarNumeroChamadoSAC(anoAtual);
+      document.getElementById('sacData').value = new Date().toISOString().split('T')[0];
+      document.getElementById('sacDataTransacao').value = new Date().toISOString().split('T')[0];
+      
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      document.getElementById('sacHoraTransacao').value = `${{hh}}:${{mm}}`;
+
+      // Popular Clientes
+      const dlCli = document.getElementById('listaSACClientes');
+      dlCli.innerHTML = '';
+      const clientesUnicos = [...new Set(dadosSAC.clientes.map(c => c.cliente).filter(Boolean))].sort();
+      clientesUnicos.forEach(cli => {{
+        const opt = document.createElement('option');
+        opt.value = cli;
+        dlCli.appendChild(opt);
+      }});
+
+      // Popular Descrições
+      const dlDesc = document.getElementById('listaSACDescricoes');
+      dlDesc.innerHTML = '';
+      dadosSAC.descricoes.forEach(d => {{
+        const opt = document.createElement('option');
+        opt.value = d;
+        dlDesc.appendChild(opt);
+      }});
+
+      // Popular Problemas
+      const dlProb = document.getElementById('listaSACProblemas');
+      dlProb.innerHTML = '';
+      dadosSAC.problemas.forEach(p => {{
+        const opt = document.createElement('option');
+        opt.value = p;
+        dlProb.appendChild(opt);
+      }});
+
+      // Popular Formas de Pagamento
+      const dlPgto = document.getElementById('listaSACFormasPgto');
+      dlPgto.innerHTML = '';
+      dadosSAC.formas_pagamento.forEach(f => {{
+        const opt = document.createElement('option');
+        opt.value = f;
+        dlPgto.appendChild(opt);
+      }});
+    }}
+
+    function aoMudarClienteSAC() {{
+      const cli = (document.getElementById('sacCliente').value || '').trim();
+      const selectLocal = document.getElementById('sacLocalInterno');
+      selectLocal.innerHTML = '<option value="">Selecione o Local Interno...</option>';
+      document.getElementById('sacCidade').value = '';
+
+      if (!cli) return;
+
+      const locaisDoCliente = dadosSAC.clientes.filter(c => c.cliente.toLowerCase() === cli.toLowerCase());
+      if (locaisDoCliente.length === 0) return;
+
+      const locaisUnicos = [...new Set(locaisDoCliente.map(l => l.local).filter(Boolean))].sort();
+      locaisUnicos.forEach(loc => {{
+        const opt = document.createElement('option');
+        opt.value = loc;
+        opt.textContent = loc;
+        selectLocal.appendChild(opt);
+      }});
+
+      if (locaisUnicos.length === 1) {{
+        selectLocal.value = locaisUnicos[0];
+        aoMudarLocalInternoSAC();
+      }}
+    }}
+
+    function aoMudarLocalInternoSAC() {{
+      const cli = (document.getElementById('sacCliente').value || '').trim();
+      const loc = document.getElementById('sacLocalInterno').value;
+      if (!cli || !loc) return;
+
+      const achado = dadosSAC.clientes.find(c => c.cliente.toLowerCase() === cli.toLowerCase() && c.local === loc);
+      if (achado && achado.cidade) {{
+        document.getElementById('sacCidade').value = achado.cidade;
+      }}
+    }}
+
+    function formatarNomeProprio(input) {{
+      if (!input.value) return;
+      input.value = input.value
+        .toLowerCase()
+        .split(' ')
+        .map(palavra => palavra.charAt(0).toUpperCase() + palavra.slice(1))
+        .join(' ');
+    }}
+
+    function limparFormSAC() {{
+      document.getElementById('sacForm').reset();
+      inicializarFormularioSAC();
+      document.getElementById('sacAtendente').value = atendenteSACLogado;
+    }}
+
+    let enviandoSAC = false;
+    async function handleSACSubmit(e) {{
+      e.preventDefault();
+      if (enviandoSAC) return;
+
+      const chamado = document.getElementById('sacChamado').value;
+      const data = document.getElementById('sacData').value;
+      const cliente = document.getElementById('sacCliente').value.trim();
+      const localInterno = document.getElementById('sacLocalInterno').value;
+      const cidade = document.getElementById('sacCidade').value.trim();
+      const descricao = document.getElementById('sacDescricao').value.trim();
+      const produto = document.getElementById('sacProduto').value;
+      const dataTransacao = document.getElementById('sacDataTransacao').value;
+      const horaTransacao = document.getElementById('sacHoraTransacao').value;
+      const valor = parseFloat(document.getElementById('sacValor').value) || 0;
+      const nomeSobrenome = document.getElementById('sacNome').value.trim();
+      const celular = document.getElementById('sacCelular').value.trim();
+      const problemas = document.getElementById('sacProblema').value.trim();
+      const formaPgto = document.getElementById('sacFormaPgto').value.trim();
+      const pix = document.getElementById('sacPix').value.trim();
+      const atendente = atendenteSACLogado || document.getElementById('sacAtendente').value;
+      
+      const agora = new Date();
+      const dataHoraLancamento = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR');
+
+      enviandoSAC = true;
+      const btn = document.getElementById('btnSalvarSAC');
+      btn.disabled = true;
+      document.getElementById('btnSalvarSACText').innerText = 'Gravando na planilha...';
+
+      const payloadSAC = {{
+        tipo: "ocorrencia_sac",
+        action: "ocorrencia_sac",
+        registro: {{
+          chamado,
+          data,
+          cliente,
+          localInterno,
+          cidade,
+          descricao,
+          produto,
+          dataTransacao,
+          horaTransacao,
+          valor,
+          nomeSobrenome,
+          celular,
+          problemas,
+          formaPgto,
+          pix,
+          atendente,
+          dataHoraLancamento
+        }}
+      }};
+
+      await enviarParaPlanilhaGarantido(payloadSAC);
+
+      // Atualiza sequencial local
+      const m = chamado.match(/SAC-(\d{{4}})-(\d+)/i);
+      if (m) {{
+        const ano = m[1];
+        const seq = parseInt(m[2]);
+        dadosSAC.maior_sac_ano[ano] = Math.max(dadosSAC.maior_sac_ano[ano] || 0, seq);
+      }}
+
+      enviandoSAC = false;
+      btn.disabled = false;
+      document.getElementById('btnSalvarSACText').innerText = 'Lançar Ocorrência SAC';
+
+      limparFormSAC();
+
+      const alertBox = document.getElementById('alertSACSuccess');
+      document.getElementById('alertSACSuccessTitle').innerText = '✅ Ocorrência ' + chamado + ' lançada com sucesso!';
+      document.getElementById('alertSACSuccessSub').innerText = 'Cliente: ' + cliente + ' (' + localInterno + ') · Atendente: ' + atendente + ' · Valor: ' + formatCurrency(valor);
+      alertBox.classList.remove('hidden');
+      alertBox.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
       lucide.createIcons();
     }}
 
@@ -1863,7 +2401,7 @@ html_code = f"""
         }}
         calcItemPreview();
       }} else if (validarObrigatorio) {{
-        alert('⚠️ Peça não encontrada!\\nO código digitado não consta na base de dados. Por favor, selecione apenas itens cadastrados na pré-lista.');
+        alert('⚠️ Peça não encontrada!\nO código digitado não consta na base de dados. Por favor, selecione apenas itens cadastrados na pré-lista.');
         inputCodigo.value = '';
         document.getElementById('itemPeca').value = '';
         document.getElementById('itemCategoria').value = '';
@@ -1887,7 +2425,7 @@ html_code = f"""
         }}
         calcItemPreview();
       }} else if (validarObrigatorio) {{
-        alert('⚠️ Peça não encontrada!\\nA descrição digitada não consta na base de dados. Por favor, selecione apenas itens cadastrados na pré-lista.');
+        alert('⚠️ Peça não encontrada!\nA descrição digitada não consta na base de dados. Por favor, selecione apenas itens cadastrados na pré-lista.');
         inputDesc.value = '';
         document.getElementById('itemCodigoPeca').value = '';
         document.getElementById('itemCategoria').value = '';
@@ -1937,7 +2475,7 @@ html_code = f"""
       );
 
       if (!pecaValida) {{
-        alert('⛔ Bloqueio de Segurança:\\nApenas peças cadastradas na pré-lista da aba "Base de Dados" são aceitas. Selecione um item válido na listagem.');
+        alert('⛔ Bloqueio de Segurança:\nApenas peças cadastradas na pré-lista da aba "Base de Dados" são aceitas. Selecione um item válido na listagem.');
         inputCodigo.value = '';
         inputDesc.value = '';
         document.getElementById('itemCategoria').value = '';
