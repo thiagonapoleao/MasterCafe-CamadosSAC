@@ -1,1828 +1,1520 @@
-# -*- coding: utf-8 -*-
-from datetime import datetime
-import io
-import json
-import os
-import urllib.request
-import pandas as pd
-import plotly.express as px
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.pdfgen import canvas
-from reportlab.platypus import (
-    HRFlowable,
-    KeepTogether,
-    PageBreak,
-    Paragraph,
-    SimpleDocTemplate,
-    Spacer,
-    Table,
-    TableStyle,
-)
 import streamlit as st
+import pandas as pd
+from datetime import datetime
+import json
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 import streamlit.components.v1 as components
+import altair as alt
+import os
+import base64
 
+# --- 1. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
-    page_title="Dashboard Executivo SAC - Master Café",
-    page_icon="☕",
+    page_title="Gestão de Conferência de Mercadorias",
+    page_icon="📦",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed"
 )
 
-# --- CONFIGURAÇÃO CENTRALIZADA DA PLANILHA E WEBHOOK ---
-SHEET_BASE_ID = "1YUS9AwQti0Gl79X-TGCIqZSkOfF0bE0BX5gyDClo3rc"
-GID_CHAMADOS = "0"
-GID_CLIENTES = "1332839106"
-GID_DADOS = "1815476457"
-GID_USUARIOS = "437161325"
-WEBHOOK_URL_DEFAULT = "https://script.google.com/macros/s/AKfycbyGRxQBo5j-gWQ4OEeGFqfwzgjcfQRzDKE2kKbyQeSvOKOdIMr1snR8YV766KBfE7RY9w/exec"
+# Função utilitária para codificação de imagem em Base64
+def carregar_imagem_base64(caminho_imagem: str) -> str:
+    if os.path.exists(caminho_imagem):
+        with open(caminho_imagem, "rb") as f:
+            return base64.b64encode(f.read()).decode("utf-8")
+    return ""
 
-# --- CSS POWER BI EXECUTIVE THEME + COMPACT FORM ---
-st.markdown(
-    """
+# --- DESIGN SYSTEM CORPORATIVO: COMPACTAÇÃO PRECISA E EQUILIBRADA ---
+st.markdown("""
 <style>
-    .main { 
-        background-color: #0f172a; 
-        color: #f8fafc; 
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-    }
-    
-    /* Header Card Power BI Style */
-    .header-card {
-        background: linear-gradient(90deg, #1e293b 0%, #0f172a 100%);
-        padding: 16px 20px;
-        border-radius: 8px;
-        border: 1px solid #334155;
-        border-left: 6px solid #0284c7;
-        margin-bottom: 14px;
-    }
-    .header-title {
-        color: #ffffff !important;
-        font-weight: 700;
-        font-size: 1.65rem;
-        margin-bottom: 2px;
-        letter-spacing: -0.5px;
-    }
-    .header-subtitle {
-        color: #94a3b8 !important;
-        font-size: 0.90rem;
-        font-weight: 400;
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+    html, body, [class*="css"], [class*="st-"] {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+        font-size: 12.5px !important;
+        color: #1e293b;
     }
 
-    /* Cards de KPI no padrão Power BI Card Visual */
-    .stMetric { 
-        background-color: #1e293b !important; 
-        padding: 16px !important; 
-        border-radius: 8px !important; 
-        border: 1px solid #334155 !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-    }
-    div[data-testid="stMetricValue"] { 
-        color: #38bdf8 !important; 
-        font-weight: 700 !important; 
-        font-size: 1.8rem !important; 
-        font-family: 'Segoe UI', sans-serif !important;
-    }
-    div[data-testid="stMetricLabel"], 
-    div[data-testid="stMetricLabel"] > label,
-    div[data-testid="stMetricLabel"] p { 
-        color: #94a3b8 !important; 
-        font-size: 0.80rem !important; 
-        font-weight: 600 !important;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+    /* Container Centralizado com Menos Folga Superior */
+    .block-container {
+        max-width: 1240px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        padding-top: 0.6rem !important;
+        padding-bottom: 1.8rem !important;
+        padding-left: 1.2rem !important;
+        padding-right: 1.2rem !important;
     }
 
-    /* Cards de Insights */
-    .insight-card {
-        background: #1e293b;
-        border: 1px solid #334155;
-        border-radius: 8px;
-        padding: 14px;
-        margin-bottom: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-    }
-
-    /* Estilos compactos para formulário do SAC */
-    .compact-section-title {
-        font-size: 0.88rem;
-        font-weight: 700;
-        color: #38bdf8;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-top: 6px;
-        margin-bottom: 4px;
-        border-bottom: 1px solid #334155;
-        padding-bottom: 2px;
-    }
-
-    div[data-testid="stVerticalBlock"] > div.element-container {
-        margin-bottom: -4px !important;
-    }
-    div[data-testid="stForm"] {
-        border: 1px solid #334155 !important;
-        background-color: #111827 !important;
+    /* Top Bar Container Slim */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.topbar-wrapper-marker) {
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
         border-radius: 8px !important;
-        padding: 16px 20px !important;
+        padding: 3px 8px !important;
+        margin-bottom: 14px !important;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
     }
-    div[data-testid="stTextInput"] label, 
-    div[data-testid="stSelectbox"] label, 
-    div[data-testid="stDateInput"] label {
-        font-size: 0.80rem !important;
+
+    /* Bloco da Logo e Título com Encaixe Preciso */
+    .brand-box {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0;
+    }
+    .brand-logo-img {
+        height: 28px;
+        max-width: 85px;
+        object-fit: contain;
+        display: block;
+    }
+    .brand-logo-icon {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+        color: #ffffff;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        box-shadow: 0 2px 6px rgba(29, 78, 216, 0.25);
+    }
+    .brand-text-col {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        line-height: 1.1;
+    }
+    .brand-title {
+        font-family: 'Plus Jakarta Sans', sans-serif !important;
+        font-size: 12px !important;
+        font-weight: 800 !important;
+        color: #0f172a !important;
+        letter-spacing: -0.2px;
+        white-space: nowrap;
+    }
+    .brand-subtitle {
+        font-size: 8px !important;
+        font-weight: 700 !important;
+        color: #64748b !important;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+    }
+
+    /* BOTÕES DA TOPBAR: Altura Reduzida e Tipografia Ajustada */
+    .nav-btn-active button,
+    .nav-btn-inactive button,
+    .nav-btn-sync button {
+        height: 26px !important;
+        min-height: 26px !important;
+        max-height: 26px !important;
+        padding: 0 4px !important;
+        font-size: 10px !important;
         font-weight: 600 !important;
-        color: #cbd5e1 !important;
-        margin-bottom: -2px !important;
+        border-radius: 5px !important;
+        letter-spacing: -0.2px !important;
+        white-space: nowrap !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: all 0.15s ease !important;
     }
-    div[data-baseweb="input"] > div, 
-    div[data-baseweb="select"] > div {
-        min-height: 36px !important;
-        height: 36px !important;
-        padding-top: 0px !important;
-        padding-bottom: 0px !important;
+    .nav-btn-active button *,
+    .nav-btn-inactive button *,
+    .nav-btn-sync button * {
+        font-size: 10px !important;
+        line-height: 1 !important;
+    }
+
+    /* BOTÃO ATIVO: Destaque Azul Primário com Foco Nítido */
+    .nav-btn-active button {
+        background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%) !important;
+        border: 1px solid #1d4ed8 !important;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.28), 0 2px 5px rgba(29, 78, 216, 0.3) !important;
+        transform: scale(1.01) !important;
+    }
+    .nav-btn-active button,
+    .nav-btn-active button *,
+    .nav-btn-active button p,
+    .nav-btn-active button span {
+        color: #ffffff !important;
+        fill: #ffffff !important;
+        font-weight: 700 !important;
+    }
+
+    /* BOTÃO INATIVO: Superfície Clara Neutra */
+    .nav-btn-inactive button {
+        background-color: #f8fafc !important;
+        background-image: none !important;
+        border: 1px solid #cbd5e1 !important;
+        box-shadow: none !important;
+    }
+    .nav-btn-inactive button,
+    .nav-btn-inactive button *,
+    .nav-btn-inactive button p,
+    .nav-btn-inactive button span {
+        color: #334155 !important;
+        fill: #334155 !important;
+        font-weight: 600 !important;
+    }
+    .nav-btn-inactive button:hover {
+        background-color: #eff6ff !important;
+        border-color: #93c5fd !important;
+    }
+    .nav-btn-inactive button:hover,
+    .nav-btn-inactive button:hover * {
+        color: #1d4ed8 !important;
+    }
+
+    /* BOTÃO SINCRONIZAR */
+    .nav-btn-sync button {
+        background-color: #ffffff !important;
+        background-image: none !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+    .nav-btn-sync button,
+    .nav-btn-sync button *,
+    .nav-btn-sync button p,
+    .nav-btn-sync button span {
+        color: #1d4ed8 !important;
+        font-size: 11px !important;
+        font-weight: 700 !important;
+    }
+    .nav-btn-sync button:hover {
+        background-color: #eff6ff !important;
+        border-color: #2563eb !important;
+    }
+
+    /* BOTÕES DE AÇÃO DO CORPO */
+    div.stButton:not(.nav-btn-active):not(.nav-btn-inactive):not(.nav-btn-sync):not(.danger-btn) > button {
+        background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%) !important;
+        border: 1px solid #1d4ed8 !important;
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+        padding: 6px 16px !important;
+        font-size: 11.5px !important;
+        letter-spacing: 0.1px !important;
+        box-shadow: 0 3px 8px rgba(29, 78, 216, 0.22) !important;
+        transition: all 0.15s ease !important;
+    }
+    div.stButton:not(.nav-btn-active):not(.nav-btn-inactive):not(.nav-btn-sync):not(.danger-btn) > button,
+    div.stButton:not(.nav-btn-active):not(.nav-btn-inactive):not(.nav-btn-sync):not(.danger-btn) > button * {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+    }
+    div.stButton:not(.nav-btn-active):not(.nav-btn-inactive):not(.nav-btn-sync):not(.danger-btn) > button:hover {
+        background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%) !important;
+        box-shadow: 0 0 0 2.5px rgba(37, 99, 235, 0.3), 0 5px 12px rgba(29, 78, 216, 0.3) !important;
+    }
+
+    /* BOTÃO DE AÇÃO PERIGOSA (EXCLUSÃO / VERMELHO) */
+    .danger-btn button {
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+        border: 1px solid #b91c1c !important;
+        border-radius: 6px !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        font-size: 11.5px !important;
+        box-shadow: 0 3px 8px rgba(220, 38, 38, 0.25) !important;
+        transition: all 0.15s ease !important;
+    }
+    .danger-btn button:hover {
+        background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%) !important;
+        box-shadow: 0 0 0 2.5px rgba(239, 68, 68, 0.35), 0 5px 12px rgba(185, 28, 28, 0.35) !important;
+    }
+    .danger-btn button * {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+
+    /* Tipografia de Cabeçalho da Página */
+    .main-title {
+        font-family: 'Plus Jakarta Sans', sans-serif !important;
+        font-size: 16.5px !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+        margin-bottom: 2px !important;
+        padding-bottom: 4px !important;
+        border-bottom: 1.5px solid #e2e8f0 !important;
+        letter-spacing: -0.2px !important;
+    }
+    .sub-title {
+        font-size: 11px !important;
+        color: #64748b !important;
+        margin-bottom: 12px !important;
+    }
+
+    /* Grid de Métricas / KPIs Compactas */
+    .metric-container {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+    .metric-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 8px 12px;
+        flex: 1;
+        min-width: 150px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+    }
+    .metric-card span {
+        font-size: 9.5px !important;
+        color: #64748b;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        display: block;
+    }
+    .metric-card strong {
+        font-family: 'Plus Jakarta Sans', sans-serif !important;
+        font-size: 14.5px !important;
+        color: #0f172a;
+        margin-top: 2px;
+        font-weight: 700;
+        display: block;
+    }
+
+    /* Dica de Teclado */
+    .keyboard-hint {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        padding: 4px 8px;
+        border-radius: 5px;
+        font-size: 10.5px !important;
+        color: #334155;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin-bottom: 8px;
+    }
+    .keyboard-hint kbd {
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        border-bottom-width: 2px;
+        padding: 1px 4px;
+        border-radius: 3px;
+        font-weight: 700;
+        font-size: 9.5px !important;
+        color: #0f172a;
+    }
+
+    /* Box de Divergência */
+    .divergence-box {
+        background-color: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: 6px;
+        padding: 9px 12px;
+        margin-top: 8px;
+        margin-bottom: 10px;
+        font-size: 11px !important;
+    }
+
+    /* Box de Alerta Vermelho / Exclusão */
+    .danger-box {
+        background-color: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 6px;
+        padding: 10px 14px;
+        margin-top: 8px;
+        margin-bottom: 12px;
+        font-size: 11px !important;
+    }
+
+    /* Formulários e Inputs Compactos */
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="input"] > div,
+    input, textarea, select {
+        font-size: 11.5px !important;
+        border-radius: 5px !important;
+    }
+    label p {
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        color: #0f172a !important;
+    }
+
+    [data-testid="stDataFrame"] div, [data-testid="stDataEditor"] div {
+        font-size: 11px !important;
+    }
+
+    /* Formatação de Impressão */
+    @media print {
+        header, .stSidebar, .stButton, [data-testid="stToolbar"], footer, .no-print, [data-testid="stVerticalBlockBorderWrapper"]:has(.topbar-wrapper-marker) {
+            display: none !important;
+        }
+        .block-container {
+            max-width: 100% !important;
+            padding: 0 !important;
+        }
+        .printable-area {
+            display: block !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #1e293b !important;
+            padding: 3px 5px !important;
+            font-size: 9.5px !important;
+        }
     }
 </style>
-""",
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
+# --- 2. CONFIGURAÇÃO DA API & SESSÃO RESILIENTE ---
+API_URL = "https://script.google.com/macros/s/AKfycbx6Dvaz55Vd9gzOmG5HHhvdrkRSF9w1kx4Ie7mxrWcQnjjOj1rf0ND7JIGEb1Jk-yCi/exec"
 
-# --- FUNÇÃO DE ESTILIZAÇÃO POWER BI PARA PLOTLY ---
-def apply_powerbi_theme(fig, title="", height=320):
-    fig.update_layout(
-        title=dict(
-            text=f"<b>{title}</b>" if title else "",
-            font=dict(family="Segoe UI, Roboto, sans-serif", size=13, color="#cbd5e1"),
-            x=0.01,
-            y=0.96,
-        ),
-        paper_bgcolor="#1e293b",
-        plot_bgcolor="#1e293b",
-        font=dict(family="Segoe UI, Roboto, sans-serif", size=11, color="#94a3b8"),
-        margin=dict(l=20, r=20, t=45 if title else 25, b=25),
-        height=height,
-        hoverlabel=dict(
-            bgcolor="#0f172a",
-            font_size=12,
-            font_family="Segoe UI",
-            font_color="#ffffff",
-            bordercolor="#334155",
-        ),
-        xaxis=dict(
-            showgrid=True,
-            gridcolor="#334155",
-            gridwidth=1,
-            griddash="dot",
-            linecolor="#334155",
-            tickfont=dict(color="#94a3b8", size=10),
-            title_font=dict(color="#cbd5e1", size=11),
-        ),
-        yaxis=dict(
-            showgrid=True,
-            gridcolor="#334155",
-            gridwidth=1,
-            griddash="dot",
-            linecolor="#334155",
-            tickfont=dict(color="#94a3b8", size=10),
-            title_font=dict(color="#cbd5e1", size=11),
-        ),
+def get_session():
+    session = requests.Session()
+    retries = Retry(
+        total=3,
+        backoff_factor=1.5,
+        status_forcelist=[500, 502, 503, 504],
+        raise_on_status=False
     )
-    fig.update_traces(
-        textposition="outside",
-        cliponaxis=False,
-        textfont=dict(color="#f8fafc", size=10, family="Segoe UI"),
-    )
-    return fig
+    adapter = HTTPAdapter(max_retries=retries)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
 
-
-# --- CANVAS COM NUMERAÇÃO DE PÁGINAS PARA REPORTLAB ---
-class NumberedCanvas(canvas.Canvas):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._saved_page_states = []
-
-    def showPage(self):
-        self._saved_page_states.append(dict(self.__dict__))
-        self._startPage()
-
-    def save(self):
-        num_pages = len(self._saved_page_states)
-        for state in self._saved_page_states:
-            self.__dict__.update(state)
-            self.draw_page_decorations(num_pages)
-            canvas.Canvas.showPage(self)
-        canvas.Canvas.save(self)
-
-    def draw_page_decorations(self, page_count):
-        self.saveState()
-        self.setFont("Helvetica", 8)
-        self.setFillColor(colors.HexColor("#64748b"))
-        self.drawString(
-            36, 22, "Master Café SAC — Relatório Gerencial e Operacional Completo"
-        )
-        self.drawRightString(
-            576, 22, f"Página {self._pageNumber} de {page_count}"
-        )
-        self.setStrokeColor(colors.HexColor("#cbd5e1"))
-        self.setLineWidth(0.5)
-        self.line(36, 34, 576, 34)
-        self.restoreState()
-
-
-# --- GERADOR DE RELATÓRIO PDF COMPLETO ---
-def generate_full_pdf_report(
-    df_filtered,
-    tot_chamados,
-    tot_reembolso,
-    top_cli,
-    top_falha,
-    active_filters,
-):
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter,
-        rightMargin=36,
-        leftMargin=36,
-        topMargin=36,
-        bottomMargin=45,
-    )
-    elements = []
-    styles = getSampleStyleSheet()
-
-    title_style = ParagraphStyle(
-        name="DocTitle",
-        parent=styles["Heading1"],
-        fontName="Helvetica-Bold",
-        fontSize=18,
-        leading=22,
-        textColor=colors.HexColor("#0f172a"),
-        spaceAfter=2,
-    )
-    subtitle_style = ParagraphStyle(
-        name="DocSubtitle",
-        parent=styles["Normal"],
-        fontSize=9,
-        textColor=colors.HexColor("#64748b"),
-        leading=13,
-    )
-    section_style = ParagraphStyle(
-        name="SectionTitle",
-        parent=styles["Heading2"],
-        fontName="Helvetica-Bold",
-        fontSize=12,
-        leading=16,
-        textColor=colors.HexColor("#0284c7"),
-        spaceBefore=10,
-        spaceAfter=6,
-    )
-    table_cell = ParagraphStyle(
-        name="TableCell",
-        parent=styles["Normal"],
-        fontSize=8,
-        leading=11,
-        textColor=colors.HexColor("#1e293b"),
-    )
-    table_header = ParagraphStyle(
-        name="TableHeader",
-        parent=styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=8.5,
-        leading=11,
-        textColor=colors.whitesmoke,
-    )
-
-    # 1. Cabeçalho Principal
-    elements.append(
-        Paragraph("☕ Master Café — Relatório Executivo do SAC", title_style)
-    )
-    dt_now = datetime.now().strftime("%d/%m/%Y às %H:%M")
-    elements.append(
-        Paragraph(
-            f"Relatório Consolidado de Gestão da Qualidade, Atendimento e Reembolsos • Gerado em: <b>{dt_now}</b>",
-            subtitle_style,
-        )
-    )
-    elements.append(Spacer(1, 8))
-    elements.append(
-        HRFlowable(
-            width="100%", thickness=1.5, color=colors.HexColor("#0284c7"), spaceAfter=10
-        )
-    )
-
-    # 2. Quadro de Filtros Ativos
-    filtros_txt = "<b>Escopo do Relatório:</b> Base Geral Consolidada"
-    t_filtros = Table(
-        [[Paragraph(filtros_txt, table_cell)]],
-        colWidths=[540],
-    )
-    t_filtros.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f1f5f9")),
-                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
-                ("PADDING", (0, 0), (-1, -1), 6),
-            ]
-        )
-    )
-    elements.append(t_filtros)
-    elements.append(Spacer(1, 10))
-
-    # 3. Cartões de KPIs Principais
-    elements.append(
-        Paragraph("1. Principais Indicadores de Desempenho (KPIs)", section_style)
-    )
-    reembolso_str = (
-        f"R$ {tot_reembolso:,.2f}".replace(",", "v")
-        .replace(".", ",")
-        .replace("v", ".")
-    )
-    tkt_medio = (tot_reembolso / tot_chamados) if tot_chamados > 0 else 0
-    tkt_medio_str = (
-        f"R$ {tkt_medio:,.2f}".replace(",", "v")
-        .replace(".", ",")
-        .replace("v", ".")
-    )
-
-    kpi_card_data = [
-        [
-            Paragraph("<b>TOTAL DE CHAMADOS</b>", subtitle_style),
-            Paragraph("<b>TOTAL REEMBOLSADO</b>", subtitle_style),
-            Paragraph("<b>TICKET MÉDIO REEMBOLSO</b>", subtitle_style),
-            Paragraph("<b>PRINCIPAL CLIENTE</b>", subtitle_style),
-        ],
-        [
-            Paragraph(
-                f"<font size=13 color='#0284c7'><b>{tot_chamados:,}</b></font>".replace(
-                    ",", "."
-                ),
-                styles["Normal"],
-            ),
-            Paragraph(
-                f"<font size=13 color='#10b981'><b>{reembolso_str}</b></font>",
-                styles["Normal"],
-            ),
-            Paragraph(
-                f"<font size=12 color='#f59e0b'><b>{tkt_medio_str}</b></font>",
-                styles["Normal"],
-            ),
-            Paragraph(
-                f"<font size=9><b>{str(top_cli)[:25]}</b></font>",
-                styles["Normal"],
-            ),
-        ],
-    ]
-    t_kpis = Table(kpi_card_data, colWidths=[135, 140, 135, 130])
-    t_kpis.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
-                ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#cbd5e1")),
-                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
-                ("TOPPADDING", (0, 0), (-1, -1), 7),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-            ]
-        )
-    )
-    elements.append(t_kpis)
-    elements.append(Spacer(1, 12))
-
-    # 4. Tabela Mensal Consolidada
-    elements.append(
-        Paragraph("2. Demonstrativo Mensal Consolidado", section_style)
-    )
-    months_valid = [
-        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-    ]
-    summary_mes = (
-        df_filtered.groupby("Mês_Clean")
-        .agg(Chamados=("Valor", "count"), Reembolso=("Valor", "sum"))
-        .reindex(months_valid)
-        .dropna(how="all")
-        .reset_index()
-    )
-
-    t_mes_data = [[
-        Paragraph("Mês de Referência", table_header),
-        Paragraph("Chamados", table_header),
-        Paragraph("Reembolso Total (R$)", table_header),
-        Paragraph("Ticket Médio (R$)", table_header),
-    ]]
-    for _, row in summary_mes.iterrows():
-        val_f = (
-            f"R$ {row['Reembolso']:,.2f}".replace(",", "v")
-            .replace(".", ",")
-            .replace("v", ".")
-        )
-        tkt = (row["Reembolso"] / row["Chamados"]) if row["Chamados"] > 0 else 0
-        tkt_f = (
-            f"R$ {tkt:,.2f}".replace(",", "v").replace(".", ",").replace("v", ".")
-        )
-        t_mes_data.append([
-            Paragraph(str(row["Mês_Clean"]), table_cell),
-            Paragraph(
-                f"{int(row['Chamados']):,}".replace(",", "."), table_cell
-            ),
-            Paragraph(val_f, table_cell),
-            Paragraph(tkt_f, table_cell),
-        ])
-
-    t_mes_tab = Table(t_mes_data, colWidths=[150, 110, 150, 130])
-    t_mes_tab.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
-                (
-                    "ROWBACKGROUNDS",
-                    (0, 1),
-                    (-1, -1),
-                    [colors.white, colors.HexColor("#f8fafc")],
-                ),
-                ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
-                ("PADDING", (0, 0), (-1, -1), 4.5),
-            ]
-        )
-    )
-    elements.append(t_mes_tab)
-    elements.append(Spacer(1, 14))
-
-    doc.build(elements, canvasmaker=NumberedCanvas)
-    buffer.seek(0)
-    return buffer.getvalue()
-
-
-# --- CARREGAMENTO DE DADOS AUXILIARES (CLIENTES, DADOS/APOIO E USUÁRIOS) ---
-@st.cache_data(ttl=600)
-def load_auxiliary_data():
-    """Carrega dados das abas Clientes, Dados e Usuarios com os novos GIDs."""
-    # 1. Clientes (gid=1332839106): Coluna A: Cliente, B: Local Interno, F: Cidade
-    url_clientes = f"https://docs.google.com/spreadsheets/d/{SHEET_BASE_ID}/export?format=csv&gid={GID_CLIENTES}"
+# --- 3. COMUNICAÇÃO HTTP COM GOOGLE APPS SCRIPT ---
+def enviar_dados_apps_script(payload: dict) -> dict:
     try:
-        df_raw_cli = pd.read_csv(url_clientes)
-        df_clientes = pd.DataFrame()
-        df_clientes["Cliente"] = df_raw_cli.iloc[:, 0].dropna().astype(str).str.strip()
-        df_clientes["Local Interno"] = df_raw_cli.iloc[:, 1].fillna("").astype(str).str.strip() if df_raw_cli.shape[1] > 1 else ""
-        df_clientes["Cidade"] = df_raw_cli.iloc[:, 5].fillna("").astype(str).str.strip() if df_raw_cli.shape[1] > 5 else ""
-        df_clientes = df_clientes[df_clientes["Cliente"] != ""]
-    except Exception:
-        df_clientes = pd.DataFrame(columns=["Cliente", "Local Interno", "Cidade"])
-
-    # 2. Dados / Apoio (gid=1815476457): Coluna A: Forma de Pagamento, L (índice 11): Problemas, N (índice 13): Descrição
-    url_dados = f"https://docs.google.com/spreadsheets/d/{SHEET_BASE_ID}/export?format=csv&gid={GID_DADOS}"
-    try:
-        df_apoio = pd.read_csv(url_dados, header=None)
-        formas_pagamento = [str(x).strip() for x in df_apoio.iloc[:, 0].dropna().unique() if str(x).strip() and str(x).strip().lower() != "nan"] if df_apoio.shape[1] > 0 else []
-        problemas_list = [str(x).strip() for x in df_apoio.iloc[:, 11].dropna().unique() if str(x).strip() and str(x).strip().lower() != "nan"] if df_apoio.shape[1] > 11 else []
-        descricao_list = [str(x).strip() for x in df_apoio.iloc[:, 13].dropna().unique() if str(x).strip() and str(x).strip().lower() != "nan"] if df_apoio.shape[1] > 13 else []
-    except Exception:
-        formas_pagamento, problemas_list, descricao_list = [], [], []
-
-    # 3. Usuários (gid=437161325): Coluna A: Usuario, Coluna B: Senha
-    url_usuarios = f"https://docs.google.com/spreadsheets/d/{SHEET_BASE_ID}/export?format=csv&gid={GID_USUARIOS}"
-    try:
-        df_usuarios = pd.read_csv(url_usuarios, header=None)
-        df_usuarios.columns = ["Usuario", "Senha"] + list(df_usuarios.columns[2:])
-        usuarios_dict = dict(zip(df_usuarios["Usuario"].astype(str).str.strip(), df_usuarios["Senha"].astype(str).str.strip()))
-    except Exception:
-        usuarios_dict = {}
-
-    return df_clientes, formas_pagamento, problemas_list, descricao_list, usuarios_dict
-
-
-# --- CARREGAMENTO E PARSER UNIVERSAL DE DATA DO DASHBOARD (ABA CHAMADOS) ---
-@st.cache_data(ttl=600)
-def load_data():
-    # Aba Chamados: gid=0
-    url = f"https://docs.google.com/spreadsheets/d/{SHEET_BASE_ID}/export?format=csv&gid={GID_CHAMADOS}"
-
-    try:
-        df = pd.read_csv(url)
-    except Exception as e:
-        st.error(f"Erro ao carregar dados da aba Chamados: {e}")
-        df = pd.DataFrame()
-
-    def parse_smart_date(val):
-        if pd.isna(val):
-            return None
-        val_str = str(val).strip()
-        if not val_str or val_str.lower() in ["nan", "none", "nat", ""]:
-            return None
-
+        session = get_session()
+        payload_str = json.dumps(payload, default=str)
+        headers = {"Content-Type": "text/plain;charset=utf-8"}
+        
+        response = session.post(
+            API_URL,
+            data=payload_str,
+            headers=headers,
+            allow_redirects=True,
+            timeout=60
+        )
+        
+        if response.status_code != 200:
+            return {"status": "error", "message": f"HTTP {response.status_code}: {response.text[:200]}"}
+        
         try:
-            val_num = float(val_str)
-            if 35000 <= val_num <= 65000:
-                return pd.to_datetime(val_num, unit="D", origin="1899-12-30").date()
-        except (ValueError, TypeError):
-            pass
-
-        data_pura = val_str.split(" ")[0].split("T")[0].strip()
-
-        for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d/%m/%y", "%d-%m-%Y"):
-            try:
-                return datetime.strptime(data_pura, fmt).date()
-            except ValueError:
-                continue
-
-        try:
-            dt = pd.to_datetime(data_pura, dayfirst=True, errors="coerce")
-            if pd.notna(dt):
-                return dt.date()
+            return response.json()
         except Exception:
-            pass
+            return {"status": "error", "message": f"Resposta inválida da API: {response.text[:250]}"}
+    except Exception as ex:
+        return {"status": "error", "message": f"Falha de conexão: {str(ex)}"}
 
-        return None
+def normalizar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
 
-    if "Data" in df.columns:
-        df["Data_Date"] = df["Data"].apply(parse_smart_date)
-        df["Data_Str"] = df["Data_Date"].apply(
-            lambda d: d.strftime("%d/%m/%Y") if pd.notna(d) and d is not None else ""
-        )
-        df["Ano"] = df["Data_Date"].apply(
-            lambda d: str(d.year) if pd.notna(d) and d is not None else "Não informado"
-        )
-    else:
-        df["Data_Date"] = None
-        df["Data_Str"] = ""
-        df["Ano"] = "Não informado"
+    if "remessa" in df.columns:
+        df["remessa"] = df["remessa"].fillna("").astype(str)
+        df["remessa"] = df["remessa"].str.replace(r"\.0$", "", regex=True).str.strip()
 
-    month_map = {
-        "Janeiro": "Janeiro", "janeiro": "Janeiro",
-        "Fevereiro": "Fevereiro", "Março": "Março",
-        "Abril": "Abril", "Maio": "Maio", "Junho": "Junho",
-        "Julho": "Julho", "Agosto": "Agosto",
-        "Setembro": "Setembro", "setembro": "Setembro",
-        "Outubro": "Outubro", "Novembro": "Novembro", "Dezembro": "Dezembro",
-    }
-
-    if "Mês" in df.columns:
-        df["Mês_Clean"] = (
-            df["Mês"]
-            .fillna("")
-            .astype(str)
-            .str.capitalize()
-            .str.strip()
-            .map(month_map)
-        )
-    else:
-        df["Mês_Clean"] = "Não informado"
-
-    if "$" in df.columns:
-        df["Valor"] = pd.to_numeric(
-            df["$"]
-            .astype(str)
-            .str.replace("R$", "", regex=False)
-            .str.replace(",", ".")
-            .str.strip(),
-            errors="coerce",
-        ).fillna(0)
-    elif "Valor" in df.columns:
-        df["Valor"] = pd.to_numeric(
-            df["Valor"]
-            .astype(str)
-            .str.replace("R$", "", regex=False)
-            .str.replace(",", ".")
-            .str.strip(),
-            errors="coerce",
-        ).fillna(0)
-    else:
-        df["Valor"] = 0.0
-
-    df["Cliente"] = (
-        df["Cliente"].fillna("Não informado").astype(str)
-        if "Cliente" in df.columns
-        else "Não informado"
-    )
-    df["Local Interno"] = (
-        df["Local Interno"].fillna("Não informado").astype(str)
-        if "Local Interno" in df.columns
-        else "Não informado"
-    )
-    df["Problemas"] = (
-        df["Problemas"].fillna("Outros").astype(str)
-        if "Problemas" in df.columns
-        else "Outros"
-    )
-    df["Descrição"] = (
-        df["Descrição"].fillna("Sem descrição").astype(str)
-        if "Descrição" in df.columns
-        else "Sem descrição"
-    )
+    for col in ["produto", "descricao", "local", "conferente", "observacao"]:
+        if col in df.columns:
+            df[col] = df[col].fillna("").astype(str).str.strip()
 
     return df
 
+@st.cache_data(ttl=180, show_spinner=False)
+def carregar_dados_planilha_cached():
+    try:
+        session = get_session()
+        r = session.get(f"{API_URL}?action=listar", allow_redirects=True, timeout=60)
+        if r.status_code == 200:
+            try:
+                dados = r.json()
+                if isinstance(dados, list):
+                    df = pd.DataFrame(dados)
+                    return normalizar_dataframe(df)
+            except Exception:
+                pass
+        return pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
 
-df = load_data()
-df_clientes_raw, opt_formas_pagamento, opt_problemas, opt_descricao, dict_usuarios = load_auxiliary_data()
+def carregar_dados_planilha():
+    try:
+        return carregar_dados_planilha_cached()
+    except Exception as e:
+        st.error(f"Erro ao buscar registros da planilha: {e}")
+        return pd.DataFrame()
 
-# --- CONTROLE DE NAVEGAÇÃO LATERAL COM BOTÕES ---
-if "pagina_ativa" not in st.session_state:
-    st.session_state.pagina_ativa = "dashboard"
+@st.cache_data(ttl=300, show_spinner=False)
+def carregar_lista_conferentes():
+    try:
+        session = get_session()
+        r = session.get(f"{API_URL}?action=get_conferentes", allow_redirects=True, timeout=40)
+        if r.status_code == 200:
+            try:
+                lista = r.json()
+                if isinstance(lista, list) and len(lista) > 0:
+                    return sorted([str(x).strip() for x in lista if str(x).strip()])
+            except Exception:
+                return []
+        return []
+    except Exception:
+        return []
 
-st.sidebar.markdown("### 🧭 Menu Principal")
+def enviar_cadastro_conferente(nome):
+    payload = {"action": "cadastrar_conferente", "nome": nome}
+    res = enviar_dados_apps_script(payload)
+    carregar_lista_conferentes.clear()
+    return res
 
-col_btn1, col_btn2 = st.sidebar.columns(2)
-with col_btn1:
-    btn_dash = st.button("📊 Dashboard", use_container_width=True, type="primary" if st.session_state.pagina_ativa == "dashboard" else "secondary")
-with col_btn2:
-    btn_sac = st.button("📝 SAC", use_container_width=True, type="primary" if st.session_state.pagina_ativa == "sac" else "secondary")
+def enviar_importacao_planilha(linhas):
+    payload = {"action": "importar", "linhas": linhas}
+    res = enviar_dados_apps_script(payload)
+    carregar_dados_planilha_cached.clear()
+    return res
 
-if btn_dash:
-    st.session_state.pagina_ativa = "dashboard"
-    st.rerun()
+def enviar_atualizacao_conferencia(itens):
+    payload = {"action": "atualizar", "itens": itens}
+    res = enviar_dados_apps_script(payload)
+    carregar_dados_planilha_cached.clear()
+    return res
 
-if btn_sac:
-    st.session_state.pagina_ativa = "sac"
-    st.rerun()
+def enviar_exclusao_remessa(remessa: str) -> dict:
+    payload = {"action": "excluir_remessa", "remessa": str(remessa).strip()}
+    res = enviar_dados_apps_script(payload)
+    carregar_dados_planilha_cached.clear()
+    return res
 
-# ==============================================================================
-# 1. ABA DE LANÇAMENTO DE OCORRÊNCIAS DO SAC (COMPACTA + JS MÁSCARAS)
-# ==============================================================================
-if st.session_state.pagina_ativa == "sac":
-    st.markdown(
-        """
-        <div class="header-card">
-            <div class="header-title">📝 Central de Lançamento de Ocorrências — SAC</div>
-            <div class="header-subtitle">Registro ágil de ocorrências, transações e reembolsos</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+def formatar_data_br(data_val):
+    if data_val is None or pd.isna(data_val):
+        return datetime.now().strftime("%d/%m/%Y")
+    
+    val_str = str(data_val).strip()
+    if val_str in ["", "nan", "None", "00:00:00"]:
+        return datetime.now().strftime("%d/%m/%Y")
 
-    # Controle de Sessão do Atendente
-    if "atendente_logado" not in st.session_state:
-        st.session_state.atendente_logado = None
+    if len(val_str) == 10 and val_str[2] == "/" and val_str[5] == "/":
+        return val_str
 
-    if not st.session_state.atendente_logado:
-        st.subheader("🔐 Autenticação de Atendente")
-        st.caption("Insira suas credenciais cadastradas na aba 'Usuarios' para liberar o lançamento.")
-        
-        col_log1, _ = st.columns([1, 1.8])
-        with col_log1:
-            with st.form("form_login_sac"):
-                login_user = st.text_input("Usuário:")
-                login_pass = st.text_input("Senha:", type="password")
-                btn_login = st.form_submit_button("Acessar Painel de Lançamento", use_container_width=True)
+    try:
+        dt = pd.to_datetime(val_str, errors="coerce", dayfirst=True)
+        if pd.notna(dt):
+            return dt.strftime("%d/%m/%Y")
+    except Exception:
+        pass
 
-                if btn_login:
-                    u_clean = login_user.strip()
-                    p_clean = login_pass.strip()
-                    if u_clean in dict_usuarios and str(dict_usuarios[u_clean]) == p_clean:
-                        st.session_state.atendente_logado = u_clean
-                        st.success(f"Bem-vindo(a), {u_clean}!")
-                        st.rerun()
-                    else:
-                        st.error("Usuário ou senha inválidos. Verifique os dados cadastrados na aba 'Usuarios'.")
-    else:
-        # Usuário autenticado
-        col_topo1, col_topo2 = st.columns([3.5, 1.2])
-        with col_topo1:
-            st.success(f"👤 Atendente conectado: **{st.session_state.atendente_logado}**")
-        with col_topo2:
-            if st.button("🚪 Sair / Trocar Usuário", use_container_width=True):
-                st.session_state.atendente_logado = None
-                st.rerun()
+    if " " in val_str:
+        partes = val_str.split(" ")
+        for p in partes:
+            if "/" in p and len(p) == 10:
+                return p
 
-        # Gerar número automático do chamado: SAC-AAAA-XXXX
-        ano_atual_str = str(datetime.now().year)
-        chamados_ano_count = len(df[df["Ano"] == ano_atual_str]) + 1 if not df.empty else 1
-        num_chamado_gerado = f"SAC-{ano_atual_str}-{chamados_ano_count:04d}"
+    return datetime.now().strftime("%d/%m/%Y")
 
-        # Lista de Clientes (Coluna A da aba Clientes)
-        lista_clientes = [""] + sorted(list(set(df_clientes_raw["Cliente"].dropna().tolist())))
-
-        # INJEÇÃO DO JAVASCRIPT DE FORMATAÇÃO E MÁSCARAS
-        components.html(
-            """
-            <script>
-            (function() {
-                const parentDoc = window.parent.document;
-
-                function applyMasks() {
-                    // Máscara de Moeda R$ 0,00
-                    const valorInputs = parentDoc.querySelectorAll('input[aria-label*="Valor"], input[placeholder*="0,00"]');
-                    valorInputs.forEach(input => {
-                        if (!input.dataset.masked) {
-                            input.dataset.masked = "true";
-                            input.addEventListener('input', function(e) {
-                                let v = e.target.value.replace(/\\D/g, '');
-                                v = (v / 100).toFixed(2) + '';
-                                v = v.replace(".", ",");
-                                v = v.replace(/(\\d)(?=(\\d{3})+(?!\\d))/g, '$1.');
-                                e.target.value = v ? 'R$ ' + v : '';
-                            });
-                        }
+def injetar_atalho_teclado_tab():
+    components.html("""
+    <script>
+    (function() {
+        const parentDoc = window.parent.document;
+        parentDoc.addEventListener('keydown', function(e) {
+            if ((e.key === 'Tab' || e.key === 'Enter') && !e.shiftKey) {
+                const active = parentDoc.activeElement;
+                if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+                    const downEvent = new KeyboardEvent('keydown', {
+                        key: 'ArrowDown',
+                        code: 'ArrowDown',
+                        keyCode: 40,
+                        which: 40,
+                        bubbles: true,
+                        cancelable: true
                     });
-
-                    // Máscara de Celular (00) 00000-0000
-                    const telInputs = parentDoc.querySelectorAll('input[aria-label*="Celular"], input[placeholder*="(00)"]');
-                    telInputs.forEach(input => {
-                        if (!input.dataset.masked) {
-                            input.dataset.masked = "true";
-                            input.addEventListener('input', function(e) {
-                                let v = e.target.value.replace(/\\D/g, '');
-                                if (v.length > 11) v = v.slice(0, 11);
-                                if (v.length > 6) {
-                                    e.target.value = `(${v.slice(0,2)}) ${v.slice(2,7)}-${v.slice(7)}`;
-                                } else if (v.length > 2) {
-                                    e.target.value = `(${v.slice(0,2)}) ${v.slice(2)}`;
-                                } else if (v.length > 0) {
-                                    e.target.value = `(${v}`;
-                                }
-                            });
-                        }
-                    });
-
-                    // Máscara de Hora HH:MM
-                    const horaInputs = parentDoc.querySelectorAll('input[aria-label*="Hora da Transação"], input[placeholder*="HH:MM"]');
-                    horaInputs.forEach(input => {
-                        if (!input.dataset.masked) {
-                            input.dataset.masked = "true";
-                            input.addEventListener('input', function(e) {
-                                let v = e.target.value.replace(/\\D/g, '');
-                                if (v.length > 4) v = v.slice(0, 4);
-                                if (v.length > 2) {
-                                    e.target.value = `${v.slice(0,2)}:${v.slice(2)}`;
-                                } else {
-                                    e.target.value = v;
-                                }
-                            });
-                        }
-                    });
-
-                    // Máscara de Data da Transação DD/MM/AAAA
-                    const dataInputs = parentDoc.querySelectorAll('input[aria-label*="Data da Transação"], input[placeholder*="DD/MM/AAAA"]');
-                    dataInputs.forEach(input => {
-                        if (!input.dataset.masked) {
-                            input.dataset.masked = "true";
-                            input.addEventListener('input', function(e) {
-                                let v = e.target.value.replace(/\\D/g, '');
-                                if (v.length > 8) v = v.slice(0, 8);
-                                if (v.length > 4) {
-                                    e.target.value = `${v.slice(0,2)}/${v.slice(2,4)}/${v.slice(4)}`;
-                                } else if (v.length > 2) {
-                                    e.target.value = `${v.slice(0,2)}/${v.slice(2)}`;
-                                } else {
-                                    e.target.value = v;
-                                }
-                            });
-                        }
-                    });
+                    
+                    if (e.key === 'Tab') {
+                        e.preventDefault();
+                        active.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+                        setTimeout(() => {
+                            parentDoc.dispatchEvent(downEvent);
+                        }, 20);
+                    }
                 }
-
-                applyMasks();
-                const observer = new MutationObserver(applyMasks);
-                observer.observe(parentDoc.body, { childList: true, subtree: true });
-            })();
-            </script>
-            """,
-            height=0,
-            width=0,
-        )
-
-        # FORMULÁRIO COMPACTO E LINEAR
-        st.markdown(f"#### 📋 Formulário de Abertura — `{num_chamado_gerado}`")
-
-        # LINHA 1: Identificação e Dados Gerais
-        st.markdown('<div class="compact-section-title">1. Dados Operacionais & Localização</div>', unsafe_allow_html=True)
-        r1_c1, r1_c2, r1_c3, r1_c4 = st.columns([1.1, 1, 1.2, 1.3])
-        with r1_c1:
-            st.text_input("Chamado", value=num_chamado_gerado, disabled=True)
-        with r1_c2:
-            data_chamado = st.date_input("Data do Chamado", value=datetime.now().date(), format="DD/MM/YYYY")
-        with r1_c3:
-            produto_sel = st.selectbox("Produto", ["", "Café", "Snaky"], index=0)
-        with r1_c4:
-            cliente_sel = st.selectbox("Cliente", lista_clientes, index=0, key="sac_cliente_sel")
-
-        # LINHA 2: Localização e Classificação da Falha
-        locais_validos = [""]
-        if cliente_sel:
-            sub_cli = df_clientes_raw[df_clientes_raw["Cliente"] == cliente_sel]
-            locais_unicos = sorted([loc for loc in sub_cli["Local Interno"].dropna().unique() if str(loc).strip()])
-            locais_validos = [""] + locais_unicos
-
-        cidade_sugerida = ""
-        if cliente_sel:
-            sub_loc = df_clientes_raw[(df_clientes_raw["Cliente"] == cliente_sel)]
-            sub_loc_cidades = [c for c in sub_loc["Cidade"].dropna().unique() if str(c).strip()]
-            cidade_sugerida = sub_loc_cidades[0] if sub_loc_cidades else ""
-
-        r2_c1, r2_c2, r2_c3, r2_c4 = st.columns([1.2, 1, 1.1, 1.3])
-        with r2_c1:
-            local_interno_sel = st.selectbox("Local Interno", locais_validos, index=0, key="sac_local_interno_sel")
-        with r2_c2:
-            cidade_sel = st.text_input("Cidade", value=cidade_sugerida, placeholder="Cidade do Local")
-        with r2_c3:
-            problema_sel = st.selectbox("Problema", [""] + opt_problemas, index=0, key="sac_problema_sel")
-        with r2_c4:
-            descricao_sel = st.selectbox("Descrição", [""] + opt_descricao, index=0, key="sac_descricao_sel")
-
-        # LINHA 3: Transação e Solicitante
-        st.markdown('<div class="compact-section-title">2. Transação Financeira & Solicitante</div>', unsafe_allow_html=True)
-        r3_c1, r3_c2, r3_c3, r3_c4 = st.columns([1, 0.9, 1, 1.2])
-        with r3_c1:
-            data_transacao_txt = st.text_input("Data Transação", placeholder="DD/MM/AAAA", key="sac_dt_transacao")
-        with r3_c2:
-            hora_transacao_txt = st.text_input("Hora Transação", placeholder="HH:MM", key="sac_hr_transacao")
-        with r3_c3:
-            valor_transacao_txt = st.text_input("Valor Reembolso", placeholder="0,00", key="sac_valor_transacao")
-        with r3_c4:
-            forma_pagamento_sel = st.selectbox("Forma de Pagamento", [""] + opt_formas_pagamento, index=0, key="sac_forma_pagamento_sel")
-
-        # LINHA 4: Chave Pix e Contato
-        r4_c1, r4_c2, r4_c3 = st.columns([1.5, 1.3, 1.2])
-        with r4_c1:
-            pix_reembolso = st.text_input("Pix - Reembolso", placeholder="CPF, e-mail, celular ou chave aleatória", key="sac_pix_reembolso")
-        with r4_c2:
-            nome_cliente = st.text_input("Nome/Sobrenome", placeholder="Nome completo do solicitante", key="sac_nome_cliente")
-        with r4_c3:
-            celular_cliente = st.text_input("Celular", placeholder="(00) 00000-0000", key="sac_celular_cliente")
-
-        data_hora_lancamento = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-
-        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-        btn_salvar_chamado = st.button("💾 Gravar Lançamento do Chamado", use_container_width=True, type="primary")
-
-        if btn_salvar_chamado:
-            if not cliente_sel:
-                st.error("Por favor, selecione um Cliente.")
-            elif not local_interno_sel:
-                st.error("Por favor, selecione um Local Interno.")
-            elif not problema_sel:
-                st.error("Por favor, selecione o Problema.")
-            elif not nome_cliente.strip():
-                st.error("Por favor, informe o Nome/Sobrenome do cliente.")
-            else:
-                nome_formatado = nome_cliente.strip().title()
-
-                try:
-                    val_limpo = float(
-                        valor_transacao_txt.replace("R$", "")
-                        .replace(".", "")
-                        .replace(",", ".")
-                        .strip()
-                    ) if valor_transacao_txt.strip() else 0.0
-                except ValueError:
-                    val_limpo = 0.0
-
-                novo_registro = {
-                    "Chamado": num_chamado_gerado,
-                    "Data": data_chamado.strftime("%d/%m/%Y"),
-                    "Cliente": cliente_sel,
-                    "Local Interno": local_interno_sel,
-                    "Cidade": cidade_sel.strip(),
-                    "Descrição": descricao_sel,
-                    "Produto": produto_sel,
-                    "Data da Transação": data_transacao_txt.strip(),
-                    "Hora da Transação": hora_transacao_txt.strip(),
-                    "Valor": val_limpo,
-                    "Nome/Sobrenome": nome_formatado,
-                    "Celular": celular_cliente.strip(),
-                    "Problemas": problema_sel,
-                    "Forma de Pagamento": forma_pagamento_sel,
-                    "Pix - Reembolso": pix_reembolso.strip(),
-                    "Atendente": st.session_state.atendente_logado,
-                    "Data/Hora do lançamento": data_hora_lancamento,
-                }
-
-                # Prioriza a URL dos secrets se definida; caso contrário usa a URL informada
-                webhook_url = st.secrets.get("GOOGLE_SHEET_WEBHOOK_URL", WEBHOOK_URL_DEFAULT)
-                gravacao_ok = False
-
-                if webhook_url:
-                    try:
-                        req_data = json.dumps(novo_registro).encode("utf-8")
-                        req = urllib.request.Request(
-                            webhook_url,
-                            data=req_data,
-                            headers={"Content-Type": "application/json"}
-                        )
-                        with urllib.request.urlopen(req, timeout=15) as response:
-                            res_body = response.read().decode("utf-8")
-                            st.info(f"Resposta do Webhook: {res_body}")
-                            gravacao_ok = True
-                    except Exception as err:
-                        st.error(f"Erro ao disparar webhook: {err}")
-                else:
-                    st.error("URL do Webhook não encontrada.")
-
-                if gravacao_ok:
-                    st.success(f"✅ Chamado **{num_chamado_gerado}** registrado com sucesso para **{nome_formatado}**!")
-                    st.json(novo_registro)
-
-# ==============================================================================
-# 2. ABA DO DASHBOARD EXECUTIVO
-# ==============================================================================
-elif st.session_state.pagina_ativa == "dashboard":
-
-    hoje = datetime.now().date()
-    datas_validas = df["Data_Date"].dropna()
-    min_data_calendario = min(datas_validas.min(), hoje) if not datas_validas.empty else hoje
-    max_data_calendario = max(datas_validas.max(), hoje) if not datas_validas.empty else hoje
-
-    meses_do_ano = {
-        1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril", 5: "Maio", 6: "Junho",
-        7: "Julho", 8: "Agosto", 9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro",
-    }
-    mes_atual_num = datetime.now().month
-    mes_atual_nome = meses_do_ano.get(mes_atual_num, "Janeiro")
-    mes_anterior_num = 12 if mes_atual_num == 1 else mes_atual_num - 1
-    mes_anterior_nome = meses_do_ano.get(mes_anterior_num, "Dezembro")
-
-    months_order = [
-        "Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
-    ]
-
-    idx_mes_atual = months_order.index(mes_atual_nome) if mes_atual_nome in months_order else len(months_order) - 1
-
-    filtered_df = df.copy()
-
-    total_chamados = len(filtered_df)
-    total_devolvido = filtered_df["Valor"].sum()
-    top_cliente = (
-        filtered_df["Cliente"].value_counts().index[0]
-        if len(filtered_df) > 0
-        else "-"
-    )
-    top_problema = (
-        filtered_df["Problemas"].value_counts().index[0]
-        if len(filtered_df) > 0
-        else "-"
-    )
-
-    # --- BOTÃO DE GERAR RELATÓRIO PDF NA BARRA LATERAL ---
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📄 Relatório Executivo")
-
-    active_filters_dict = {
-        "ano": "Consolidado Geral",
-    }
-
-    pdf_full_bytes = generate_full_pdf_report(
-        filtered_df,
-        total_chamados,
-        total_devolvido,
-        top_cliente,
-        top_problema,
-        active_filters_dict,
-    )
-
-    st.sidebar.download_button(
-        label="📥 Gerar Relatório Completo (PDF)",
-        data=pdf_full_bytes,
-        file_name="Relatorio_Executivo_SAC_MasterCafe_Consolidado.pdf",
-        mime="application/pdf",
-        help="Exportar dados consolidados em formato PDF",
-        use_container_width=True,
-    )
-
-    if st.sidebar.button("🔄 Atualizar Dados", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
-
-    # --- CABEÇALHO PRINCIPAL ---
-    st.markdown(
-        """
-        <div class="header-card">
-            <div class="header-title">☕ Master Café — Dashboard Executivo SAC</div>
-            <div class="header-subtitle">Painel de Gestão da Qualidade, Atendimento e Reembolsos Financeiros</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # --- 1. CARDS DE KPIS ---
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total de Chamados", f"{total_chamados:,}".replace(",", "."))
-    c2.metric(
-        "Total Reembolsado",
-        f"R$ {total_devolvido:,.2f}".replace(",", "v")
-        .replace(".", ",")
-        .replace("v", "."),
-    )
-    c3.metric("Principal Cliente", top_cliente)
-    c4.metric("Principal Falha", top_problema)
-
-    st.markdown("---")
-
-    # --- 2. INSIGHTS AUTOMÁTICOS ---
-    st.subheader("💡 Insights & Destaques Gerenciais Automáticos")
-    i1, i2, i3 = st.columns(3)
-
-    with i1:
-        st.markdown(
-            """
-            <div class="insight-card" style="border-left: 4px solid #38bdf8;">
-                <h4 style="color:#38bdf8; margin:0 0 8px 0; font-size: 15px;">Pico Operacional em Agosto</h4>
-                <p style="font-size:13px; color:#cbd5e1; margin:0; line-height: 1.4;">Agosto concentrou o maior volume com <b>1.495 chamados</b> e <b>R$ 8.128,78</b> reembolsados, impulsionado por Senac Araraquara e Shopee SBC.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with i2:
-        st.markdown(
-            """
-            <div class="insight-card" style="border-left: 4px solid #34d399;">
-                <h4 style="color:#34d399; margin:0 0 8px 0; font-size: 15px;">Gargalo Técnico em Bebidas e Snacks</h4>
-                <p style="font-size:13px; color:#cbd5e1; margin:0; line-height: 1.4;">"Produto Enroscado" e "Bebida Não Entregue" somam a maioria absoluta das reclamações, exigindo ajuste em molas e sensores.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with i3:
-        st.markdown(
-            """
-            <div class="insight-card" style="border-left: 4px solid #fbbf24;">
-                <h4 style="color:#fbbf24; margin:0 0 8px 0; font-size: 15px;">Concentração em Teleperformance</h4>
-                <p style="font-size:13px; color:#cbd5e1; margin:0; line-height: 1.4;">A conta Teleperformance responde por <b>1.949 chamados</b> no acumulado do ano, representando mais de 23% de toda a demanda do SAC.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    # --- 3. DESTAQUES MÊS A MÊS COM FILTROS DE COMPARAÇÃO ---
-    st.markdown("### 📌 Destaques Mês a Mês & Locais Críticos")
-
-    months_choices = [
-        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-    ]
-
-    default_idx_a = months_choices.index(mes_anterior_nome) if mes_anterior_nome in months_choices else len(months_choices) - 2
-    default_idx_b = months_choices.index(mes_atual_nome) if mes_atual_nome in months_choices else len(months_choices) - 1
-
-    f_c1, f_c2, _ = st.columns([1, 1, 1.2])
-    with f_c1:
-        mes_comp_a = st.selectbox(
-            "Mês A (Mês Anterior):",
-            months_choices,
-            index=default_idx_a,
-            key="comp_mes_a",
-        )
-    with f_c2:
-        mes_comp_b = st.selectbox(
-            "Mês B (Mês Atual - Referência Crítica):",
-            months_choices,
-            index=default_idx_b,
-            key="comp_mes_b",
-        )
-
-    ca, cs, ct3 = st.columns([1, 1, 1.2])
-
-    with ca:
-        df_a = (
-            filtered_df[filtered_df["Mês_Clean"] == mes_comp_a]["Local Interno"]
-            .value_counts()
-            .head(5)
-            .reset_index()
-        )
-        df_a.columns = ["Local", "Chamados"]
-        fig_a = px.bar(
-            df_a,
-            x="Chamados",
-            y="Local",
-            orientation="h",
-            text="Chamados",
-            color_discrete_sequence=["#f59e0b"],
-        )
-        fig_a.update_traces(marker=dict(line=dict(width=0)))
-        fig_a.update_layout(yaxis=dict(autorange="reversed"))
-        fig_a = apply_powerbi_theme(
-            fig_a, title=f"Top 5 Locais — {mes_comp_a}", height=280
-        )
-        st.plotly_chart(fig_a, use_container_width=True)
-
-    with cs:
-        df_b = (
-            filtered_df[filtered_df["Mês_Clean"] == mes_comp_b]["Local Interno"]
-            .value_counts()
-            .head(5)
-            .reset_index()
-        )
-        df_b.columns = ["Local", "Chamados"]
-        fig_b = px.bar(
-            df_b,
-            x="Chamados",
-            y="Local",
-            orientation="h",
-            text="Chamados",
-            color_discrete_sequence=["#0284c7"],
-        )
-        fig_b.update_traces(marker=dict(line=dict(width=0)))
-        fig_b.update_layout(yaxis=dict(autorange="reversed"))
-        fig_b = apply_powerbi_theme(
-            fig_b, title=f"Top 5 Locais — {mes_comp_b}", height=280
-        )
-        st.plotly_chart(fig_b, use_container_width=True)
-
-    with ct3:
-        top3_mes_b = (
-            filtered_df[filtered_df["Mês_Clean"] == mes_comp_b]["Local Interno"]
-            .value_counts()
-            .head(3)
-            .index.tolist()
-        )
-
-        items_html = ""
-        for idx, loc in enumerate(top3_mes_b, 1):
-            loc_data = filtered_df[
-                (filtered_df["Mês_Clean"] == mes_comp_b) & (filtered_df["Local Interno"] == loc)
-            ]
-            main_prob = (
-                loc_data["Problemas"].value_counts().index[0]
-                if len(loc_data) > 0
-                else "N/A"
-            )
-            main_desc = (
-                loc_data["Descrição"].value_counts().index[0]
-                if len(loc_data) > 0
-                else "N/A"
-            )
-
-            items_html += f"""
-            <div style="background-color: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                    <span style="font-weight: 600; color: #f8fafc; font-size: 13px;">{idx}. {loc}</span>
-                    <span style="background-color: #0284c7; color: #ffffff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px;">
-                        {len(loc_data)} chamados
-                    </span>
-                </div>
-                <div style="font-size: 11px; color: #94a3b8; line-height: 1.4;">
-                    <div><b style="color: #cbd5e1;">Falha:</b> {main_prob}</div>
-                    <div><b style="color: #cbd5e1;">Item:</b> {main_desc}</div>
-                </div>
-            </div>
-            """
-
-        if not items_html:
-            items_html = f"<p style='color:#94a3b8; font-size:12px; margin-top:20px;'>Nenhum registro encontrado para o mês de {mes_comp_b}.</p>"
-
-        st.markdown(
-            f"""
-            <div style="
-                background-color: #1e293b; 
-                border: 1px solid #334155; 
-                border-radius: 8px; 
-                padding: 16px; 
-                height: 280px; 
-                box-sizing: border-box; 
-                overflow-y: auto; 
-                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-            ">
-                <div style="font-family: 'Segoe UI', sans-serif; font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
-                    <span>📌</span> Top 3 Locais Críticos ({mes_comp_b})
-                </div>
-                {items_html}
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    st.markdown("---")
-
-    # --- 4. VALORES E CHAMADOS MENSAL (HISTÓRICO COMPLETO) ---
-    g1, g2 = st.columns(2)
-
-    with g1:
-        ch_mes = (
-            filtered_df.groupby("Mês_Clean")["Problemas"]
-            .count()
-            .reindex(months_choices)
-            .fillna(0)
-            .reset_index()
-        )
-        ch_mes.columns = ["Mês_Clean", "Chamado"]
-        fig_ch = px.bar(
-            ch_mes,
-            x="Mês_Clean",
-            y="Chamado",
-            text="Chamado",
-            color_discrete_sequence=["#00b4d8"],
-        )
-        fig_ch.update_traces(marker=dict(line=dict(width=0)))
-        fig_ch = apply_powerbi_theme(
-            fig_ch, title="Chamados por Mês", height=320
-        )
-        fig_ch.update_xaxes(title_text="")
-        fig_ch.update_yaxes(title_text="Chamados")
-        st.plotly_chart(fig_ch, use_container_width=True)
-
-    with g2:
-        val_mes = (
-            filtered_df.groupby("Mês_Clean")["Valor"]
-            .sum()
-            .reindex(months_choices)
-            .fillna(0)
-            .reset_index()
-        )
-        fig_val = px.bar(
-            val_mes,
-            x="Mês_Clean",
-            y="Valor",
-            text_auto=".2f",
-            color_discrete_sequence=["#10b981"],
-        )
-        fig_val.update_traces(marker=dict(line=dict(width=0)))
-        fig_val = apply_powerbi_theme(
-            fig_val, title="Valores Devolvidos por Mês em R$", height=320
-        )
-        fig_val.update_xaxes(title_text="")
-        fig_val.update_yaxes(title_text="Reembolso (R$)")
-        st.plotly_chart(fig_val, use_container_width=True)
-
-    # --- 5. RANKINGS ANUAIS ---
-    st.markdown("---")
-    r1, r2 = st.columns(2)
-
-    with r1:
-        t10_cli = filtered_df["Cliente"].value_counts().head(10).reset_index()
-        t10_cli.columns = ["Cliente", "Chamados"]
-        fig_cli = px.bar(
-            t10_cli,
-            x="Chamados",
-            y="Cliente",
-            orientation="h",
-            text="Chamados",
-            color_discrete_sequence=["#6366f1"],
-        )
-        fig_cli.update_traces(marker=dict(line=dict(width=0)))
-        fig_cli.update_layout(yaxis=dict(autorange="reversed"))
-        fig_cli = apply_powerbi_theme(
-            fig_cli, title="Top 10 Clientes do Período", height=350
-        )
-        st.plotly_chart(fig_cli, use_container_width=True)
-
-    with r2:
-        t10_loc = filtered_df["Local Interno"].value_counts().head(10).reset_index()
-        t10_loc.columns = ["Local Interno", "Chamados"]
-        fig_loc = px.bar(
-            t10_loc,
-            x="Chamados",
-            y="Local Interno",
-            orientation="h",
-            text="Chamados",
-            color_discrete_sequence=["#14b8a6"],
-        )
-        fig_loc.update_traces(marker=dict(line=dict(width=0)))
-        fig_loc.update_layout(yaxis=dict(autorange="reversed"))
-        fig_loc = apply_powerbi_theme(
-            fig_loc, title="Top 10 Locais Internos do Período", height=350
-        )
-        st.plotly_chart(fig_loc, use_container_width=True)
-
-    # --- 6. GRÁFICOS DIÁRIOS ---
-    st.markdown("---")
-
-    c_filtro_m1, _ = st.columns([1.2, 2.8])
-    with c_filtro_m1:
-        mes_graf_diario = st.selectbox(
-            "📅 Filtrar Mês dos Gráficos Diários:",
-            months_order,
-            index=idx_mes_atual,
-            key="filtro_mes_graficos_diarios"
-        )
-
-    df_datas_validas = filtered_df[filtered_df["Data_Date"].notna()].copy()
-    if mes_graf_diario != "Todos":
-        df_datas_validas = df_datas_validas[df_datas_validas["Mês_Clean"] == mes_graf_diario]
-
-    col_dia_graf1, col_dia_graf2 = st.columns(2)
-
-    with col_dia_graf1:
-        if not df_datas_validas.empty:
-            ch_por_dia = (
-                df_datas_validas.groupby("Data_Date")
-                .size()
-                .reset_index(name="Quantidade de Chamados")
-                .sort_values(by="Data_Date", ascending=True)
-            )
-            ch_por_dia["Data_Formatada"] = ch_por_dia["Data_Date"].apply(lambda d: d.strftime("%d/%m/%Y"))
-            ordem_cronologica_dias = ch_por_dia["Data_Formatada"].tolist()
-
-            titulo_ch_dia = f"Quantidade de Chamados por Dia ({mes_graf_diario})" if mes_graf_diario != "Todos" else "Quantidade de Chamados por Dia (Período Completo)"
-
-            fig_dia_ch = px.bar(
-                ch_por_dia,
-                x="Data_Formatada",
-                y="Quantidade de Chamados",
-                text="Quantidade de Chamados",
-                color_discrete_sequence=["#38bdf8"],
-                category_orders={"Data_Formatada": ordem_cronologica_dias},
-            )
-            fig_dia_ch.update_traces(marker=dict(line=dict(width=0)))
-            fig_dia_ch = apply_powerbi_theme(
-                fig_dia_ch, title=titulo_ch_dia, height=340
-            )
-            fig_dia_ch.update_xaxes(
-                title_text="Data",
-                tickangle=-45,
-                type="category",
-                categoryorder="array",
-                categoryarray=ordem_cronologica_dias
-            )
-            fig_dia_ch.update_yaxes(title_text="Qtd Chamados")
-            st.plotly_chart(fig_dia_ch, use_container_width=True)
-        else:
-            st.info(f"Sem dados de chamados registrados para o mês de {mes_graf_diario}.")
-
-    with col_dia_graf2:
-        if not df_datas_validas.empty:
-            val_por_dia = (
-                df_datas_validas.groupby("Data_Date")["Valor"]
-                .sum()
-                .reset_index(name="Valor Devolvido")
-                .sort_values(by="Data_Date", ascending=True)
-            )
-            val_por_dia["Data_Formatada"] = val_por_dia["Data_Date"].apply(lambda d: d.strftime("%d/%m/%Y"))
-            ordem_cronologica_dias_val = val_por_dia["Data_Formatada"].tolist()
-
-            titulo_val_dia = f"Valores Devolvidos por Dia em R$ ({mes_graf_diario})" if mes_graf_diario != "Todos" else "Valores Devolvidos por Dia em R$ (Período Completo)"
-
-            fig_dia_val = px.bar(
-                val_por_dia,
-                x="Data_Formatada",
-                y="Valor Devolvido",
-                text_auto=".2f",
-                color_discrete_sequence=["#10b981"],
-                category_orders={"Data_Formatada": ordem_cronologica_dias_val},
-            )
-            fig_dia_val.update_traces(marker=dict(line=dict(width=0)))
-            fig_dia_val = apply_powerbi_theme(
-                fig_dia_val, title=titulo_val_dia, height=340
-            )
-            fig_dia_val.update_xaxes(
-                title_text="Data",
-                tickangle=-45,
-                type="category",
-                categoryorder="array",
-                categoryarray=ordem_cronologica_dias_val
-            )
-            fig_dia_val.update_yaxes(title_text="Total Reembolsado (R$)")
-            st.plotly_chart(fig_dia_val, use_container_width=True)
-        else:
-            st.info(f"Sem valores devolvidos registrados para o mês de {mes_graf_diario}.")
-
-    # --- 7. FILTROS DINÂMICOS LOCAIS ---
-    st.markdown("---")
-
-    dev_col1, dev_col2 = st.columns(2)
-
-    with dev_col1:
-        st.markdown("**Top Devoluções (R$) - Filtro de Mês Dinâmico**")
-        dev_month_selected = st.selectbox(
-            "Mudar Mês (Top Devoluções R$)",
-            months_order,
-            index=idx_mes_atual,
-            key="dev_month_filter",
-        )
-
-        dev_df_m = filtered_df.copy()
-        if dev_month_selected != "Todos":
-            dev_df_m = dev_df_m[dev_df_m["Mês_Clean"] == dev_month_selected]
-
-        dev_loc_m = (
-            dev_df_m.groupby("Local Interno")["Valor"]
-            .sum()
-            .sort_values(ascending=False)
-            .head(10)
-            .reset_index()
-        )
-        fig_dev_m = px.bar(
-            dev_loc_m,
-            x="Valor",
-            y="Local Interno",
-            orientation="h",
-            text_auto=".2f",
-            color_discrete_sequence=["#10b981"],
-        )
-        fig_dev_m.update_traces(marker=dict(line=dict(width=0)))
-        fig_dev_m.update_layout(yaxis=dict(autorange="reversed"))
-        fig_dev_m = apply_powerbi_theme(
-            fig_dev_m,
-            title=f"Top Devoluções (R$) — {dev_month_selected}",
-            height=320,
-        )
-        st.plotly_chart(fig_dev_m, use_container_width=True)
-
-    with dev_col2:
-        st.markdown("**Top Devoluções (R$) - Filtro de Dia Dinâmico**")
-        day_dev_selected = st.date_input(
-            "Mudar Dia (Top Devoluções R$):",
-            value=hoje,
-            min_value=min_data_calendario,
-            max_value=max_data_calendario,
-            format="DD/MM/YYYY",
-            key="day_dev_calendar",
-        )
-
-        dev_df_d = filtered_df.copy()
-        day_dev_str = day_dev_selected.strftime("%d/%m/%Y")
-        dev_df_d = dev_df_d[
-            (dev_df_d["Data_Date"] == day_dev_selected)
-            | (dev_df_d["Data_Str"] == day_dev_str)
-        ]
-
-        dev_loc_d = (
-            dev_df_d.groupby("Local Interno")["Valor"]
-            .sum()
-            .sort_values(ascending=False)
-            .head(10)
-            .reset_index()
-        )
-        fig_dev_d = px.bar(
-            dev_loc_d,
-            x="Valor",
-            y="Local Interno",
-            orientation="h",
-            text_auto=".2f",
-            color_discrete_sequence=["#10b981"],
-        )
-        fig_dev_d.update_traces(marker=dict(line=dict(width=0)))
-        fig_dev_d.update_layout(yaxis=dict(autorange="reversed"))
-        fig_dev_d = apply_powerbi_theme(
-            fig_dev_d,
-            title=f"Top Devoluções (R$) — {day_dev_str}",
-            height=320,
-        )
-        st.plotly_chart(fig_dev_d, use_container_width=True)
-
-    loc_col1, loc_col2 = st.columns(2)
-
-    with loc_col1:
-        st.markdown("**Top 10 Locais Internos - Filtro de Mês (Chamados)**")
-        ch_month_selected = st.selectbox(
-            "Mudar Mês (Top Locais Chamados)",
-            months_order,
-            index=idx_mes_atual,
-            key="ch_loc_month_filter",
-        )
-
-        ch_df_m = filtered_df.copy()
-        if ch_month_selected != "Todos":
-            ch_df_m = ch_df_m[ch_df_m["Mês_Clean"] == ch_month_selected]
-
-        dia_loc_m = ch_df_m["Local Interno"].value_counts().head(10).reset_index()
-        dia_loc_m.columns = ["Local Interno", "Chamados"]
-
-        fig_loc_m = px.bar(
-            dia_loc_m,
-            x="Chamados",
-            y="Local Interno",
-            orientation="h",
-            text="Chamados",
-            color_discrete_sequence=["#38bdf8"],
-        )
-        fig_loc_m.update_traces(marker=dict(line=dict(width=0)))
-        fig_loc_m.update_layout(yaxis=dict(autorange="reversed"))
-        fig_loc_m = apply_powerbi_theme(
-            fig_loc_m,
-            title=f"Top 10 Locais no Mês — {ch_month_selected}",
-            height=320,
-        )
-        st.plotly_chart(fig_loc_m, use_container_width=True)
-
-    with loc_col2:
-        st.markdown("**Top 10 Locais Internos - Filtro de Dia (Calendário)**")
-        day_selected_loc = st.date_input(
-            "Mudar Dia (Top Locais Chamados):",
-            value=hoje,
-            min_value=min_data_calendario,
-            max_value=max_data_calendario,
-            format="DD/MM/YYYY",
-            key="day_loc_calendar",
-        )
-
-        day_df = filtered_df.copy()
-        day_str_target = day_selected_loc.strftime("%d/%m/%Y")
-        day_df = day_df[
-            (day_df["Data_Date"] == day_selected_loc)
-            | (day_df["Data_Str"] == day_str_target)
-        ]
-
-        dia_loc = day_df["Local Interno"].value_counts().head(10).reset_index()
-        dia_loc.columns = ["Local Interno", "Chamados"]
-
-        fig_dia = px.bar(
-            dia_loc,
-            x="Chamados",
-            y="Local Interno",
-            orientation="h",
-            text="Chamados",
-            color_discrete_sequence=["#f59e0b"],
-        )
-        fig_dia.update_traces(marker=dict(line=dict(width=0)))
-        fig_dia.update_layout(yaxis=dict(autorange="reversed"))
-        fig_dia = apply_powerbi_theme(
-            fig_dia,
-            title=f"Top 10 Locais no Dia — {day_str_target}",
-            height=320,
-        )
-        st.plotly_chart(fig_dia, use_container_width=True)
-
-    # --- 8. TABELAS DETALHADAS OPERACIONAIS ---
-    st.markdown("---")
-    st.markdown("### 📅 Detalhamento Operacional de Registros")
-
-    lista_clientes_dinamica = ["Todos"] + sorted(
-        [
-            str(c).strip()
-            for c in filtered_df["Cliente"].dropna().unique()
-            if str(c).strip() not in ["Não informado", "nan", "None", ""]
-        ]
-    )
-
-    tab_chamados_dia, tab_mes_cli, tab_dia_cli, tab_mes_top3, tab_dia_top3 = st.tabs(
-        [
-            "📋 Chamados por Dia (Completa)",
-            "Por Mês e Cliente", 
-            "Por Data e Cliente", 
-            "Por Mês (Top 3 Locais)", 
-            "Por Dia (Top 3 Locais)"
-        ]
-    )
-
-    # --- ABA: TABELA DE CHAMADOS POR DIA ---
-    with tab_chamados_dia:
-        st.markdown("#### Chamados por Dia — Detalhamento por Local Interno, Descrição e Problema")
-        
-        col_d_sel1, col_d_sel2 = st.columns([1, 2])
-        with col_d_sel1:
-            data_analitica_sel = st.date_input(
-                "📆 Escolha o Dia para Detalhar:",
-                value=hoje,
-                min_value=min_data_calendario,
-                max_value=max_data_calendario,
-                format="DD/MM/YYYY",
-                key="tb_dia_detalhado_calendar"
-            )
-        with col_d_sel2:
-            filtro_opc_loc = st.selectbox(
-                "Filtrar Local Interno (Opcional):",
-                ["Todos"] + sorted(filtered_df["Local Interno"].dropna().unique().tolist()),
-                key="tb_dia_detalhado_loc_filtro"
-            )
-
-        df_analitico_dia = filtered_df.copy()
-        data_analitica_str = data_analitica_sel.strftime("%d/%m/%Y")
-        
-        df_analitico_dia = df_analitico_dia[
-            (df_analitico_dia["Data_Date"] == data_analitica_sel) |
-            (df_analitico_dia["Data_Str"] == data_analitica_str)
-        ]
-        
-        if filtro_opc_loc != "Todos":
-            df_analitico_dia = df_analitico_dia[df_analitico_dia["Local Interno"] == filtro_opc_loc]
-
-        if not df_analitico_dia.empty:
-            tabela_detalhada = (
-                df_analitico_dia.groupby(["Local Interno", "Descrição", "Problemas"])
-                .agg(
-                    Quantidade=("Valor", "count"),
-                    Total_Reembolso=("Valor", "sum")
-                )
-                .reset_index()
-                .sort_values(by="Quantidade", ascending=False)
-                .rename(columns={"Problemas": "Problema", "Quantidade": "Quantidade de Chamados"})
-            )
+            }
+        }, true);
+    })();
+    </script>
+    """, height=0, width=0)
+
+# --- 4. EXTRAÇÃO DO EXCEL ---
+def extrair_excel(uploaded_file):
+    itens = []
+    df_raw = pd.read_excel(uploaded_file, header=None, dtype=str)
+    
+    linha_cabecalho = None
+    idx_col_prod = None
+    idx_col_desc = None
+    idx_col_qtd = None
+
+    for r_idx in range(min(50, len(df_raw))):
+        linha = df_raw.iloc[r_idx]
+        linha_limpa = [str(val).strip().lower() for val in linha.dropna()]
+        texto_linha = " ".join(linha_limpa)
+
+        if any(termo in texto_linha for termo in ["produto", "código", "codigo", "item"]):
+            linha_cabecalho = r_idx
             
-            tabela_detalhada.insert(0, "Data", data_analitica_str)
+            for c_idx, val in enumerate(linha):
+                if pd.isna(val):
+                    continue
+                v = str(val).strip().lower()
+                
+                if any(k in v for k in ["produto", "código", "codigo", "item"]) and idx_col_prod is None:
+                    idx_col_prod = c_idx
+                elif any(k in v for k in ["descri", "nome", "especifica"]) and idx_col_desc is None:
+                    idx_col_desc = c_idx
+                elif any(k in v for k in ["quant", "qtd"]) and not any(k in v for k in ["lote", "série", "serie"]):
+                    idx_col_qtd = c_idx
+            break
 
-            st.markdown(
-                f"**Exibindo registros da data:** `{data_analitica_str}` | "
-                f"**Total de chamados no dia:** `{tabela_detalhada['Quantidade de Chamados'].sum()}` | "
-                f"**Total reembolsado:** `R$ {tabela_detalhada['Total_Reembolso'].sum():,.2f}`".replace(",", "v").replace(".", ",").replace("v", ".")
-            )
+    if linha_cabecalho is None:
+        return itens
 
-            st.dataframe(
-                tabela_detalhada[["Data", "Local Interno", "Descrição", "Problema", "Quantidade de Chamados"]],
-                use_container_width=True,
-                hide_index=True,
-            )
+    if idx_col_prod is None:
+        idx_col_prod = 0
+    if idx_col_desc is None and len(df_raw.columns) > 1:
+        idx_col_desc = 1
+
+    for r_idx in range(linha_cabecalho + 1, len(df_raw)):
+        linha = df_raw.iloc[r_idx]
+
+        if linha.dropna().empty:
+            continue
+
+        cod = str(linha.iloc[idx_col_prod]).strip() if idx_col_prod < len(linha) and pd.notna(linha.iloc[idx_col_prod]) else ""
+        desc = str(linha.iloc[idx_col_desc]).strip() if idx_col_desc is not None and idx_col_desc < len(linha) and pd.notna(linha.iloc[idx_col_desc]) else ""
+
+        cod_lower = cod.lower()
+        if not cod or cod_lower in ["none", "nan", "total", "subtotal", "produto", "código", "codigo", ""]:
+            continue
+
+        qtd = 0.0
+        if idx_col_qtd is not None and idx_col_qtd < len(linha) and pd.notna(linha.iloc[idx_col_qtd]):
+            qtd_str = str(linha.iloc[idx_col_qtd]).strip().replace(".", "").replace(",", ".")
+            try:
+                qtd = float(qtd_str)
+            except ValueError:
+                qtd = 0.0
         else:
-            st.warning(f"Nenhum chamado encontrado para a data '{data_analitica_str}'.")
+            for val in reversed(linha):
+                if pd.notna(val):
+                    val_str = str(val).strip().replace(".", "").replace(",", ".")
+                    try:
+                        qtd = float(val_str)
+                        break
+                    except ValueError:
+                        continue
 
-    # --- ABA 1: POR MÊS E CLIENTE ---
-    with tab_mes_cli:
-        c_m1, c_m2 = st.columns([1, 1.5])
-        with c_m1:
-            sel_tb_mes = st.selectbox(
-                "📅 Selecionar Mês:",
-                months_order,
-                index=idx_mes_atual,
-                key="tb_cli_mes_filter",
-            )
-        with c_m2:
-            sel_tb_cli_m = st.selectbox(
-                "👤 Selecionar Cliente:",
-                lista_clientes_dinamica,
-                index=0,
-                key="tb_cli_mes_client_filter",
-            )
+        itens.append({
+            "Produto": cod,
+            "Descricao": desc if desc.lower() not in ["none", "nan"] else "",
+            "Quantidade": qtd
+        })
 
-        df_tab_mes = filtered_df.copy()
-        if sel_tb_mes != "Todos":
-            df_tab_mes = df_tab_mes[df_tab_mes["Mês_Clean"] == sel_tb_mes]
-        if sel_tb_cli_m != "Todos":
-            df_tab_mes = df_tab_mes[df_tab_mes["Cliente"] == sel_tb_cli_m]
+    return itens
 
-        if not df_tab_mes.empty:
-            tabela_mes_agrupada = (
-                df_tab_mes.groupby(["Problemas", "Descrição"])
-                .size()
-                .reset_index(name="Quantidade de Chamados")
-                .sort_values(by="Quantidade de Chamados", ascending=False)
-                .rename(columns={"Problemas": "Problema"})
-            )
-            st.markdown(
-                f"**Exibindo chamados para:** Mês `'{sel_tb_mes}'` | Cliente `'{sel_tb_cli_m}'` "
-                f"*(Total: {tabela_mes_agrupada['Quantidade de Chamados'].sum()} ocorrências)*"
-            )
-            st.dataframe(
-                tabela_mes_agrupada[["Problema", "Descrição", "Quantidade de Chamados"]],
-                use_container_width=True,
-                hide_index=True,
-            )
-        else:
-            st.warning(f"Nenhum registro encontrado para o mês '{sel_tb_mes}' e cliente '{sel_tb_cli_m}'.")
+# --- 5. NAVEGAÇÃO SUPERIOR ENVOLVIDA EM CONTAINER (TOP BAR SLIM) ---
+if "menu_selecionado" not in st.session_state:
+    st.session_state.menu_selecionado = "Dashboard de Resumo"
 
-    # --- ABA 2: POR DATA (CALENDÁRIO) E CLIENTE ---
-    with tab_dia_cli:
-        c_d1, c_d2 = st.columns([1, 1.5])
-        with c_d1:
-            sel_tb_data = st.date_input(
-                "📆 Selecionar Data no Calendário:",
-                value=hoje,
-                min_value=min_data_calendario,
-                max_value=max_data_calendario,
-                format="DD/MM/YYYY",
-                key="tb_cli_dia_calendar",
-            )
-        with c_d2:
-            sel_tb_cli_d = st.selectbox(
-                "👤 Selecionar Cliente:",
-                lista_clientes_dinamica,
-                index=0,
-                key="tb_cli_dia_client_filter",
-            )
+opcoes_menu = [
+    ("📊 Dashboard", "Dashboard de Resumo"),
+    ("📥 Importar", "Importar Remessa"),
+    ("🖨️ Folha Cega", "Folha de Impressão Cega"),
+    ("🔍 Conferir", "Digitar Conferência Cega"),
+    ("👤 Conferentes", "Cadastrar Novo Conferente")
+]
 
-        df_tab_dia = filtered_df.copy()
-        data_alvo_str = sel_tb_data.strftime("%d/%m/%Y")
-        df_tab_dia = df_tab_dia[
-            (df_tab_dia["Data_Date"] == sel_tb_data)
-            | (df_tab_dia["Data_Str"] == data_alvo_str)
-        ]
-        if sel_tb_cli_d != "Todos":
-            df_tab_dia = df_tab_dia[df_tab_dia["Cliente"] == sel_tb_cli_d]
+# Preparação do logotipo em Base64
+img_b64 = carregar_imagem_base64("Logotipo.png")
+if img_b64:
+    logo_html = f'<img src="data:image/png;base64,{img_b64}" class="brand-logo-img" alt="Logo">'
+else:
+    logo_html = '<div class="brand-logo-icon">📦</div>'
 
-        if not df_tab_dia.empty:
-            tabela_dia_agrupada = (
-                df_tab_dia.groupby(["Problemas", "Descrição"])
-                .size()
-                .reset_index(name="Quantidade de Chamados")
-                .sort_values(by="Quantidade de Chamados", ascending=False)
-                .rename(columns={"Problemas": "Problema"})
-            )
-            st.markdown(
-                f"**Exibindo chamados para:** Data `'{data_alvo_str}'` | Cliente `'{sel_tb_cli_d}'` "
-                f"*(Total: {tabela_dia_agrupada['Quantidade de Chamados'].sum()} ocorrências)*"
-            )
-            st.dataframe(
-                tabela_dia_agrupada[["Problema", "Descrição", "Quantidade de Chamados"]],
-                use_container_width=True,
-                hide_index=True,
-            )
-        else:
-            st.warning(f"Nenhum registro encontrado para a data '{data_alvo_str}' e cliente '{sel_tb_cli_d}'.")
+# Proporção Compacta e Precisa
+with st.container(border=True):
+    st.markdown('<div class="topbar-wrapper-marker" style="display:none;"></div>', unsafe_allow_html=True)
+    
+    col_brand, c1, c2, c3, c4, c5, col_sync = st.columns([2.5, 1.05, 1.0, 1.15, 1.0, 1.15, 0.4], vertical_alignment="center")
 
-    # --- ABA 3: POR MÊS (TOP 3 LOCAIS) ---
-    with tab_mes_top3:
-        c_m3_1, c_m3_2 = st.columns([1, 2])
-        with c_m3_1:
-            month_for_top3 = st.selectbox(
-                "📅 Selecionar Mês:",
-                months_order,
-                index=idx_mes_atual,
-                key="tb_top3_month_filter",
-            )
+    with col_brand:
+        st.markdown(f"""
+        <div class="brand-box">
+            {logo_html}
+            <div class="brand-text-col">
+                <span class="brand-title">ESTOQUE & CONFERÊNCIA</span>
+                <span class="brand-subtitle">Gestão Integrada</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-        month_df_top3 = filtered_df.copy()
-        if month_for_top3 != "Todos":
-            month_df_top3 = month_df_top3[month_df_top3["Mês_Clean"] == month_for_top3]
+    nav_cols = [c1, c2, c3, c4, c5]
+    for idx, (label_icone, chave_menu) in enumerate(opcoes_menu):
+        with nav_cols[idx]:
+            is_active = (st.session_state.menu_selecionado == chave_menu)
+            classe_css = "nav-btn-active" if is_active else "nav-btn-inactive"
+            
+            st.markdown(f'<div class="{classe_css}">', unsafe_allow_html=True)
+            if st.button(label_icone, key=f"nav_top_{chave_menu}", use_container_width=True):
+                if st.session_state.menu_selecionado != chave_menu:
+                    st.session_state.menu_selecionado = chave_menu
+                    st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
-        top_3_month_locals = (
-            month_df_top3["Local Interno"].value_counts().head(3).index.tolist()
-        )
+    with col_sync:
+        st.markdown('<div class="nav-btn-sync">', unsafe_allow_html=True)
+        if st.button("🔄", key="btn_top_sync", help="Sincronizar dados com a planilha Google", use_container_width=True):
+            carregar_dados_planilha_cached.clear()
+            carregar_lista_conferentes.clear()
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        if top_3_month_locals:
-            with c_m3_2:
-                selected_top_local_m = st.selectbox(
-                    "🎯 Filtrar Local Interno (Mês):",
-                    ["Exibir em Abas Separadas (Top 3)"] + top_3_month_locals,
-                    key="top_3_local_m_filter",
+menu = st.session_state.menu_selecionado
+
+# ==============================================================================
+# OPÇÃO: DASHBOARD DE RESUMO (ALTAIR COM PALETA CORPORATIVA SLATE/INDIGO)
+# ==============================================================================
+if menu == "Dashboard de Resumo":
+    st.markdown('<div class="main-title">📊 Resumo Gerencial de Conferência Cega</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title">Monitoramento de produtividade, divergências e acuracidade em tempo real.</div>', unsafe_allow_html=True)
+
+    with st.spinner("Compilando indicadores..."):
+        df_raw = carregar_dados_planilha()
+
+    if df_raw.empty:
+        st.info("Nenhum registro encontrado na aba Conferencia para gerar o resumo.")
+    else:
+        df = df_raw.copy()
+        
+        data_col = df["data_importacao"] if "data_importacao" in df.columns else pd.Series(index=df.index, dtype=str)
+        dt_parsed = pd.to_datetime(data_col, format="%d/%m/%Y", errors="coerce")
+        dt_parsed = dt_parsed.fillna(pd.to_datetime(data_col, errors="coerce", dayfirst=True))
+        
+        df["dt_parsed"] = pd.to_datetime(dt_parsed, errors="coerce")
+        df["dt_parsed"] = df["dt_parsed"].fillna(pd.Timestamp.now().normalize())
+
+        df["ano"] = df["dt_parsed"].dt.year.astype(str)
+        df["mes_num"] = df["dt_parsed"].dt.month
+        df["mes_nome"] = df["dt_parsed"].dt.strftime("%B")
+        df["mes_ano"] = df["dt_parsed"].dt.strftime("%m/%Y")
+        df["ano_mes_sort"] = df["dt_parsed"].dt.strftime("%Y-%m")
+        df["dia_str"] = df["dt_parsed"].dt.strftime("%d/%m/%Y")
+
+        df["quantidade"] = pd.to_numeric(df.get("quantidade", 0), errors="coerce").fillna(0.0)
+        df["conferencia"] = pd.to_numeric(df.get("conferencia", None), errors="coerce")
+        df["divergencia"] = pd.to_numeric(df.get("divergencia", None), errors="coerce")
+
+        col_f1, col_f2 = st.columns([2, 2])
+        with col_f1:
+            confs_unicos = sorted([str(c).strip() for c in df.get("conferente", pd.Series()).dropna().unique() if str(c).strip() != ""])
+            lista_confs = ["TODOS"] + confs_unicos
+            filtro_conf = st.selectbox("Filtrar por Conferente:", lista_confs)
+        with col_f2:
+            remessas_unicas = sorted([str(r).strip() for r in df.get("remessa", pd.Series()).dropna().unique() if str(r).strip() not in ["", "nan", "None"]])
+            remessas_todas = ["TODAS"] + remessas_unicas
+            filtro_rem = st.selectbox("Filtrar por Remessa:", remessas_todas)
+
+        df_filtrado = df.copy()
+        if filtro_conf != "TODOS" and "conferente" in df_filtrado.columns:
+            df_filtrado = df_filtrado[df_filtrado["conferente"] == filtro_conf]
+        if filtro_rem != "TODAS" and "remessa" in df_filtrado.columns:
+            df_filtrado = df_filtrado[df_filtrado["remessa"] == filtro_rem]
+
+        total_remessas = df_filtrado["remessa"].nunique() if "remessa" in df_filtrado.columns else 0
+        total_itens = len(df_filtrado)
+        itens_conferidos = df_filtrado[df_filtrado["conferencia"].notna()]
+        total_conferidos = len(itens_conferidos)
+        
+        itens_sem_erro = df_filtrado[df_filtrado["divergencia"] == 0]
+        itens_com_erro = df_filtrado[(df_filtrado["divergencia"].notna()) & (df_filtrado["divergencia"] != 0)]
+        
+        taxa_acuracia = (len(itens_sem_erro) / total_conferidos * 100) if total_conferidos > 0 else 100.0
+
+        st.markdown(f"""
+        <div class="metric-container">
+            <div class="metric-card" style="border-top: 3px solid #1d4ed8;">
+                <span>Remessas Auditadas</span>
+                <strong>{total_remessas}</strong>
+            </div>
+            <div class="metric-card" style="border-top: 3px solid #64748b;">
+                <span>Itens Conferidos</span>
+                <strong>{total_conferidos} de {total_itens}</strong>
+            </div>
+            <div class="metric-card" style="border-top: 3px solid {'#059669' if taxa_acuracia >= 98 else '#dc2626'};">
+                <span>Acuracidade Físico x Remessa</span>
+                <strong style="color: {'#059669' if taxa_acuracia >= 98 else '#dc2626'};">{taxa_acuracia:.1f}%</strong>
+            </div>
+            <div class="metric-card" style="border-top: 3px solid {'#dc2626' if len(itens_com_erro) > 0 else '#059669'};">
+                <span>Itens com Divergência</span>
+                <strong style="color: {'#dc2626' if len(itens_com_erro) > 0 else '#059669'};">{len(itens_com_erro)}</strong>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.write("---")
+
+        col_g1, col_g2 = st.columns(2)
+
+        # ----------------- GRÁFICO 1: EVOLUÇÃO MENSAL COM FILTRO DE ANO -----------------
+        with col_g1:
+            st.markdown("##### 📅 Conferências Realizadas por Mês")
+            
+            df_conferidos_base = df_filtrado[df_filtrado["conferencia"].notna()].copy()
+            anos_disponiveis = sorted(df_conferidos_base["ano"].dropna().unique().tolist(), reverse=True)
+            
+            if anos_disponiveis:
+                ano_atual_str = str(datetime.now().year)
+                idx_ano_default = anos_disponiveis.index(ano_atual_str) if ano_atual_str in anos_disponiveis else 0
+                
+                filtro_ano_graf1 = st.selectbox(
+                    "Filtrar Ano do Gráfico:",
+                    ["TODOS OS ANOS"] + anos_disponiveis,
+                    index=idx_ano_default + 1 if ano_atual_str in anos_disponiveis else 0,
+                    key="sel_ano_graf1"
                 )
-
-            def get_month_local_table(local_name):
-                c_df = month_df_top3[month_df_top3["Local Interno"] == local_name]
-                tb = (
-                    c_df.groupby(["Problemas", "Descrição"])
-                    .size()
-                    .reset_index(name="Quantidade de Chamados")
-                    .sort_values(by="Quantidade de Chamados", ascending=False)
-                    .rename(columns={"Problemas": "Problema"})
-                )
-                return tb
-
-            if selected_top_local_m == "Exibir em Abas Separadas (Top 3)":
-                tabs_m = st.tabs([f"🥇 {loc}" for loc in top_3_month_locals])
-                for idx, tab in enumerate(tabs_m):
-                    with tab:
-                        local_item = top_3_month_locals[idx]
-                        tb_local = get_month_local_table(local_item)
-                        st.markdown(f"**Registros do Local no Mês ({month_for_top3}):** `{local_item}`")
-                        st.dataframe(
-                            tb_local[["Problema", "Descrição", "Quantidade de Chamados"]],
-                            use_container_width=True,
-                            hide_index=True,
-                        )
+                
+                if filtro_ano_graf1 != "TODOS OS ANOS":
+                    df_graf_mes_base = df_conferidos_base[df_conferidos_base["ano"] == filtro_ano_graf1]
+                else:
+                    df_graf_mes_base = df_conferidos_base
             else:
-                tb_single_m = get_month_local_table(selected_top_local_m)
-                st.markdown(f"**Registros do Local no Mês ({month_for_top3}):** `{selected_top_local_m}`")
+                df_graf_mes_base = df_conferidos_base
+
+            df_mes = (
+                df_graf_mes_base.groupby(["ano_mes_sort", "mes_ano"])
+                .size()
+                .reset_index(name="Qtd")
+                .sort_values("ano_mes_sort")
+            )
+
+            if not df_mes.empty:
+                max_val_mes = float(df_mes["Qtd"].max() * 1.18) if df_mes["Qtd"].max() > 0 else 10.0
+                barras_mes = alt.Chart(df_mes).mark_bar(color="#1d4ed8", cornerRadiusTopLeft=5, cornerRadiusTopRight=5).encode(
+                    x=alt.X("mes_ano:N", title="Mês/Ano", sort=alt.SortField(field="ano_mes_sort", order="ascending"), axis=alt.Axis(labelAngle=0, labelColor="#64748b", titleColor="#475569")),
+                    y=alt.Y("Qtd:Q", title="Qtd. Itens", scale=alt.Scale(domain=[0, max_val_mes]), axis=alt.Axis(labelColor="#64748b", titleColor="#475569"))
+                )
+                textos_mes = barras_mes.mark_text(
+                    align="center",
+                    baseline="bottom",
+                    dy=-4,
+                    fontSize=11,
+                    fontWeight=600,
+                    color="#0f172a"
+                ).encode(
+                    text="Qtd:Q"
+                )
+                chart_mes = (barras_mes + textos_mes).properties(height=260)
+                st.altair_chart(chart_mes, use_container_width=True)
+            else:
+                st.info("Sem dados suficientes para a evolução mensal no filtro selecionado.")
+
+        # ----------------- GRÁFICO 2: VOLUME POR DIA COM FILTRO DE MÊS/ANO -----------------
+        with col_g2:
+            st.markdown("##### 📊 Volume de Conferência por Dia")
+            
+            meses_anos_disponiveis = (
+                df_conferidos_base[["ano_mes_sort", "mes_ano"]]
+                .drop_duplicates()
+                .sort_values("ano_mes_sort", ascending=False)
+            )
+
+            if not meses_anos_disponiveis.empty:
+                lista_opcoes_mes_ano = meses_anos_disponiveis["mes_ano"].tolist()
+                mes_ano_atual = datetime.now().strftime("%m/%Y")
+                idx_mes_default = lista_opcoes_mes_ano.index(mes_ano_atual) if mes_ano_atual in lista_opcoes_mes_ano else 0
+
+                filtro_mes_ano_dia = st.selectbox(
+                    "Filtrar Mês/Ano Específico:",
+                    lista_opcoes_mes_ano,
+                    index=idx_mes_default,
+                    key="sel_mes_ano_graf2"
+                )
+
+                df_graf_dia_base = df_conferidos_base[df_conferidos_base["mes_ano"] == filtro_mes_ano_dia]
+            else:
+                df_graf_dia_base = df_conferidos_base
+
+            df_dia = (
+                df_graf_dia_base.groupby(["dt_parsed", "dia_str"])
+                .size()
+                .reset_index(name="Qtd")
+                .sort_values("dt_parsed")
+            )
+
+            if not df_dia.empty:
+                max_val_dia = float(df_dia["Qtd"].max() * 1.18) if df_dia["Qtd"].max() > 0 else 10.0
+                barras_dia = alt.Chart(df_dia).mark_bar(color="#0f172a", cornerRadiusTopLeft=5, cornerRadiusTopRight=5).encode(
+                    x=alt.X("dia_str:N", title=f"Data ({filtro_mes_ano_dia if 'filtro_mes_ano_dia' in locals() else 'Período'})", sort=alt.SortField(field="dt_parsed", order="ascending"), axis=alt.Axis(labelAngle=-45, labelColor="#64748b", titleColor="#475569")),
+                    y=alt.Y("Qtd:Q", title="Qtd. Itens", scale=alt.Scale(domain=[0, max_val_dia]), axis=alt.Axis(labelColor="#64748b", titleColor="#475569"))
+                )
+                textos_dia = barras_dia.mark_text(
+                    align="center",
+                    baseline="bottom",
+                    dy=-4,
+                    fontSize=11,
+                    fontWeight=600,
+                    color="#0f172a"
+                ).encode(
+                    text="Qtd:Q"
+                )
+                chart_dia = (barras_dia + textos_dia).properties(height=260)
+                st.altair_chart(chart_dia, use_container_width=True)
+            else:
+                st.info("Sem conferências realizadas no Mês/Ano selecionado.")
+
+        st.write("---")
+        col_e1, col_e2 = st.columns(2)
+
+        with col_e1:
+            st.markdown("##### ⚠️ Diagnóstico Geral de Divergências")
+            
+            def classificar_erro(div):
+                if pd.isna(div):
+                    return "Pendente"
+                elif div == 0:
+                    return "Sem Divergência"
+                elif div < 0:
+                    return "Falta Física"
+                else:
+                    return "Sobra Física"
+
+            df_status = df_filtrado.copy()
+            df_status["Diagnóstico"] = df_status["divergencia"].apply(classificar_erro)
+            df_resumo_erros = df_status["Diagnóstico"].value_counts().reset_index()
+            df_resumo_erros.columns = ["Diagnóstico", "Qtd. Itens"]
+            df_resumo_erros["Percentual (%)"] = ((df_resumo_erros["Qtd. Itens"] / len(df_status)) * 100).round(1)
+
+            st.dataframe(
+                df_resumo_erros,
+                column_config={
+                    "Diagnóstico": "Diagnóstico",
+                    "Qtd. Itens": st.column_config.NumberColumn("Qtd. Itens", format="%d"),
+                    "Percentual (%)": st.column_config.NumberColumn("Percentual", format="%.1f%%")
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+
+        with col_e2:
+            st.markdown("##### 🏷️ Ranking de Produtos com Maior Divergência")
+            df_erros_itens = df_filtrado[df_filtrado["divergencia"].fillna(0) != 0].copy()
+            
+            if not df_erros_itens.empty and "produto" in df_erros_itens.columns:
+                df_top_erros = df_erros_itens.groupby(["produto", "descricao"])["divergencia"].count().reset_index(name="Ocorrências")
+                df_top_erros = df_top_erros.sort_values("Ocorrências", ascending=False).head(10)
                 st.dataframe(
-                    tb_single_m[["Problema", "Descrição", "Quantidade de Chamados"]],
+                    df_top_erros,
+                    column_config={
+                        "produto": "Código",
+                        "descricao": "Descrição do Produto",
+                        "Ocorrências": st.column_config.NumberColumn("Qtd. Divergências", format="%d")
+                    },
+                    hide_index=True,
+                    use_container_width=True
+                )
+            else:
+                st.success("🎉 Nenhuma divergência registrada no filtro atual!")
+
+# ==============================================================================
+# OPÇÃO: IMPORTAR REMESSA (Aba Conferencia) - COM BLOQUEIO DE DUPLICIDADE
+# ==============================================================================
+elif menu == "Importar Remessa":
+    st.markdown('<div class="main-title">📥 Importação de Remessa</div>', unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        num_remessa = st.text_input("Número da Remessa *", placeholder="Ex: 268326")
+    with col2:
+        nome_local_input = st.text_input("Local / Estoque de Destino *", placeholder="Ex: S.R. EMBALAGENS")
+
+    arquivo_excel = st.file_uploader("Selecione o arquivo da Remessa", type=["xlsx", "xls"])
+
+    if st.button("Processar e Salvar", type="primary"):
+        if not num_remessa or not nome_local_input or not arquivo_excel:
+            st.error("Preencha todos os campos obrigatórios e anexe o arquivo.")
+        else:
+            remessa_limpa = str(num_remessa).strip()
+            nome_local = str(nome_local_input).strip().upper()
+
+            # --- VALIDAÇÃO CONTRA DUPLICIDADE DE REMESSA ---
+            with st.spinner("Verificando se a remessa já existe na base..."):
+                df_existente = carregar_dados_planilha()
+                remessas_cadastradas = []
+                if not df_existente.empty and "remessa" in df_existente.columns:
+                    remessas_cadastradas = [
+                        str(r).strip() for r in df_existente["remessa"].dropna().unique()
+                        if str(r).strip() not in ["", "nan", "None"]
+                    ]
+
+            if remessa_limpa in remessas_cadastradas:
+                st.error(f"⛔ **Importação Bloqueada:** O número de remessa **{remessa_limpa}** já existe na aba Conferencia. Se precisar reimportá-la, acesse a aba 'Conferir' e exclua a remessa antiga primeiro.")
+            else:
+                with st.spinner("Processando linhas a partir da coluna 'Produto'..."):
+                    itens = extrair_excel(arquivo_excel)
+
+                if not itens:
+                    st.warning("Nenhum item válido encontrado no arquivo. Verifique se o cabeçalho possui a coluna 'Produto' ou 'Código'.")
+                else:
+                    data_importacao = datetime.now().strftime("%d/%m/%Y")
+                    
+                    linhas_para_sheets = []
+                    for item in itens:
+                        linhas_para_sheets.append([
+                            remessa_limpa,                  # A: Remessa
+                            nome_local,                     # B: Estoque
+                            data_importacao,                # C: Horario / Data
+                            str(item["Produto"]).strip(),   # D: Codigo
+                            str(item["Descricao"]).strip(), # E: Descrição
+                            float(item["Quantidade"]),      # F: Quantidade
+                            "",                             # G: Conferencia
+                            "",                             # H: Divergencia
+                            "",                             # I: Conferente
+                            ""                              # J: Justificativa para Divergencia
+                        ])
+
+                    with st.spinner("Gravando linhas na aba Conferencia..."):
+                        res = enviar_importacao_planilha(linhas_para_sheets)
+                        if res.get("status") == "success":
+                            st.success(f"✅ {len(linhas_para_sheets)} itens gravados com sucesso para a remessa **{remessa_limpa}** (Estoque: **{nome_local}**)!")
+                            df_preview = pd.DataFrame(itens)
+                            st.dataframe(df_preview, use_container_width=True)
+                        else:
+                            st.error(f"Erro: {res.get('message', 'Falha ao processar requisição')}")
+
+# ==============================================================================
+# OPÇÃO: FOLHA DE IMPRESSÃO CEGA (ECONÔMICA)
+# ==============================================================================
+elif menu == "Folha de Impressão Cega":
+    st.markdown('<div class="main-title">🖨️ Folha de Separação / Contagem Cega</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title">Gere a folha física com formato compacto para economia de papel.</div>', unsafe_allow_html=True)
+
+    with st.spinner("Consultando dados..."):
+        df = carregar_dados_planilha()
+
+    if df.empty:
+        st.info("Nenhuma remessa encontrada na aba Conferencia.")
+    else:
+        remessas_disponiveis = [
+            str(r).strip() for r in df["remessa"].dropna().unique().tolist()
+            if str(r).strip() not in ["", "nan", "None"]
+        ]
+        remessa_selecionada = st.selectbox("Selecione a Remessa para Gerar a Impressão:", [""] + remessas_disponiveis)
+
+        if remessa_selecionada:
+            remessa_busca = str(remessa_selecionada).strip()
+            dados_remessa = df[df["remessa"].astype(str).str.strip() == remessa_busca].copy()
+
+            if dados_remessa.empty:
+                st.warning("Nenhum item localizado para a remessa selecionada.")
+            else:
+                data_cad = formatar_data_br(dados_remessa["data_importacao"].iloc[0])
+                local_cad = str(dados_remessa["local"].iloc[0]).upper()
+
+                linhas_tabela = ""
+                for _, row in dados_remessa.iterrows():
+                    cod_item = str(row.get('produto', ''))
+                    desc_item = str(row.get('descricao', ''))
+                    linhas_tabela += (
+                        "<tr>"
+                        f"<td style='border: 1px solid #94a3b8; padding: 4px 6px; font-weight: 700; font-size: 9.5px; color: #0f172a;'>{cod_item}</td>"
+                        f"<td style='border: 1px solid #94a3b8; padding: 4px 6px; font-size: 9.5px; line-height: 1.2; color: #334155;'>{desc_item}</td>"
+                        "<td style='border: 1px solid #94a3b8; padding: 4px 6px; height: 22px;'></td>"
+                        "</tr>"
+                    )
+
+                documento_html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #0f172a;
+            margin: 0;
+            padding: 4px;
+            background-color: #ffffff;
+        }}
+        .header-box {{
+            border-bottom: 2px solid #1d4ed8;
+            padding-bottom: 6px;
+            margin-bottom: 8px;
+        }}
+        .header-title {{
+            font-size: 13.5px;
+            font-weight: 800;
+            margin: 0 0 3px 0;
+            color: #1d4ed8;
+            letter-spacing: 0.2px;
+            text-transform: uppercase;
+        }}
+        .header-meta {{
+            display: flex;
+            gap: 16px;
+            font-size: 10px;
+            color: #475569;
+            font-weight: 600;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 6px;
+        }}
+        th {{
+            border: 1px solid #1d4ed8;
+            background-color: #eff6ff;
+            padding: 5px 6px;
+            font-size: 10px;
+            text-align: left;
+            font-weight: 700;
+            color: #1e40af;
+        }}
+        .signature-box {{
+            margin-top: 24px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 9.5px;
+            color: #475569;
+            padding-top: 4px;
+        }}
+        .btn-imprimir {{
+            background: #1d4ed8;
+            color: white;
+            border: none;
+            padding: 7px 16px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 8px;
+            box-shadow: 0 2px 6px rgba(29, 78, 216, 0.3);
+            transition: all 0.15s ease;
+        }}
+        .btn-imprimir:hover {{
+            background: #1e40af;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
+        }}
+        @media print {{
+            .btn-imprimir {{
+                display: none !important;
+            }}
+            body {{
+                padding: 0;
+            }}
+            @page {{
+                margin: 6mm;
+            }}
+        }}
+    </style>
+</head>
+<body>
+    <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Folha Econômica</button>
+
+    <div class="header-box">
+        <div class="header-title">FOLHA DE CONFERÊNCIA FÍSICA (CONTAGEM CEGA)</div>
+        <div class="header-meta">
+            <div>REMESSA: <strong>{remessa_selecionada}</strong></div>
+            <div>LOCAL: <strong>{local_cad}</strong></div>
+            <div>DATA: <strong>{data_cad}</strong></div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 18%;">CÓDIGO</th>
+                <th style="width: 62%;">DESCRIÇÃO DO PRODUTO</th>
+                <th style="width: 20%; text-align: center;">QTD. CONFERIDA</th>
+            </tr>
+        </thead>
+        <tbody>
+            {linhas_tabela}
+        </tbody>
+    </table>
+
+    <div class="signature-box">
+        <div>Assinatura do Conferente: _____________________________________</div>
+        <div>Data da Conferência: ____/____/________</div>
+    </div>
+</body>
+</html>"""
+
+                altura_calculada = max(360, 100 + (len(dados_remessa) * 26))
+                components.html(documento_html, height=altura_calculada, scrolling=True)
+
+# ==============================================================================
+# OPÇÃO: DIGITAR CONFERÊNCIA CEGA & EXCLUSÃO DIRETA DA REMESSA
+# ==============================================================================
+elif menu == "Digitar Conferência Cega":
+    st.markdown('<div class="main-title">🔍 Digitação de Conferência Cega e Validação</div>', unsafe_allow_html=True)
+
+    with st.spinner("Buscando registros..."):
+        df = carregar_dados_planilha()
+
+    if df.empty:
+        st.info("Nenhuma remessa encontrada para conferência.")
+    else:
+        remessas = [
+            str(r).strip() for r in df["remessa"].dropna().unique().tolist()
+            if str(r).strip() not in ["", "nan", "None"]
+        ]
+
+        # Estado para controlar o modal de confirmação de exclusão
+        if "mostrar_confirmacao_excluir" not in st.session_state:
+            st.session_state.mostrar_confirmacao_excluir = False
+
+        col_pesquisa, col_btn_del = st.columns([3.5, 1.5], vertical_alignment="bottom")
+
+        with col_pesquisa:
+            remessa_pesquisa = st.selectbox(
+                "Pesquisar pelo Número da Remessa:",
+                [""] + remessas,
+                key="sel_remessa_conferencia"
+            )
+
+        with col_btn_del:
+            if remessa_pesquisa:
+                st.markdown('<div class="danger-btn">', unsafe_allow_html=True)
+                if st.button("🗑️ Excluir Remessa", key="btn_abrir_excluir", use_container_width=True):
+                    st.session_state.mostrar_confirmacao_excluir = not st.session_state.mostrar_confirmacao_excluir
+                st.markdown('</div>', unsafe_allow_html=True)
+
+        # PAINEL DE CONFIRMAÇÃO DE EXCLUSÃO DA REMESSA
+        if remessa_pesquisa and st.session_state.mostrar_confirmacao_excluir:
+            remessa_alvo_del = str(remessa_pesquisa).strip()
+            total_linhas_del = len(df[df["remessa"].astype(str).str.strip() == remessa_alvo_del])
+
+            st.markdown(f"""
+            <div class="danger-box">
+                <strong style="color: #991b1b; font-size: 12px;">⚠️ EXCLUIR TODA A REMESSA {remessa_alvo_del}</strong><br>
+                <span style="color: #7f1d1d;">
+                    Esta ação apagará <strong>todos os {total_linhas_del} itens</strong> desta remessa permanentemente da aba <strong>Conferencia</strong>.
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            c_conf, c_btn1, c_btn2 = st.columns([2.5, 1.2, 1], vertical_alignment="center")
+            with c_conf:
+                chk_autoriza = st.checkbox(f"Confirmar exclusão definitiva da remessa {remessa_alvo_del}", key="chk_del_def")
+            with c_btn1:
+                st.markdown('<div class="danger-btn">', unsafe_allow_html=True)
+                if st.button("Confirmar Exclusão", key="btn_confirmar_del_final", use_container_width=True):
+                    if not chk_autoriza:
+                        st.error("Marque a caixa de confirmação primeiro.")
+                    else:
+                        with st.spinner(f"Excluindo remessa {remessa_alvo_del}..."):
+                            res_del = enviar_exclusao_remessa(remessa_alvo_del)
+                            if res_del.get("status") == "success":
+                                st.session_state.mostrar_confirmacao_excluir = False
+                                carregar_dados_planilha_cached.clear()
+                                st.success(f"✅ Remessa {remessa_alvo_del} excluída com sucesso!")
+                                st.rerun()
+                            else:
+                                st.error(f"Erro: {res_del.get('message', 'Falha na API')}")
+                st.markdown('</div>', unsafe_allow_html=True)
+            with c_btn2:
+                if st.button("Cancelar", key="btn_cancela_del", use_container_width=True):
+                    st.session_state.mostrar_confirmacao_excluir = False
+                    st.rerun()
+
+        if remessa_pesquisa:
+            remessa_alvo = str(remessa_pesquisa).strip()
+            itens_remessa = df[df["remessa"].astype(str).str.strip() == remessa_alvo].copy()
+
+            if itens_remessa.empty:
+                st.warning("Nenhum item localizado para a remessa selecionada.")
+            else:
+                local_atual = str(itens_remessa["local"].iloc[0]).upper()
+                data_atual_br = formatar_data_br(itens_remessa["data_importacao"].iloc[0])
+
+                itens_remessa["quantidade"] = pd.to_numeric(itens_remessa["quantidade"], errors="coerce").fillna(0.0)
+                itens_remessa["conferencia"] = pd.to_numeric(itens_remessa["conferencia"], errors="coerce")
+                itens_remessa["divergencia"] = pd.to_numeric(itens_remessa["divergencia"], errors="coerce")
+
+                ja_conferida = itens_remessa["conferencia"].notna().any()
+                itens_divergentes = itens_remessa[itens_remessa["divergencia"].fillna(1) != 0].copy()
+
+                if ja_conferida and len(itens_divergentes) > 0:
+                    modo_reconferencia = True
+                    dados_trabalho = itens_divergentes.copy()
+                    st.warning(f"⚠️ **Segunda Conferência (Apenas Divergências):** Foram identificados **{len(itens_divergentes)} item(ns)** divergentes. Reconte apenas os itens listados abaixo.")
+                elif ja_conferida and len(itens_divergentes) == 0:
+                    modo_reconferencia = False
+                    dados_trabalho = itens_remessa.copy()
+                    st.success("✨ **Remessa 100% Conferida e Sem Divergências!** Todos os itens foram validados com sucesso.")
+                else:
+                    modo_reconferencia = False
+                    dados_trabalho = itens_remessa.copy()
+                    st.info("📋 **Primeira Conferência (Contagem Cega):** Digite a quantidade física contada para cada produto.")
+
+                st.markdown(f"""
+                <div class="metric-container">
+                    <div class="metric-card" style="border-top: 3px solid #1d4ed8;">
+                        <span>Remessa</span>
+                        <strong>{remessa_alvo}</strong>
+                    </div>
+                    <div class="metric-card" style="border-top: 3px solid #64748b;">
+                        <span>Local / Depósito</span>
+                        <strong>{local_atual}</strong>
+                    </div>
+                    <div class="metric-card" style="border-top: 3px solid #64748b;">
+                        <span>Data de Importação</span>
+                        <strong>{data_atual_br}</strong>
+                    </div>
+                    <div class="metric-card" style="border-top: 3px solid #0f172a;">
+                        <span>Itens a Conferir</span>
+                        <strong>{len(dados_trabalho)}</strong>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                lista_conferentes = carregar_lista_conferentes()
+                conferente_anterior = ""
+                if "conferente" in dados_trabalho.columns and dados_trabalho["conferente"].dropna().any():
+                    conferente_anterior = str(dados_trabalho["conferente"].dropna().iloc[0]).strip().upper()
+
+                if not lista_conferentes:
+                    st.warning("⚠️ Nenhum conferente localizado na coluna D da aba 'Local-Estoque'.")
+                    nome_conferente_final = ""
+                else:
+                    idx_default = 0
+                    if conferente_anterior in lista_conferentes:
+                        idx_default = lista_conferentes.index(conferente_anterior) + 1
+                    
+                    nome_conferente_sel = st.selectbox(
+                        "Selecione o Conferente Responsável *",
+                        ["-- Selecione o conferente --"] + lista_conferentes,
+                        index=idx_default
+                    )
+                    nome_conferente_final = "" if nome_conferente_sel == "-- Selecione o conferente --" else nome_conferente_sel
+
+                dados_trabalho["conferencia"] = dados_trabalho["conferencia"].fillna(0.0)
+                df_editavel = dados_trabalho[["row_index", "produto", "descricao", "conferencia"]].copy()
+
+                st.markdown("""
+                <div class="keyboard-hint">
+                    <span style="font-size: 13px; color: #1d4ed8; font-weight: 800; line-height: 1;">⇊</span>
+                    <span><strong>Agilidade de Digitação:</strong> Digite o valor e aperte <kbd>Enter</kbd> para salvar e descer direto para o próximo produto.</span>
+                </div>
+                """, unsafe_allow_html=True)
+
+                injetar_atalho_teclado_tab()
+
+                editado = st.data_editor(
+                    df_editavel,
+                    column_config={
+                        "row_index": None,
+                        "produto": st.column_config.TextColumn("Código", disabled=True),
+                        "descricao": st.column_config.TextColumn("Descrição", disabled=True),
+                        "conferencia": st.column_config.NumberColumn(
+                            "Conferência (Físico)",
+                            min_value=0.0,
+                            step=1.0,
+                            format="%.2f",
+                            required=True
+                        ),
+                    },
                     use_container_width=True,
                     hide_index=True,
-                )
-        else:
-            st.warning(f"Nenhum registro encontrado para o mês de {month_for_top3}.")
-
-    # --- ABA 4: POR DIA (TOP 3 LOCAIS) ---
-    with tab_dia_top3:
-        c_d3_1, c_d3_2 = st.columns([1.2, 1.8])
-        with c_d3_1:
-            chosen_date_top3 = st.date_input(
-                "📆 Selecionar Data no Calendário:",
-                value=hoje,
-                min_value=min_data_calendario,
-                max_value=max_data_calendario,
-                format="DD/MM/YYYY",
-                key="tb_top3_day_calendar",
-            )
-
-        day_df_top3 = filtered_df.copy()
-        day_str_op_top3 = chosen_date_top3.strftime("%d/%m/%Y")
-        day_df_top3 = day_df_top3[
-            (day_df_top3["Data_Date"] == chosen_date_top3)
-            | (day_df_top3["Data_Str"] == day_str_op_top3)
-        ]
-
-        top_3_day_locals = (
-            day_df_top3["Local Interno"].value_counts().head(3).index.tolist()
-        )
-
-        if top_3_day_locals:
-            with c_d3_2:
-                selected_top_local_d = st.selectbox(
-                    "🎯 Filtrar Local Interno (Dia):",
-                    ["Exibir em Abas Separadas (Top 3)"] + top_3_day_locals,
-                    key="top_3_local_d_filter",
+                    key=f"editor_conferencia_{remessa_alvo}_{modo_reconferencia}"
                 )
 
-            def get_day_local_table(local_name):
-                c_df = day_df_top3[day_df_top3["Local Interno"] == local_name]
-                tb = (
-                    c_df.groupby(["Problemas", "Descrição"])
-                    .size()
-                    .reset_index(name="Quantidade de Chamados")
-                    .sort_values(by="Quantidade de Chamados", ascending=False)
-                    .rename(columns={"Problemas": "Problema"})
-                )
-                return tb
+                mapa_esperado = dados_trabalho.set_index("row_index")["quantidade"].to_dict()
+                itens_com_divergencia_detectada = []
 
-            if selected_top_local_d == "Exibir em Abas Separadas (Top 3)":
-                tabs_d = st.tabs([f"🥇 {loc}" for loc in top_3_day_locals])
-                for idx, tab in enumerate(tabs_d):
-                    with tab:
-                        local_item = top_3_day_locals[idx]
-                        tb_local_d = get_day_local_table(local_item)
-                        st.markdown(f"**Registros do Local na Data ({day_str_op_top3}):** `{local_item}`")
-                        st.dataframe(
-                            tb_local_d[["Problema", "Descrição", "Quantidade de Chamados"]],
-                            use_container_width=True,
-                            hide_index=True,
-                        )
+                for _, row in editado.iterrows():
+                    r_id = int(row["row_index"])
+                    conf_val = float(row["conferencia"])
+                    qtd_esp = mapa_esperado.get(r_id, 0.0)
+                    if conf_val - qtd_esp != 0:
+                        itens_com_divergencia_detectada.append({
+                            "row_index": r_id,
+                            "produto": str(row["produto"]),
+                            "descricao": str(row["descricao"]),
+                            "conferido": conf_val,
+                            "divergencia": conf_val - qtd_esp
+                        })
+
+                st.write("---")
+                autorizar_divergencia = st.checkbox("⚠️ Autorizar encerramento/finalização da conferência com divergência")
+                justificativas_itens = {}
+
+                if autorizar_divergencia:
+                    if len(itens_com_divergencia_detectada) == 0:
+                        st.info("✨ Não há itens divergentes no momento. Ao salvar, todos os itens constarão como conferidos sem divergência.")
+                    else:
+                        st.markdown("""
+                        <div class="divergence-box">
+                            <strong style="color: #92400e;">📝 Justificativa Individual por Item Divergente</strong><br>
+                            <span style="font-size: 11px; color: #78350f;">
+                                Informe a justificativa específica para cada produto que apresentou divergência. Ela será gravada na linha exata do produto (Coluna J).
+                            </span>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        for item_div in itens_com_divergencia_detectada:
+                            r_id = item_div["row_index"]
+                            label_item = f"Produto: {item_div['produto']} - {item_div['descricao']} (Qtd Físico: {item_div['conferido']:.2f})"
+                            
+                            obs_anterior = ""
+                            if "observacao" in dados_trabalho.columns:
+                                linha_orig = dados_trabalho[dados_trabalho["row_index"] == r_id]
+                                if not linha_orig.empty and pd.notna(linha_orig["observacao"].iloc[0]):
+                                    obs_anterior = str(linha_orig["observacao"].iloc[0]).strip()
+
+                            justificativas_itens[r_id] = st.text_input(
+                                f"Justificativa para {label_item} *",
+                                value=obs_anterior,
+                                placeholder="Ex: Mercadoria avariada / Sobra de lote / Falta confirmada no fornecedor",
+                                key=f"justificativa_item_{r_id}"
+                            )
+
+                if st.button("⚖️ Comparar e Gravar", type="primary"):
+                    if not nome_conferente_final:
+                        st.error("⚠️ Selecione o **Nome do Conferente** na lista antes de gravar.")
+                    else:
+                        justificativas_pendentes = False
+                        if autorizar_divergencia:
+                            for it in itens_com_divergencia_detectada:
+                                r_id = it["row_index"]
+                                if not str(justificativas_itens.get(r_id, "")).strip():
+                                    justificativas_pendentes = True
+                                    break
+
+                        if autorizar_divergencia and justificativas_pendentes:
+                            st.error("⚠️ Você optou por autorizar a divergência. É **obrigatório** preencher a justificativa para todos os produtos divergentes listados acima.")
+                        else:
+                            with st.spinner("Gravando conferência na aba Conferencia..."):
+                                itens_atualizar = []
+                                resultados_exibicao = []
+
+                                for _, row in editado.iterrows():
+                                    r_id = int(row["row_index"])
+                                    conf_val = float(row["conferencia"])
+                                    qtd_esp = mapa_esperado.get(r_id, 0.0)
+                                    div_val = conf_val - qtd_esp
+
+                                    obs_do_item = ""
+                                    if div_val != 0 and autorizar_divergencia:
+                                        obs_do_item = str(justificativas_itens.get(r_id, "")).strip().upper()
+
+                                    itens_atualizar.append({
+                                        "row_index": r_id,
+                                        "conferencia": conf_val,
+                                        "divergencia": div_val,
+                                        "conferente": nome_conferente_final,
+                                        "observacao": obs_do_item
+                                    })
+
+                                    status = "Correto (Sem Divergência)" if div_val == 0 else "Divergente"
+                                    resultados_exibicao.append({
+                                        "produto": row["produto"],
+                                        "descricao": row["descricao"],
+                                        "conferencia": conf_val,
+                                        "conferente": nome_conferente_final,
+                                        "status": status,
+                                        "justificativa": obs_do_item,
+                                        "_tem_erro": (div_val != 0)
+                                    })
+
+                                res = enviar_atualizacao_conferencia(itens_atualizar)
+
+                                if res.get("status") == "success":
+                                    msg_sucesso = f"✅ Dados gravados com sucesso! Conferente: **{nome_conferente_final}**."
+                                    if autorizar_divergencia and len(itens_com_divergencia_detectada) > 0:
+                                        msg_sucesso += " Justificativas lançadas na linha de cada produto divergente (Coluna J)."
+                                    st.success(msg_sucesso)
+                                    
+                                    df_resultado = pd.DataFrame(resultados_exibicao)
+                                    
+                                    # Formatação de Contraste no Styler
+                                    def colorir_status(val):
+                                        if "Divergente" in str(val):
+                                            return "background-color: #fef2f2; color: #991b1b; font-weight: 700; border: 1px solid #fecaca;"
+                                        else:
+                                            return "background-color: #ecfdf5; color: #065f46; font-weight: 600; border: 1px solid #a7f3d0;"
+
+                                    st.write("### 📊 Resultado da Conferência")
+                                    
+                                    colunas_tabela = ["produto", "descricao", "conferencia", "conferente", "status"]
+                                    if autorizar_divergencia:
+                                        colunas_tabela.append("justificativa")
+
+                                    df_mostrar = df_resultado[colunas_tabela]
+                                    styler_res = df_mostrar.style
+                                    if hasattr(styler_res, "map"):
+                                        styler_res = styler_res.map(colorir_status, subset=["status"])
+                                    else:
+                                        styler_res = styler_res.applymap(colorir_status, subset=["status"])
+
+                                    st.dataframe(
+                                        styler_res,
+                                        column_config={
+                                            "produto": "Código",
+                                            "descricao": "Descrição",
+                                            "conferencia": st.column_config.NumberColumn("Qtd. Conferida", format="%.2f"),
+                                            "conferente": "Conferente",
+                                            "status": "Situação da Contagem",
+                                            "justificativa": "Justificativa (Coluna J)"
+                                        },
+                                        use_container_width=True
+                                    )
+
+                                    total_erros = df_resultado["_tem_erro"].sum()
+                                    if total_erros == 0:
+                                        st.balloons()
+                                        st.success("🎉 **Perfeito!** Todos os itens batem com a remessa.")
+                                    else:
+                                        if autorizar_divergencia:
+                                            st.info("ℹ️ **Conferência Finalizada com Justificativa:** As pendências foram autorizadas e registradas nos itens específicos.")
+                                        else:
+                                            st.warning(f"⚠️ **Atenção:** Existem **{total_erros} item(ns) divergente(s)**. Busque a remessa novamente para realizar a segunda conferência ou marque a opção de autorizar a divergência com justificativa item a item.")
+                                else:
+                                    mensagem_erro = res.get("message", "Falha na comunicação com a planilha")
+                                    st.error(f"Erro ao salvar: {mensagem_erro}")
+
+# ==============================================================================
+# OPÇÃO: CADASTRAR NOVO CONFERENTE (Aba Local-Estoque - Coluna D)
+# ==============================================================================
+elif menu == "Cadastrar Novo Conferente":
+    st.markdown('<div class="main-title">👤 Cadastro de Conferente</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title">Os conferentes são lidos e gravados na Coluna D da aba <strong>Local-Estoque</strong>.</div>', unsafe_allow_html=True)
+
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        novo_conferente = st.text_input("Nome Completo do Conferente *", placeholder="Ex: JOÃO SILVA")
+        if st.button("Cadastrar Conferente", type="primary"):
+            if not novo_conferente.strip():
+                st.error("Informe o nome do conferente para realizar o cadastro.")
             else:
-                tb_single_d = get_day_local_table(selected_top_local_d)
-                st.markdown(f"**Registros do Local na Data ({day_str_op_top3}):** `{selected_top_local_d}`")
-                st.dataframe(
-                    tb_single_d[["Problema", "Descrição", "Quantidade de Chamados"]],
-                    use_container_width=True,
-                    hide_index=True,
-                )
-        else:
-            st.warning(f"Nenhum registro encontrado para a data {day_str_op_top3}.")
+                nome_formatado = novo_conferente.strip().upper()
+                with st.spinner("Salvando novo conferente..."):
+                    res = enviar_cadastro_conferente(nome_formatado)
+                    if res.get("status") == "success":
+                        st.success(f"✅ Conferente **{nome_formatado}** cadastrado com sucesso!")
+                        st.balloons()
+                    else:
+                        mensagem_erro = res.get("message", "Falha de comunicação")
+                        st.error(f"Erro ao cadastrar: {mensagem_erro}")
+
+    st.write("---")
+    st.write("#### 👥 Conferentes Atualmente Cadastrados:")
+    conferentes_atuais = carregar_lista_conferentes()
+    if conferentes_atuais:
+        df_conf = pd.DataFrame(conferentes_atuais, columns=["Nome do Conferente"])
+        st.dataframe(df_conf, use_container_width=True)
+    else:
+        st.info("Nenhum conferente localizado até o momento.")
