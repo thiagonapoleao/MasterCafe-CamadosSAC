@@ -203,7 +203,7 @@ def carregar_dados_sac():
             col_atend = get_col(["Atendente", "atendente"])
             col_dthr = get_col(["Data/Hora do lançamento", "Data/Hora", "dataHoraLancamento"])
             
-            # Reconhecimento amplo da Coluna S (Reembolso Realizado / Reemb. Pago?)
+            # Reconhecimento da Coluna S
             col_reemb_realizado = get_col([
                 "Reembolso Realizado", "reembolsoRealizado", "Reembolso Realizado?", 
                 "Reemb. Pago?", "Reemb Pago", "Reembolso Pago", "Pago", "reembolso_realizado"
@@ -309,6 +309,13 @@ html_code = f"""
       background-color: #ffffff; 
       color: #64748b; 
       border: 1px solid #e2e8f0; 
+    }}
+    /* Tabela compacta sem quebra de página */
+    .table-compact th, .table-compact td {{
+      padding-top: 0.375rem !important;
+      padding-bottom: 0.375rem !important;
+      padding-left: 0.4rem !important;
+      padding-right: 0.4rem !important;
     }}
   </style>
 </head>
@@ -805,7 +812,7 @@ html_code = f"""
             </form>
           </section>
 
-          <!-- LISTA DE TODOS OS CHAMADOS REALIZADOS -->
+          <!-- LISTA DE TODOS OS CHAMADOS REALIZADOS (COMPACTA) -->
           <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
               <div>
@@ -826,23 +833,23 @@ html_code = f"""
               </div>
             </div>
 
-            <div class="overflow-x-auto">
-              <table class="w-full text-left text-xs text-slate-600">
-                <thead class="bg-slate-50 uppercase font-semibold text-slate-500">
+            <div class="w-full">
+              <table class="w-full text-left text-[11px] text-slate-600 table-compact">
+                <thead class="bg-slate-50 uppercase font-semibold text-slate-500 text-[10px]">
                   <tr>
-                    <th class="py-2.5 px-3 rounded-l-lg">Ações</th>
-                    <th class="py-2.5 px-3 font-mono">Chamado</th>
-                    <th class="py-2.5 px-3">Data</th>
-                    <th class="py-2.5 px-3">Cliente</th>
-                    <th class="py-2.5 px-3">Local</th>
-                    <th class="py-2.5 px-3">Filial</th>
-                    <th class="py-2.5 px-3">Produto</th>
-                    <th class="py-2.5 px-3 text-right">Valor</th>
-                    <th class="py-2.5 px-3">Nome Cliente</th>
-                    <th class="py-2.5 px-3">Reembolso</th>
-                    <th class="py-2.5 px-3 text-center">Reemb. Pago?</th>
-                    <th class="py-2.5 px-3">Atendente</th>
-                    <th class="py-2.5 px-3 rounded-r-lg">Data Lançamento</th>
+                    <th class="py-2 px-2 rounded-l-lg text-center w-16">Ações</th>
+                    <th class="py-2 px-2 font-mono">Chamado</th>
+                    <th class="py-2 px-2">Data</th>
+                    <th class="py-2 px-2">Cliente</th>
+                    <th class="py-2 px-2">Local</th>
+                    <th class="py-2 px-2">Filial</th>
+                    <th class="py-2 px-2">Produto</th>
+                    <th class="py-2 px-2 text-right">Valor</th>
+                    <th class="py-2 px-2">Nome Cliente</th>
+                    <th class="py-2 px-2">Reembolso</th>
+                    <th class="py-2 px-2 text-center">Reemb. Pago?</th>
+                    <th class="py-2 px-2">Atendente</th>
+                    <th class="py-2 px-2 rounded-r-lg">Data Lançamento</th>
                   </tr>
                 </thead>
                 <tbody id="tableSACChamadosBody" class="divide-y divide-slate-100">
@@ -857,7 +864,7 @@ html_code = f"""
         </div>
       </div>
 
-      <!-- PÁGINA 3: TODOS OS CHAMADOS ABERTOS (ACESSO: ATENDENTE E GERAL) -->
+      <!-- PÁGINA 3: TODOS OS CHAMADOS ABERTOS (ACESSO: ATENDENTE E GERAL - COMPACTA) -->
       <div id="pageChamadosAbertos" class="space-y-6 hidden">
         <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
@@ -884,19 +891,19 @@ html_code = f"""
             </div>
           </div>
 
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-slate-600">
-              <thead class="bg-slate-50 uppercase font-semibold text-slate-500">
+          <div class="w-full">
+            <table class="w-full text-left text-[11px] text-slate-600 table-compact">
+              <thead class="bg-slate-50 uppercase font-semibold text-slate-500 text-[10px]">
                 <tr>
-                  <th class="py-2.5 px-3 rounded-l-lg font-mono">Chamado</th>
-                  <th class="py-2.5 px-3">Data</th>
-                  <th class="py-2.5 px-3">Cliente</th>
-                  <th class="py-2.5 px-3 text-right">Valor</th>
-                  <th class="py-2.5 px-3">Nome do Cliente</th>
-                  <th class="py-2.5 px-3">Reembolso</th>
-                  <th class="py-2.5 px-3">Pix - Reembolso</th>
-                  <th class="py-2.5 px-3 text-center">Reemb. Pago?</th>
-                  <th class="py-2.5 px-3 rounded-r-lg text-center w-24">Ações</th>
+                  <th class="py-2 px-2 rounded-l-lg font-mono">Chamado</th>
+                  <th class="py-2 px-2">Data</th>
+                  <th class="py-2 px-2">Cliente</th>
+                  <th class="py-2 px-2 text-right">Valor</th>
+                  <th class="py-2 px-2">Nome do Cliente</th>
+                  <th class="py-2 px-2">Reembolso</th>
+                  <th class="py-2 px-2">Pix - Reembolso</th>
+                  <th class="py-2 px-2 text-center">Reemb. Pago?</th>
+                  <th class="py-2 px-2 rounded-r-lg text-center w-12">Ação</th>
                 </tr>
               </thead>
               <tbody id="tableChamadosAbertosBody" class="divide-y divide-slate-100">
@@ -1050,17 +1057,17 @@ html_code = f"""
               </div>
             </div>
 
-            <div class="overflow-x-auto">
-              <table class="w-full text-left text-xs text-slate-600">
-                <thead class="bg-slate-50 uppercase font-semibold text-slate-500">
+            <div class="w-full">
+              <table class="w-full text-left text-[11px] text-slate-600 table-compact">
+                <thead class="bg-slate-50 uppercase font-semibold text-slate-500 text-[10px]">
                   <tr>
-                    <th class="py-2.5 px-3 rounded-l-lg w-24">Ações</th>
-                    <th class="py-2.5 px-3">Cliente</th>
-                    <th class="py-2.5 px-3">Local</th>
-                    <th class="py-2.5 px-3">Local interno</th>
-                    <th class="py-2.5 px-3">Máquina</th>
-                    <th class="py-2.5 px-3">Modelo de máquina</th>
-                    <th class="py-2.5 px-3 rounded-r-lg">Filial Responsavel</th>
+                    <th class="py-2 px-2 rounded-l-lg w-16 text-center">Ações</th>
+                    <th class="py-2 px-2">Cliente</th>
+                    <th class="py-2 px-2">Local</th>
+                    <th class="py-2 px-2">Local interno</th>
+                    <th class="py-2 px-2">Máquina</th>
+                    <th class="py-2 px-2">Modelo de máquina</th>
+                    <th class="py-2 px-2 rounded-r-lg">Filial Responsavel</th>
                   </tr>
                 </thead>
                 <tbody id="tableClientesBody" class="divide-y divide-slate-100">
@@ -1651,7 +1658,7 @@ html_code = f"""
       
       // Carrega o campo Reembolso Realizado
       var rReal = (item.reembolsoRealizado || 'Não').trim().toLowerCase();
-      document.getElementById('sacReembolsoRealizado').value = (rReal === 'sim' || rReal === 's') ? 'Sim' : 'Não';
+      document.getElementById('sacReembolsoRealizado').value = (rReal === 'sim' || rReal === 's' || rReal === 'true') ? 'Sim' : 'Não';
       
       // Preserva e exibe o atendente e a data/hora originais
       document.getElementById('sacAtendente').value = item.atendente || atendenteSACLogado;
@@ -1756,35 +1763,33 @@ html_code = f"""
         const rVal = (c.reembolsoRealizado || 'Não').toString().trim().toLowerCase();
         const pago = (rVal === 'sim' || rVal === 's' || rVal === 'true');
         const badgePago = pago 
-          ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Sim</span>'
-          : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Não</span>';
+          ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Sim</span>'
+          : '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Não</span>';
 
         return `
-          <tr class="hover:bg-slate-50 transition">
-            <td class="py-2 px-3 whitespace-nowrap">
-              <div class="flex items-center gap-1.5">
-                <button type="button" onclick="editarChamadoSAC('${{c.chamado}}', 'sac')" title="Editar chamado ${{c.chamado}}" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
-                  <i data-lucide="edit-2" class="w-3 h-3"></i>
-                  Editar
+          <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+            <td class="py-1.5 px-2 text-center whitespace-nowrap">
+              <div class="inline-flex items-center gap-1 justify-center">
+                <button type="button" onclick="editarChamadoSAC('${{c.chamado}}', 'sac')" title="Editar chamado ${{c.chamado}}" class="p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition cursor-pointer">
+                  <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
                 </button>
-                <button type="button" onclick="excluirChamadoSAC('${{c.chamado}}')" title="Excluir chamado ${{c.chamado}}" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition cursor-pointer">
-                  <i data-lucide="trash-2" class="w-3 h-3"></i>
-                  Excluir
+                <button type="button" onclick="excluirChamadoSAC('${{c.chamado}}')" title="Excluir chamado ${{c.chamado}}" class="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition cursor-pointer">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 </button>
               </div>
             </td>
-            <td class="py-2.5 px-3 font-mono font-bold text-sky-700">${{c.chamado}}</td>
-            <td class="py-2.5 px-3">${{c.data || '-'}}</td>
-            <td class="py-2.5 px-3 font-semibold text-slate-800">${{c.cliente || '-'}}</td>
-            <td class="py-2.5 px-3 text-slate-600">${{c.localInterno || '-'}}</td>
-            <td class="py-2.5 px-3 text-slate-600">${{c.cidade || '-'}}</td>
-            <td class="py-2.5 px-3 font-medium text-slate-700">${{c.produto || '-'}}</td>
-            <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
-            <td class="py-2.5 px-3 font-medium text-slate-800">${{c.nomeSobrenome || '-'}}</td>
-            <td class="py-2.5 px-3 text-sky-900 font-semibold">${{c.reembolso || '-'}}</td>
-            <td class="py-2.5 px-3 text-center whitespace-nowrap">${{badgePago}}</td>
-            <td class="py-2.5 px-3 font-medium text-slate-600">${{c.atendente || '-'}}</td>
-            <td class="py-2.5 px-3 text-slate-400 text-[11px]">${{c.dataHoraLancamento || '-'}}</td>
+            <td class="py-1.5 px-2 font-mono font-bold text-sky-700 whitespace-nowrap">${{c.chamado}}</td>
+            <td class="py-1.5 px-2 whitespace-nowrap">${{c.data || '-'}}</td>
+            <td class="py-1.5 px-2 font-semibold text-slate-800 max-w-[120px] truncate" title="${{c.cliente || ''}}">${{c.cliente || '-'}}</td>
+            <td class="py-1.5 px-2 text-slate-600 max-w-[100px] truncate" title="${{c.localInterno || ''}}">${{c.localInterno || '-'}}</td>
+            <td class="py-1.5 px-2 text-slate-600 max-w-[90px] truncate" title="${{c.cidade || ''}}">${{c.cidade || '-'}}</td>
+            <td class="py-1.5 px-2 font-medium text-slate-700 whitespace-nowrap">${{c.produto || '-'}}</td>
+            <td class="py-1.5 px-2 text-right font-bold text-emerald-700 whitespace-nowrap">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
+            <td class="py-1.5 px-2 font-medium text-slate-800 max-w-[120px] truncate" title="${{c.nomeSobrenome || ''}}">${{c.nomeSobrenome || '-'}}</td>
+            <td class="py-1.5 px-2 text-sky-900 font-semibold max-w-[90px] truncate" title="${{c.reembolso || ''}}">${{c.reembolso || '-'}}</td>
+            <td class="py-1.5 px-2 text-center whitespace-nowrap">${{badgePago}}</td>
+            <td class="py-1.5 px-2 font-medium text-slate-600 max-w-[90px] truncate" title="${{c.atendente || ''}}">${{c.atendente || '-'}}</td>
+            <td class="py-1.5 px-2 text-slate-400 text-[10px] whitespace-nowrap">${{c.dataHoraLancamento || '-'}}</td>
           </tr>
         `;
       }}).join('');
@@ -1811,23 +1816,22 @@ html_code = f"""
         const rVal = (c.reembolsoRealizado || 'Não').toString().trim().toLowerCase();
         const pago = (rVal === 'sim' || rVal === 's' || rVal === 'true');
         const badgePago = pago 
-          ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Sim</span>'
-          : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Não</span>';
+          ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Sim</span>'
+          : '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Não</span>';
 
         return `
-          <tr class="hover:bg-slate-50 transition">
-            <td class="py-2.5 px-3 font-mono font-bold text-sky-700">${{c.chamado}}</td>
-            <td class="py-2.5 px-3 text-slate-700">${{c.data || '-'}}</td>
-            <td class="py-2.5 px-3 font-semibold text-slate-800">${{c.cliente || '-'}}</td>
-            <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
-            <td class="py-2.5 px-3 font-medium text-slate-800">${{c.nomeSobrenome || '-'}}</td>
-            <td class="py-2.5 px-3 text-sky-900 font-semibold">${{c.reembolso || '-'}}</td>
-            <td class="py-2.5 px-3 font-mono text-slate-600">${{c.pix || '-'}}</td>
-            <td class="py-2.5 px-3 text-center whitespace-nowrap">${{badgePago}}</td>
-            <td class="py-2.5 px-3 text-center whitespace-nowrap">
-              <button type="button" onclick="editarChamadoSAC('${{c.chamado}}', 'chamadosAbertos')" title="Editar chamado ${{c.chamado}}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
+          <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+            <td class="py-1.5 px-2 font-mono font-bold text-sky-700 whitespace-nowrap">${{c.chamado}}</td>
+            <td class="py-1.5 px-2 text-slate-700 whitespace-nowrap">${{c.data || '-'}}</td>
+            <td class="py-1.5 px-2 font-semibold text-slate-800 max-w-[150px] truncate" title="${{c.cliente || ''}}">${{c.cliente || '-'}}</td>
+            <td class="py-1.5 px-2 text-right font-bold text-emerald-700 whitespace-nowrap">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
+            <td class="py-1.5 px-2 font-medium text-slate-800 max-w-[160px] truncate" title="${{c.nomeSobrenome || ''}}">${{c.nomeSobrenome || '-'}}</td>
+            <td class="py-1.5 px-2 text-sky-900 font-semibold max-w-[110px] truncate" title="${{c.reembolso || ''}}">${{c.reembolso || '-'}}</td>
+            <td class="py-1.5 px-2 font-mono text-slate-600 max-w-[150px] truncate" title="${{c.pix || ''}}">${{c.pix || '-'}}</td>
+            <td class="py-1.5 px-2 text-center whitespace-nowrap">${{badgePago}}</td>
+            <td class="py-1.5 px-2 text-center whitespace-nowrap">
+              <button type="button" onclick="editarChamadoSAC('${{c.chamado}}', 'chamadosAbertos')" title="Editar chamado ${{c.chamado}}" class="p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition cursor-pointer inline-flex items-center justify-center">
                 <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
-                Editar
               </button>
             </td>
           </tr>
@@ -2161,25 +2165,23 @@ html_code = f"""
       }}
 
       tbody.innerHTML = lista.map((c, idx) => `
-        <tr class="hover:bg-slate-50 transition">
-          <td class="py-2.5 px-3 whitespace-nowrap">
-            <div class="flex items-center gap-1.5">
-              <button type="button" onclick="editarCliente(${{idx}})" title="Editar cadastro" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
-                <i data-lucide="edit-2" class="w-3 h-3"></i>
-                Editar
+        <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+          <td class="py-1.5 px-2 text-center whitespace-nowrap">
+            <div class="inline-flex items-center gap-1 justify-center">
+              <button type="button" onclick="editarCliente(${{idx}})" title="Editar cadastro" class="p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition cursor-pointer">
+                <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
               </button>
-              <button type="button" onclick="excluirCliente(${{idx}})" title="Excluir cadastro" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition cursor-pointer">
-                <i data-lucide="trash-2" class="w-3 h-3"></i>
-                Excluir
+              <button type="button" onclick="excluirCliente(${{idx}})" title="Excluir cadastro" class="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition cursor-pointer">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
               </button>
             </div>
           </td>
-          <td class="py-2.5 px-3 font-bold text-slate-800">${{c.cliente || '-'}}</td>
-          <td class="py-2.5 px-3 text-slate-600">${{c.local || '-'}}</td>
-          <td class="py-2.5 px-3 text-slate-700 font-medium">${{c.localInterno || '-'}}</td>
-          <td class="py-2.5 px-3 text-slate-600 font-mono">${{c.maquina || '-'}}</td>
-          <td class="py-2.5 px-3 text-slate-600">${{c.modeloMaquina || '-'}}</td>
-          <td class="py-2.5 px-3 font-semibold text-sky-800">${{c.filialResponsavel || '-'}}</td>
+          <td class="py-1.5 px-2 font-bold text-slate-800">${{c.cliente || '-'}}</td>
+          <td class="py-1.5 px-2 text-slate-600">${{c.local || '-'}}</td>
+          <td class="py-1.5 px-2 text-slate-700 font-medium">${{c.localInterno || '-'}}</td>
+          <td class="py-1.5 px-2 text-slate-600 font-mono">${{c.maquina || '-'}}</td>
+          <td class="py-1.5 px-2 text-slate-600">${{c.modeloMaquina || '-'}}</td>
+          <td class="py-1.5 px-2 font-semibold text-sky-800">${{c.filialResponsavel || '-'}}</td>
         </tr>
       `).join('');
 
