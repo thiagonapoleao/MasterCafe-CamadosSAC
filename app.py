@@ -62,7 +62,6 @@ logo_base64_src = obter_logo_base64()
 SPREADSHEET_SAC_ID = "1YUS9AwQti0Gl79X-TGCIqZSkOfF0bE0BX5gyDClo3rc"
 GID_SAC_CHAMADOS = "0"
 GID_SAC_CLIENTES = "1332839106"
-# Aba Usuarios apontada para o GID 437161325 na planilha informada
 GID_SAC_USUARIOS = "437161325"
 
 SPREADSHEET_SAC_CONFIG_ID = "1vOa6QpGPZ6rZ1doT2RRU1SAXWR5usPzv"
@@ -146,10 +145,6 @@ def carregar_dados_sac():
     except Exception:
         pass
 
-    # ==========================================================================
-    # USUÁRIOS: COLUNA A (NOME), B (USUÁRIO), C (SENHA), D (ACESSO)
-    # TRATAMENTO COM CONVERSÃO EM MINÚSCULAS PARA LOGIN E SENHA
-    # ==========================================================================
     usuarios_validos = []
     try:
         df_usr = pd.read_csv(URL_CSV_SAC_USUARIOS, dtype=str)
@@ -207,6 +202,14 @@ def carregar_dados_sac():
             col_pix = get_col(["Pix - Reembolso", "Pix", "pix"])
             col_atend = get_col(["Atendente", "atendente"])
             col_dthr = get_col(["Data/Hora do lançamento", "Data/Hora", "dataHoraLancamento"])
+            
+            # Reconhecimento amplo da Coluna S
+            col_reemb_realizado = get_col([
+                "Reembolso Realizado", "reembolsoRealizado", "Reembolso Realizado?", 
+                "Reemb. Pago?", "Reemb Pago", "Reembolso Pago", "Pago", "reembolso_realizado"
+            ])
+            if not col_reemb_realizado and len(cols) >= 19:
+                col_reemb_realizado = cols[18]
 
             for idx, r in df_ch.iterrows():
                 val = str(r[col_chamado]).strip() if col_chamado and pd.notna(r[col_chamado]) else ""
@@ -221,6 +224,10 @@ def carregar_dados_sac():
 
                 def get_val(col_name):
                     return str(r[col_name]).strip() if col_name and col_name in r and pd.notna(r[col_name]) else ""
+
+                val_reemb_real = get_val(col_reemb_realizado)
+                if not val_reemb_real:
+                    val_reemb_real = "Não"
 
                 chamados_salvos.append({
                     "linha": idx + 2,
@@ -241,7 +248,8 @@ def carregar_dados_sac():
                     "reembolso": get_val(col_reemb),
                     "pix": get_val(col_pix),
                     "atendente": get_val(col_atend),
-                    "dataHoraLancamento": get_val(col_dthr)
+                    "dataHoraLancamento": get_val(col_dthr),
+                    "reembolsoRealizado": val_reemb_real
                 })
     except Exception:
         pass
@@ -301,6 +309,24 @@ html_code = f"""
       background-color: #ffffff; 
       color: #64748b; 
       border: 1px solid #e2e8f0; 
+    }}
+
+    /* TABELA COM LARGURA RIGOROSAMENTE FIXADA PARA NÃO TRANSBORDAR O CARD */
+    .table-fixed-layout {{
+      table-layout: fixed !important;
+      width: 100% !important;
+      border-collapse: collapse;
+    }}
+    .table-fixed-layout th, 
+    .table-fixed-layout td {{
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      white-space: nowrap !important;
+      padding-top: 0.35rem !important;
+      padding-bottom: 0.35rem !important;
+      padding-left: 0.25rem !important;
+      padding-right: 0.25rem !important;
+      font-size: 10.5px !important;
     }}
   </style>
 </head>
@@ -407,6 +433,12 @@ html_code = f"""
               Lançamento SAC
             </button>
             
+            <!-- ABA: CHAMADOS ABERTOS (TODOS OS PERFIS: ATENDENTE E GERAL) -->
+            <button id="navChamadosAbertos" type="button" class="nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('chamadosAbertos')">
+              <i data-lucide="inbox" class="w-4 h-4"></i>
+              Chamados Abertos
+            </button>
+
             <!-- BOTÃO COM LIBERAÇÃO POR PERMISSÃO: SÓ APARECE PARA ACESSO GERAL -->
             <button id="navCadastroClientes" type="button" class="hidden nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('cadastroClientes')">
               <i data-lucide="user-plus" class="w-4 h-4"></i>
@@ -596,7 +628,7 @@ html_code = f"""
               <div class="p-2 bg-amber-500 text-white rounded-xl"><i data-lucide="edit-3" class="w-5 h-5"></i></div>
               <div>
                 <p class="text-sm font-bold">Modo de Edição de Chamado: <span id="labelSACEditChamado" class="font-mono text-amber-800">SAC-0000-0000</span></p>
-                <p class="text-xs text-amber-700">Você está alterando este chamado do SAC. Ao salvar, os dados serão atualizados na planilha.</p>
+                <p class="text-xs text-amber-700">Você está alterando este chamado do SAC. O atendente criador e a data/hora original de abertura serão mantidos.</p>
               </div>
             </div>
             <button type="button" onclick="cancelarEdicaoSAC()" class="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 rounded-xl text-xs font-bold text-amber-900 transition cursor-pointer">
@@ -756,6 +788,15 @@ html_code = f"""
                   <input type="text" id="sacPix" placeholder="Chave Pix (CPF, Celular, E-mail ou Aleatória)..." class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
 
+                <!-- NOVO CAMPO: Reembolso Realizado (Coluna S) -->
+                <div>
+                  <label class="block text-xs font-bold text-emerald-800 mb-1">Reembolso Realizado? *</label>
+                  <select id="sacReembolsoRealizado" required class="w-full text-sm font-bold rounded-xl border border-emerald-300 bg-white px-3 py-2 text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm">
+                    <option value="Não" selected>Não</option>
+                    <option value="Sim">Sim</option>
+                  </select>
+                </div>
+
                 <!-- Atendente (Coluna A) -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Atendente *</label>
@@ -763,7 +804,7 @@ html_code = f"""
                 </div>
 
                 <!-- Data/Hora Lançamento -->
-                <div>
+                <div class="md:col-span-2 lg:col-span-2">
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Data/Hora Lançamento</label>
                   <input type="text" id="sacDataHoraAuto" readonly value="Automático no Envio" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-slate-500 cursor-not-allowed">
                 </div>
@@ -782,8 +823,8 @@ html_code = f"""
             </form>
           </section>
 
-          <!-- LISTA DE TODOS OS CHAMADOS REALIZADOS -->
-          <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <!-- LISTA DE TODOS OS CHAMADOS REALIZADOS (RIGOROSAMENTE ENQUADRADA NO CARD) -->
+          <section class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 overflow-hidden">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
               <div>
                 <h2 class="text-base font-bold flex items-center gap-2 text-slate-800">
@@ -803,27 +844,28 @@ html_code = f"""
               </div>
             </div>
 
-            <div class="overflow-x-auto">
-              <table class="w-full text-left text-xs text-slate-600">
-                <thead class="bg-slate-50 uppercase font-semibold text-slate-500">
+            <div class="w-full overflow-hidden">
+              <table class="table-fixed-layout text-slate-600">
+                <thead class="bg-slate-50 uppercase font-bold text-slate-500 text-[10px]">
                   <tr>
-                    <th class="py-2.5 px-3 rounded-l-lg">Ações</th>
-                    <th class="py-2.5 px-3 font-mono">Chamado</th>
-                    <th class="py-2.5 px-3">Data</th>
-                    <th class="py-2.5 px-3">Cliente</th>
-                    <th class="py-2.5 px-3">Local</th>
-                    <th class="py-2.5 px-3">Filial</th>
-                    <th class="py-2.5 px-3">Produto</th>
-                    <th class="py-2.5 px-3 text-right">Valor</th>
-                    <th class="py-2.5 px-3">Nome Cliente</th>
-                    <th class="py-2.5 px-3">Reembolso</th>
-                    <th class="py-2.5 px-3">Atendente</th>
-                    <th class="py-2.5 px-3 rounded-r-lg">Data Lançamento</th>
+                    <th style="width: 5%;" class="rounded-l-lg text-center">Ações</th>
+                    <th style="width: 9%;" class="font-mono">Chamado</th>
+                    <th style="width: 7%;">Data</th>
+                    <th style="width: 12%;">Cliente</th>
+                    <th style="width: 10%;">Local</th>
+                    <th style="width: 9%;">Filial</th>
+                    <th style="width: 7%;">Produto</th>
+                    <th style="width: 8%;" class="text-right">Valor</th>
+                    <th style="width: 11%;">Nome Cliente</th>
+                    <th style="width: 8%;">Reembolso</th>
+                    <th style="width: 6%;" class="text-center">Pago?</th>
+                    <th style="width: 8%;">Atendente</th>
+                    <th style="width: 0%;" class="rounded-r-lg">Lançamento</th>
                   </tr>
                 </thead>
                 <tbody id="tableSACChamadosBody" class="divide-y divide-slate-100">
                   <tr>
-                    <td colspan="12" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado registrado ainda.</td>
+                    <td colspan="13" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado registrado ainda.</td>
                   </tr>
                 </tbody>
               </table>
@@ -833,7 +875,59 @@ html_code = f"""
         </div>
       </div>
 
-      <!-- PÁGINA 3: CADASTRO DE CLIENTES (ACESSO EXCLUSIVO: GERAL) -->
+      <!-- PÁGINA 3: TODOS OS CHAMADOS ABERTOS (ACESSO: ATENDENTE E GERAL - RIGOROSAMENTE ENQUADRADA NO CARD) -->
+      <div id="pageChamadosAbertos" class="space-y-6 hidden">
+        <section class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 overflow-hidden">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+            <div class="flex items-center gap-3">
+              <div class="p-2.5 bg-sky-600 text-white rounded-xl shadow-lg shadow-sky-500/20">
+                <i data-lucide="inbox" class="w-6 h-6"></i>
+              </div>
+              <div>
+                <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                  Todos os Chamados Abertos
+                </h2>
+                <p class="text-xs text-slate-500">Lista dedicada com status de reembolso e edição direta no formulário do SAC</p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <div class="relative">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                <input type="text" id="searchAbertos" placeholder="Filtrar chamado, cliente, nome..." oninput="filtrarChamadosAbertos()" class="text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 w-64">
+              </div>
+              <span id="badgeContadorAbertos" class="text-xs px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 font-bold border border-sky-200">
+                0 chamado(s)
+              </span>
+            </div>
+          </div>
+
+          <div class="w-full overflow-hidden">
+            <table class="table-fixed-layout text-slate-600">
+              <thead class="bg-slate-50 uppercase font-bold text-slate-500 text-[10px]">
+                <tr>
+                  <th style="width: 10%;" class="rounded-l-lg font-mono">Chamado</th>
+                  <th style="width: 8%;">Data</th>
+                  <th style="width: 15%;">Cliente</th>
+                  <th style="width: 9%;" class="text-right">Valor</th>
+                  <th style="width: 16%;">Nome do Cliente</th>
+                  <th style="width: 11%;">Reembolso</th>
+                  <th style="width: 16%;">Pix - Reembolso</th>
+                  <th style="width: 9%;" class="text-center">Pago?</th>
+                  <th style="width: 6%;" class="rounded-r-lg text-center">Ação</th>
+                </tr>
+              </thead>
+              <tbody id="tableChamadosAbertosBody" class="divide-y divide-slate-100">
+                <tr>
+                  <td colspan="9" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado aberto encontrado.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <!-- PÁGINA 4: CADASTRO DE CLIENTES (ACESSO EXCLUSIVO: GERAL - ENQUADRADA NO CARD) -->
       <div id="pageCadastroClientes" class="hidden space-y-6">
 
         <!-- BLOQUEIO DE SEGURANÇA PARA ATENDENTE SEM PERMISSÃO -->
@@ -953,8 +1047,8 @@ html_code = f"""
             </form>
           </section>
 
-          <!-- LISTA DE CLIENTES CADASTRADOS -->
-          <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <!-- LISTA DE CLIENTES CADASTRADOS (RIGOROSAMENTE ENQUADRADA NO CARD) -->
+          <section class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 overflow-hidden">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
               <div>
                 <h2 class="text-base font-bold flex items-center gap-2 text-slate-800">
@@ -974,17 +1068,17 @@ html_code = f"""
               </div>
             </div>
 
-            <div class="overflow-x-auto">
-              <table class="w-full text-left text-xs text-slate-600">
-                <thead class="bg-slate-50 uppercase font-semibold text-slate-500">
+            <div class="w-full overflow-hidden">
+              <table class="table-fixed-layout text-slate-600">
+                <thead class="bg-slate-50 uppercase font-bold text-slate-500 text-[10px]">
                   <tr>
-                    <th class="py-2.5 px-3 rounded-l-lg w-24">Ações</th>
-                    <th class="py-2.5 px-3">Cliente</th>
-                    <th class="py-2.5 px-3">Local</th>
-                    <th class="py-2.5 px-3">Local interno</th>
-                    <th class="py-2.5 px-3">Máquina</th>
-                    <th class="py-2.5 px-3">Modelo de máquina</th>
-                    <th class="py-2.5 px-3 rounded-r-lg">Filial Responsavel</th>
+                    <th style="width: 7%;" class="rounded-l-lg text-center">Ações</th>
+                    <th style="width: 22%;">Cliente</th>
+                    <th style="width: 17%;">Local</th>
+                    <th style="width: 18%;">Local interno</th>
+                    <th style="width: 12%;">Máquina</th>
+                    <th style="width: 12%;">Modelo</th>
+                    <th style="width: 12%;" class="rounded-r-lg">Filial</th>
                   </tr>
                 </thead>
                 <tbody id="tableClientesBody" class="divide-y divide-slate-100">
@@ -1013,6 +1107,7 @@ html_code = f"""
     let listaCadastroClientes = Array.isArray(dadosSAC.cadastro_clientes) ? dadosSAC.cadastro_clientes : [];
     let chamadoEmEdicao = null;
     let clienteEmEdicao = null;
+    let origemEdicaoSAC = 'sac';
     
     // VARIÁVEIS GLOBAIS DE SESSÃO
     let atendenteSACLogado = "";
@@ -1046,6 +1141,7 @@ html_code = f"""
         aplicarRegrasDeAcesso();
         inicializarFormularioSAC();
         renderizarTabelaChamadosSAC();
+        renderizarTabelaChamadosAbertos();
 
         let abaDesejada = 'dashboardSAC';
         try {{
@@ -1063,12 +1159,10 @@ html_code = f"""
 
     function realizarLoginGlobal(e) {{
       e.preventDefault();
-      // Tratamento para preenchimento em minúsculas e sem espaços nas pontas
       const u = (document.getElementById('globalLoginUser').value || '').trim().toLowerCase();
       const p = (document.getElementById('globalLoginPass').value || '').trim().toLowerCase();
       const erroBox = document.getElementById('globalLoginErro');
 
-      // Validação conferindo campos tratados em minúsculas
       const userValido = dadosSAC.usuarios.find(x => 
         String(x.usuario || '').trim().toLowerCase() === u && 
         String(x.senha || '').trim().toLowerCase() === p
@@ -1076,10 +1170,8 @@ html_code = f"""
 
       if (userValido) {{
         erroBox.classList.add('hidden');
-        // Coluna A: Nome do Atendente
         atendenteSACLogado = userValido.nome || userValido.usuario;
         loginUsuarioConectado = userValido.usuario;
-        // Coluna D: Acesso (Geral ou Atendente)
         nivelAcessoLogado = userValido.acesso || "Atendente";
 
         try {{
@@ -1109,9 +1201,6 @@ html_code = f"""
       verificarEstadoAutenticacao();
     }}
 
-    // =========================================================================
-    // ATUALIZAÇÃO DA INTERFACE BASEADA NO NÍVEL DE ACESSO
-    // =========================================================================
     function aplicarRegrasDeAcesso() {{
       const btnCadastro = document.getElementById('navCadastroClientes');
       const badgeAcesso = document.getElementById('badgeNivelAcesso');
@@ -1148,9 +1237,6 @@ html_code = f"""
       }}
     }}
 
-    // =========================================================================
-    // FORMATAÇÃO DE TEXTO: PRIMEIRAS MAIÚSCULAS
-    // =========================================================================
     function converterParaPrimeirasMaiusculas(texto) {{
       if (!texto) return '';
       const preposicoes = ['de', 'da', 'do', 'das', 'dos', 'e'];
@@ -1173,9 +1259,6 @@ html_code = f"""
       input.value = converterParaPrimeirasMaiusculas(input.value);
     }}
 
-    // =========================================================================
-    // TRAVAMENTO RÍGIDO DE PRÉ-LISTA
-    // =========================================================================
     function obterValoresDeDatalist(datalistId) {{
       const dl = document.getElementById(datalistId);
       if (!dl) return [];
@@ -1360,12 +1443,14 @@ html_code = f"""
       const pages = {{
         dashboardSAC: document.getElementById('pageDashboardSAC'),
         sac: document.getElementById('pageSAC'),
+        chamadosAbertos: document.getElementById('pageChamadosAbertos'),
         cadastroClientes: document.getElementById('pageCadastroClientes')
       }};
 
       const buttons = {{
         dashboardSAC: document.getElementById('navDashboardSAC'),
         sac: document.getElementById('navSAC'),
+        chamadosAbertos: document.getElementById('navChamadosAbertos'),
         cadastroClientes: document.getElementById('navCadastroClientes')
       }};
 
@@ -1387,6 +1472,10 @@ html_code = f"""
 
       if (page === 'dashboardSAC') {{
         atualizarDashboardSAC();
+      }} else if (page === 'chamadosAbertos') {{
+        renderizarTabelaChamadosAbertos();
+      }} else if (page === 'sac') {{
+        renderizarTabelaChamadosSAC();
       }} else if (page === 'cadastroClientes') {{
         aplicarRegrasDeAcesso();
         renderizarTabelaClientes();
@@ -1425,6 +1514,7 @@ html_code = f"""
       document.getElementById('sacHoraTransacao').value = "";
       document.getElementById('sacReembolso').value = "";
       document.getElementById('sacPix').value = "";
+      document.getElementById('sacReembolsoRealizado').value = "Não";
       document.getElementById('sacValor').value = "";
       document.getElementById('sacNome').value = "";
       document.getElementById('sacCelular').value = "";
@@ -1528,6 +1618,7 @@ html_code = f"""
       document.getElementById('sacHoraTransacao').value = "";
       document.getElementById('sacReembolso').value = "";
       document.getElementById('sacPix').value = "";
+      document.getElementById('sacReembolsoRealizado').value = "Não";
       document.getElementById('sacValor').value = "";
       document.getElementById('sacNome').value = "";
       document.getElementById('sacCelular').value = "";
@@ -1544,14 +1635,17 @@ html_code = f"""
       document.getElementById('sacChamado').value = calcularPreviaProximoChamado(anoAtual);
       document.getElementById('sacData').value = new Date().toISOString().split('T')[0];
       document.getElementById('sacAtendente').value = atendenteSACLogado;
+      document.getElementById('sacDataHoraAuto').value = "Automático no Envio";
 
       lucide.createIcons();
     }}
 
-    function editarChamadoSAC(numeroChamado) {{
+    function editarChamadoSAC(numeroChamado, origem = 'sac') {{
       const item = listaChamadosSAC.find(c => c.chamado === numeroChamado);
       if (!item) return;
 
+      origemEdicaoSAC = origem;
+      switchPage('sac');
       chamadoEmEdicao = item;
       document.getElementById('sacChamado').value = item.chamado;
       document.getElementById('sacData').value = item.data;
@@ -1572,7 +1666,14 @@ html_code = f"""
       document.getElementById('sacFormaPgto').value = item.formaPgto;
       document.getElementById('sacReembolso').value = item.reembolso || '';
       document.getElementById('sacPix').value = item.pix || '';
+      
+      // Carrega o campo Reembolso Realizado
+      var rReal = (item.reembolsoRealizado || 'Não').trim().toLowerCase();
+      document.getElementById('sacReembolsoRealizado').value = (rReal === 'sim' || rReal === 's' || rReal === 'true') ? 'Sim' : 'Não';
+      
+      // Preserva e exibe o atendente e a data/hora originais
       document.getElementById('sacAtendente').value = item.atendente || atendenteSACLogado;
+      document.getElementById('sacDataHoraAuto').value = item.dataHoraLancamento || 'Original Preservado';
 
       document.getElementById('alertSACEditMode').classList.remove('hidden');
       document.getElementById('labelSACEditChamado').innerText = item.chamado;
@@ -1584,7 +1685,12 @@ html_code = f"""
     }}
 
     function cancelarEdicaoSAC() {{
+      const origemAnterior = origemEdicaoSAC;
       limparFormSAC();
+      if (origemAnterior === 'chamadosAbertos') {{
+        switchPage('chamadosAbertos');
+      }}
+      origemEdicaoSAC = 'sac';
     }}
 
     function excluirChamadoSAC(numeroChamado) {{
@@ -1613,6 +1719,7 @@ html_code = f"""
 
       listaChamadosSAC = listaChamadosSAC.filter(c => c.chamado !== numeroChamado);
       renderizarTabelaChamadosSAC();
+      renderizarTabelaChamadosAbertos();
 
       if (chamadoEmEdicao && chamadoEmEdicao.chamado === numeroChamado) {{
         limparFormSAC();
@@ -1647,7 +1754,8 @@ html_code = f"""
         (c.nomeSobrenome && c.nomeSobrenome.toLowerCase().includes(termo)) ||
         (c.localInterno && c.localInterno.toLowerCase().includes(termo)) ||
         (c.cidade && c.cidade.toLowerCase().includes(termo)) ||
-        (c.problemas && c.problemas.toLowerCase().includes(termo))
+        (c.problemas && c.problemas.toLowerCase().includes(termo)) ||
+        (c.reembolsoRealizado && c.reembolsoRealizado.toLowerCase().includes(termo))
       );
       renderizarTabelaChamadosSAC(filtrados);
     }}
@@ -1658,39 +1766,107 @@ html_code = f"""
       if (badge) badge.innerText = lista.length + ' chamado(s)';
 
       if (!lista || lista.length === 0) {{
-        tbody.innerHTML = '<tr><td colspan="12" class="text-center py-6 text-slate-400 font-semibold">Nenhuma ocorrência encontrada.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" class="text-center py-6 text-slate-400 font-semibold">Nenhuma ocorrência encontrada.</td></tr>';
         return;
       }}
 
-      tbody.innerHTML = lista.map(c => `
-        <tr class="hover:bg-slate-50 transition">
-          <td class="py-2 px-3 whitespace-nowrap">
-            <div class="flex items-center gap-1.5">
-              <button type="button" onclick="editarChamadoSAC('${{c.chamado}}')" title="Editar chamado ${{c.chamado}}" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
-                <i data-lucide="edit-2" class="w-3 h-3"></i>
-                Editar
-              </button>
-              <button type="button" onclick="excluirChamadoSAC('${{c.chamado}}')" title="Excluir chamado ${{c.chamado}}" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition cursor-pointer">
-                <i data-lucide="trash-2" class="w-3 h-3"></i>
-                Excluir
-              </button>
-            </div>
-          </td>
-          <td class="py-2.5 px-3 font-mono font-bold text-sky-700">${{c.chamado}}</td>
-          <td class="py-2.5 px-3">${{c.data || '-'}}</td>
-          <td class="py-2.5 px-3 font-semibold text-slate-800">${{c.cliente || '-'}}</td>
-          <td class="py-2.5 px-3 text-slate-600">${{c.localInterno || '-'}}</td>
-          <td class="py-2.5 px-3 text-slate-600">${{c.cidade || '-'}}</td>
-          <td class="py-2.5 px-3 font-medium text-slate-700">${{c.produto || '-'}}</td>
-          <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
-          <td class="py-2.5 px-3 font-medium text-slate-800">${{c.nomeSobrenome || '-'}}</td>
-          <td class="py-2.5 px-3 text-sky-900 font-semibold">${{c.reembolso || '-'}}</td>
-          <td class="py-2.5 px-3 font-medium text-slate-600">${{c.atendente || '-'}}</td>
-          <td class="py-2.5 px-3 text-slate-400 text-[11px]">${{c.dataHoraLancamento || '-'}}</td>
-        </tr>
-      `).join('');
+      tbody.innerHTML = lista.map(c => {{
+        const rVal = (c.reembolsoRealizado || 'Não').toString().trim().toLowerCase();
+        const pago = (rVal === 'sim' || rVal === 's' || rVal === 'true');
+        const badgePago = pago 
+          ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Sim</span>'
+          : '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Não</span>';
+
+        return `
+          <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+            <td class="text-center whitespace-nowrap">
+              <div class="inline-flex items-center gap-1 justify-center">
+                <button type="button" onclick="editarChamadoSAC('${{c.chamado}}', 'sac')" title="Editar chamado ${{c.chamado}}" class="p-1 rounded bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition cursor-pointer">
+                  <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+                </button>
+                <button type="button" onclick="excluirChamadoSAC('${{c.chamado}}')" title="Excluir chamado ${{c.chamado}}" class="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition cursor-pointer">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            </td>
+            <td class="font-mono font-bold text-sky-700 truncate" title="${{c.chamado}}">${{c.chamado}}</td>
+            <td class="truncate" title="${{c.data || '-'}}">${{c.data || '-'}}</td>
+            <td class="font-semibold text-slate-800 truncate" title="${{c.cliente || ''}}">${{c.cliente || '-'}}</td>
+            <td class="text-slate-600 truncate" title="${{c.localInterno || ''}}">${{c.localInterno || '-'}}</td>
+            <td class="text-slate-600 truncate" title="${{c.cidade || ''}}">${{c.cidade || '-'}}</td>
+            <td class="font-medium text-slate-700 truncate" title="${{c.produto || '-'}}">${{c.produto || '-'}}</td>
+            <td class="text-right font-bold text-emerald-700 truncate" title="${{c.valor || ''}}">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
+            <td class="font-medium text-slate-800 truncate" title="${{c.nomeSobrenome || ''}}">${{c.nomeSobrenome || '-'}}</td>
+            <td class="text-sky-900 font-semibold truncate" title="${{c.reembolso || ''}}">${{c.reembolso || '-'}}</td>
+            <td class="text-center whitespace-nowrap">${{badgePago}}</td>
+            <td class="font-medium text-slate-600 truncate" title="${{c.atendente || ''}}">${{c.atendente || '-'}}</td>
+            <td class="text-slate-400 text-[10px] truncate" title="${{c.dataHoraLancamento || ''}}">${{c.dataHoraLancamento || '-'}}</td>
+          </tr>
+        `;
+      }}).join('');
 
       lucide.createIcons();
+    }}
+
+    // =========================================================================
+    // ROTINAS DA PÁGINA: CHAMADOS ABERTOS
+    // =========================================================================
+    function renderizarTabelaChamadosAbertos(lista = listaChamadosSAC) {{
+      const tbody = document.getElementById('tableChamadosAbertosBody');
+      const badge = document.getElementById('badgeContadorAbertos');
+      if (badge) badge.innerText = lista.length + ' chamado(s)';
+
+      if (!tbody) return;
+
+      if (!lista || lista.length === 0) {{
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado aberto encontrado.</td></tr>';
+        return;
+      }}
+
+      tbody.innerHTML = lista.map(c => {{
+        const rVal = (c.reembolsoRealizado || 'Não').toString().trim().toLowerCase();
+        const pago = (rVal === 'sim' || rVal === 's' || rVal === 'true');
+        const badgePago = pago 
+          ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Sim</span>'
+          : '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Não</span>';
+
+        return `
+          <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+            <td class="font-mono font-bold text-sky-700 truncate" title="${{c.chamado}}">${{c.chamado}}</td>
+            <td class="text-slate-700 truncate" title="${{c.data || '-'}}">${{c.data || '-'}}</td>
+            <td class="font-semibold text-slate-800 truncate" title="${{c.cliente || ''}}">${{c.cliente || '-'}}</td>
+            <td class="text-right font-bold text-emerald-700 truncate" title="${{c.valor || ''}}">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
+            <td class="font-medium text-slate-800 truncate" title="${{c.nomeSobrenome || ''}}">${{c.nomeSobrenome || '-'}}</td>
+            <td class="text-sky-900 font-semibold truncate" title="${{c.reembolso || ''}}">${{c.reembolso || '-'}}</td>
+            <td class="font-mono text-slate-600 truncate" title="${{c.pix || ''}}">${{c.pix || '-'}}</td>
+            <td class="text-center whitespace-nowrap">${{badgePago}}</td>
+            <td class="text-center whitespace-nowrap">
+              <button type="button" onclick="editarChamadoSAC('${{c.chamado}}', 'chamadosAbertos')" title="Editar chamado ${{c.chamado}}" class="p-1 rounded bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition cursor-pointer inline-flex items-center justify-center">
+                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      }}).join('');
+
+      lucide.createIcons();
+    }}
+
+    function filtrarChamadosAbertos() {{
+      const termo = (document.getElementById('searchAbertos')?.value || '').trim().toLowerCase();
+      if (!termo) {{
+        renderizarTabelaChamadosAbertos(listaChamadosSAC);
+        return;
+      }}
+      const filtrados = listaChamadosSAC.filter(c => 
+        (c.chamado && c.chamado.toLowerCase().includes(termo)) ||
+        (c.cliente && c.cliente.toLowerCase().includes(termo)) ||
+        (c.nomeSobrenome && c.nomeSobrenome.toLowerCase().includes(termo)) ||
+        (c.reembolso && c.reembolso.toLowerCase().includes(termo)) ||
+        (c.pix && c.pix.toLowerCase().includes(termo)) ||
+        (c.reembolsoRealizado && c.reembolsoRealizado.toLowerCase().includes(termo))
+      );
+      renderizarTabelaChamadosAbertos(filtrados);
     }}
 
     function handleSACSubmit(e) {{
@@ -1761,10 +1937,20 @@ html_code = f"""
       const formaPgto = document.getElementById('sacFormaPgto').value.trim();
       const reembolso = converterParaPrimeirasMaiusculas(document.getElementById('sacReembolso').value.trim());
       const pix = document.getElementById('sacPix').value.trim();
-      const atendente = atendenteSACLogado || document.getElementById('sacAtendente').value;
-      
-      const agora = new Date();
-      const dataHoraLancamento = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR');
+      const reembolsoRealizado = document.getElementById('sacReembolsoRealizado').value || "Não";
+
+      // REGRA: Preserva atendente original e data/hora original se estiver em modo edição
+      let atendente = "";
+      let dataHoraLancamento = "";
+
+      if (ehEdicao && chamadoEmEdicao) {{
+        atendente = chamadoEmEdicao.atendente || document.getElementById('sacAtendente').value || atendenteSACLogado;
+        dataHoraLancamento = chamadoEmEdicao.dataHoraLancamento || "";
+      }} else {{
+        atendente = atendenteSACLogado || document.getElementById('sacAtendente').value;
+        const agora = new Date();
+        dataHoraLancamento = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR');
+      }}
 
       const payloadSAC = {{
         "acao": ehEdicao ? "editar" : "inserir",
@@ -1787,7 +1973,8 @@ html_code = f"""
         "Reembolso": reembolso,
         "Pix - Reembolso": pix,
         "Atendente": atendente,
-        "Data/Hora do lançamento": dataHoraLancamento
+        "Data/Hora do lançamento": dataHoraLancamento,
+        "Reembolso Realizado": reembolsoRealizado
       }};
 
       enviarParaPlanilhaGarantido(payloadSAC);
@@ -1811,7 +1998,8 @@ html_code = f"""
         reembolso,
         pix,
         atendente,
-        dataHoraLancamento
+        dataHoraLancamento,
+        reembolsoRealizado
       }};
 
       if (ehEdicao) {{
@@ -1827,8 +2015,12 @@ html_code = f"""
         dadosSAC.maior_sac_ano[ano] = Math.max(dadosSAC.maior_sac_ano[ano] || 0, seq);
       }}
 
+      const destinoAposSalvar = (ehEdicao && origemEdicaoSAC === 'chamadosAbertos') ? 'chamadosAbertos' : 'sac';
+
       limparFormSAC();
       renderizarTabelaChamadosSAC();
+      renderizarTabelaChamadosAbertos();
+      origemEdicaoSAC = 'sac';
 
       setTimeout(() => {{
         abrirModalLoading(
@@ -1837,9 +2029,13 @@ html_code = f"""
           'sucesso'
         );
 
+        if (destinoAposSalvar === 'chamadosAbertos') {{
+          switchPage('chamadosAbertos');
+        }}
+
         exibirMensagemTopo(
           ehEdicao ? '✅ Ocorrência ' + chamado + ' atualizada com sucesso!' : '✅ Ocorrência ' + chamado + ' lançada com sucesso!',
-          'Cliente: ' + cliente + ' (' + localInterno + ') · Filial: ' + cidade + ' · Atendente: ' + atendente + ' · Valor: ' + formatCurrency(valor),
+          'Cliente: ' + cliente + ' (' + localInterno + ') · Filial: ' + cidade + ' · Reemb. Pago: ' + reembolsoRealizado + ' · Valor: ' + formatCurrency(valor),
           ehEdicao ? 'editar' : 'sucesso'
         );
 
@@ -1979,25 +2175,23 @@ html_code = f"""
       }}
 
       tbody.innerHTML = lista.map((c, idx) => `
-        <tr class="hover:bg-slate-50 transition">
-          <td class="py-2.5 px-3 whitespace-nowrap">
-            <div class="flex items-center gap-1.5">
-              <button type="button" onclick="editarCliente(${{idx}})" title="Editar cadastro" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
-                <i data-lucide="edit-2" class="w-3 h-3"></i>
-                Editar
+        <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+          <td class="text-center whitespace-nowrap">
+            <div class="inline-flex items-center gap-1 justify-center">
+              <button type="button" onclick="editarCliente(${{idx}})" title="Editar cadastro" class="p-1 rounded bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition cursor-pointer">
+                <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
               </button>
-              <button type="button" onclick="excluirCliente(${{idx}})" title="Excluir cadastro" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition cursor-pointer">
-                <i data-lucide="trash-2" class="w-3 h-3"></i>
-                Excluir
+              <button type="button" onclick="excluirCliente(${{idx}})" title="Excluir cadastro" class="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition cursor-pointer">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
               </button>
             </div>
           </td>
-          <td class="py-2.5 px-3 font-bold text-slate-800">${{c.cliente || '-'}}</td>
-          <td class="py-2.5 px-3 text-slate-600">${{c.local || '-'}}</td>
-          <td class="py-2.5 px-3 text-slate-700 font-medium">${{c.localInterno || '-'}}</td>
-          <td class="py-2.5 px-3 text-slate-600 font-mono">${{c.maquina || '-'}}</td>
-          <td class="py-2.5 px-3 text-slate-600">${{c.modeloMaquina || '-'}}</td>
-          <td class="py-2.5 px-3 font-semibold text-sky-800">${{c.filialResponsavel || '-'}}</td>
+          <td class="font-bold text-slate-800 truncate" title="${{c.cliente || ''}}">${{c.cliente || '-'}}</td>
+          <td class="text-slate-600 truncate" title="${{c.local || ''}}">${{c.local || '-'}}</td>
+          <td class="text-slate-700 font-medium truncate" title="${{c.localInterno || ''}}">${{c.localInterno || '-'}}</td>
+          <td class="text-slate-600 font-mono truncate" title="${{c.maquina || ''}}">${{c.maquina || '-'}}</td>
+          <td class="text-slate-600 truncate" title="${{c.modeloMaquina || ''}}">${{c.modeloMaquina || '-'}}</td>
+          <td class="font-semibold text-sky-800 truncate" title="${{c.filialResponsavel || ''}}">${{c.filialResponsavel || '-'}}</td>
         </tr>
       `).join('');
 
