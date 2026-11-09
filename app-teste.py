@@ -95,6 +95,7 @@ def carregar_dados_sac():
         pass
 
     formas_pagamento = []
+    cidades_lista = []
     problemas = []
     descricoes = []
     try:
@@ -103,6 +104,9 @@ def carregar_dados_sac():
             if len(df_cfg.columns) > 0:
                 col_a = df_cfg.columns[0]
                 formas_pagamento = [str(x).strip() for x in df_cfg[col_a].dropna().unique() if str(x).strip() and str(x).lower() not in ["nan", "forma de pagamento", "forma"]]
+            if len(df_cfg.columns) > 4:
+                col_e = df_cfg.columns[4]
+                cidades_lista = [str(x).strip() for x in df_cfg[col_e].dropna().unique() if str(x).strip() and str(x).lower() not in ["nan", "cidade", "cidades"]]
             if len(df_cfg.columns) > 11:
                 col_l = df_cfg.columns[11]
                 problemas = [str(x).strip() for x in df_cfg[col_l].dropna().unique() if str(x).strip() and str(x).lower() not in ["nan", "problemas", "problema"]]
@@ -202,6 +206,7 @@ def carregar_dados_sac():
     return {
         "clientes": clientes_dados,
         "formas_pagamento": sorted(formas_pagamento),
+        "cidades": sorted(cidades_lista),
         "problemas": sorted(problemas),
         "descricoes": sorted(descricoes),
         "usuarios": usuarios_validos,
@@ -257,6 +262,25 @@ html_code = f"""
   <form id="hiddenSACSubmissionForm" action="{APPS_SCRIPT_SAC_WEBAPP_URL}" method="POST" target="target_post_frame" style="display:none;">
     <input type="hidden" name="data" id="hiddenSACSubmissionData">
   </form>
+
+  <!-- MODAL DE PROCESSAMENTO / AÇÃO EM ANDAMENTO -->
+  <div id="modalLoadingAcao" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl border border-slate-100 flex flex-col items-center text-center space-y-4 animate-in fade-in zoom-in duration-200">
+      <div class="w-16 h-16 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shadow-inner">
+        <svg class="animate-spin h-8 w-8 text-sky-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+      </div>
+      <div>
+        <h3 id="modalLoadingTitle" class="text-base font-bold text-slate-900">Lançando no Sistema...</h3>
+        <p id="modalLoadingSub" class="text-xs text-slate-500 mt-1">Sua solicitação está sendo transmitida e registrada na planilha Chamados.</p>
+      </div>
+      <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+        <div class="bg-sky-500 h-full w-2/3 animate-pulse"></div>
+      </div>
+    </div>
+  </div>
 
   <!-- Header Superior -->
   <header class="sticky top-0 z-40 bg-white/95 border-b border-slate-200 backdrop-blur-md px-6 py-3">
@@ -519,21 +543,6 @@ html_code = f"""
       <!-- PAINEL DO FORMULÁRIO DO SAC -->
       <div id="sacMainPanel" class="hidden space-y-6">
 
-        <!-- MENSAGEM DINÂMICA DE AÇÃO EM ANDAMENTO (FEEDBACK EM TEMPO REAL) -->
-        <div id="sacActionLoadingBanner" class="hidden p-4 rounded-2xl bg-amber-500 text-white flex items-center justify-between shadow-lg shadow-amber-500/25 transition">
-          <div class="flex items-center gap-3">
-            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-            </svg>
-            <div>
-              <p id="sacActionLoadingTitle" class="text-sm font-bold">Ação em andamento...</p>
-              <p id="sacActionLoadingSub" class="text-xs text-amber-100">Processando e enviando os dados para a planilha oficial Chamados.</p>
-            </div>
-          </div>
-          <span class="text-[11px] font-bold bg-amber-600/80 px-3 py-1 rounded-lg">Aguarde</span>
-        </div>
-
         <!-- ALERTA DE EDIÇÃO DE CHAMADO -->
         <div id="alertSACEditMode" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex justify-between items-center shadow-sm">
           <div class="flex items-center gap-3">
@@ -616,10 +625,11 @@ html_code = f"""
                 </select>
               </div>
 
-              <!-- Cidade -->
+              <!-- Cidade com fallback em pré-lista da aba Dados coluna E -->
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Cidade *</label>
-                <input type="text" id="sacCidade" placeholder="Cidade correspondente" required class="w-full text-sm rounded-xl border border-slate-300 bg-slate-100 px-3.5 py-2 text-slate-800">
+                <input list="listaSACCidades" id="sacCidade" placeholder="Cidade do atendimento..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <datalist id="listaSACCidades"></datalist>
               </div>
 
               <!-- Descrição -->
@@ -629,25 +639,26 @@ html_code = f"""
                 <datalist id="listaSACDescricoes"></datalist>
               </div>
 
-              <!-- Produto -->
+              <!-- Produto (Começa limpo/vazio) -->
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Produto *</label>
                 <select id="sacProduto" required class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                  <option value="" selected disabled>Selecione o Produto...</option>
                   <option value="Café">Café</option>
                   <option value="Snaky">Snaky</option>
                 </select>
               </div>
 
-              <!-- Data da Transação (Começa Zerado/Vazio) -->
+              <!-- Data da Transação (Começa Zerado/Vazio e é OBRIGATÓRIO) -->
               <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Data da Transação</label>
-                <input type="date" id="sacDataTransacao" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Data da Transação *</label>
+                <input type="date" id="sacDataTransacao" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
               </div>
 
-              <!-- Hora da Transação (Começa Zerado/Vazio) -->
+              <!-- Hora da Transação (Começa Zerado/Vazio e é OBRIGATÓRIO) -->
               <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Hora da Transação</label>
-                <input type="time" id="sacHoraTransacao" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Hora da Transação *</label>
+                <input type="time" id="sacHoraTransacao" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
               </div>
 
               <!-- Valor (R$) -->
@@ -787,23 +798,22 @@ html_code = f"""
       atendenteSACLogado = sessionStorage.getItem('sac_atendente_conectado') || "";
     }} catch(e) {{}}
 
-    // EXIBE E OCULTA O BANNER DE AÇÃO EM ANDAMENTO
-    function mostrarAcaoEmAndamento(titulo, subtitulo) {{
-      const banner = document.getElementById('sacActionLoadingBanner');
-      if (banner) {{
-        document.getElementById('sacActionLoadingTitle').innerText = titulo;
-        document.getElementById('sacActionLoadingSub').innerText = subtitulo;
-        banner.classList.remove('hidden');
-        banner.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+    // MODAL DE AÇÃO EM ANDAMENTO (OVERLAY VISUAL)
+    function abrirModalLoading(titulo, subtitulo) {{
+      const modal = document.getElementById('modalLoadingAcao');
+      if (modal) {{
+        document.getElementById('modalLoadingTitle').innerText = titulo;
+        document.getElementById('modalLoadingSub').innerText = subtitulo;
+        modal.classList.remove('hidden');
       }}
     }}
 
-    function ocultarAcaoEmAndamento() {{
-      const banner = document.getElementById('sacActionLoadingBanner');
-      if (banner) banner.classList.add('hidden');
+    function fecharModalLoading() {{
+      const modal = document.getElementById('modalLoadingAcao');
+      if (modal) modal.classList.add('hidden');
     }}
 
-    // ENVIO DESACOPLADO E INSTANTÂNEO (Não congela o navegador nem o Streamlit)
+    // ENVIO DESACOPLADO E INSTANTÂNEO
     function enviarParaPlanilhaGarantido(payload) {{
       const endpoint = APPS_SCRIPT_SAC_URL;
       const strData = JSON.stringify(payload);
@@ -952,6 +962,10 @@ html_code = f"""
       document.getElementById('sacChamado').value = calcularPreviaProximoChamado(anoAtual);
       document.getElementById('sacData').value = new Date().toISOString().split('T')[0];
       
+      // Produto começa limpo/vazio
+      document.getElementById('sacProduto').value = "";
+      
+      // Data e Hora de transação começam ZERADOS/VAZIOS
       document.getElementById('sacDataTransacao').value = "";
       document.getElementById('sacHoraTransacao').value = "";
       document.getElementById('sacReembolso').value = "";
@@ -968,6 +982,7 @@ html_code = f"""
       const selectLocal = document.getElementById('sacLocalInterno');
       selectLocal.innerHTML = '<option value="">Selecione primeiro o Cliente...</option>';
 
+      // Datalist de Clientes
       const dlCli = document.getElementById('listaSACClientes');
       dlCli.innerHTML = '';
       const clientesUnicos = [...new Set(dadosSAC.clientes.map(c => c.cliente).filter(Boolean))].sort();
@@ -977,6 +992,19 @@ html_code = f"""
         dlCli.appendChild(opt);
       }});
 
+      // Datalist de Cidades da coluna E da aba Dados
+      const dlCid = document.getElementById('listaSACCidades');
+      dlCid.innerHTML = '';
+      const cidadesGerais = dadosSAC.cidades && dadosSAC.cidades.length > 0 
+        ? dadosSAC.cidades 
+        : [...new Set(dadosSAC.clientes.map(c => c.cidade).filter(Boolean))].sort();
+      cidadesGerais.forEach(cid => {{
+        const opt = document.createElement('option');
+        opt.value = cid;
+        dlCid.appendChild(opt);
+      }});
+
+      // Datalist de Descrições
       const dlDesc = document.getElementById('listaSACDescricoes');
       dlDesc.innerHTML = '';
       dadosSAC.descricoes.forEach(d => {{
@@ -985,6 +1013,7 @@ html_code = f"""
         dlDesc.appendChild(opt);
       }});
 
+      // Datalist de Problemas
       const dlProb = document.getElementById('listaSACProblemas');
       dlProb.innerHTML = '';
       dadosSAC.problemas.forEach(p => {{
@@ -993,6 +1022,7 @@ html_code = f"""
         dlProb.appendChild(opt);
       }});
 
+      // Datalist de Formas de Pagamento
       const dlPgto = document.getElementById('listaSACFormasPgto');
       dlPgto.innerHTML = '';
       dadosSAC.formas_pagamento.forEach(f => {{
@@ -1006,7 +1036,6 @@ html_code = f"""
       const cli = (document.getElementById('sacCliente').value || '').trim();
       const selectLocal = document.getElementById('sacLocalInterno');
       selectLocal.innerHTML = '<option value="">Selecione o Local Interno...</option>';
-      document.getElementById('sacCidade').value = '';
 
       if (!cli) return;
 
@@ -1051,6 +1080,7 @@ html_code = f"""
       chamadoEmEdicao = null;
       document.getElementById('sacForm').reset();
       
+      document.getElementById('sacProduto').value = "";
       document.getElementById('sacLocalInterno').innerHTML = '<option value="">Selecione primeiro o Cliente...</option>';
       document.getElementById('sacCidade').value = "";
       document.getElementById('sacDataTransacao').value = "";
@@ -1089,7 +1119,7 @@ html_code = f"""
       document.getElementById('sacLocalInterno').value = item.localInterno;
       document.getElementById('sacCidade').value = item.cidade;
       document.getElementById('sacDescricao').value = item.descricao;
-      document.getElementById('sacProduto').value = item.produto || 'Café';
+      document.getElementById('sacProduto').value = item.produto || '';
       document.getElementById('sacDataTransacao').value = item.dataTransacao || '';
       document.getElementById('sacHoraTransacao').value = item.horaTransacao || '';
       
@@ -1121,7 +1151,7 @@ html_code = f"""
         return;
       }}
 
-      mostrarAcaoEmAndamento('Excluindo Chamado...', 'Removendo a ocorrência ' + numeroChamado + ' da planilha Chamados.');
+      abrirModalLoading('Excluindo Chamado...', 'Removendo a ocorrência ' + numeroChamado + ' da planilha Chamados.');
 
       const item = listaChamadosSAC.find(c => c.chamado === numeroChamado);
 
@@ -1143,7 +1173,7 @@ html_code = f"""
         limparFormSAC();
       }}
 
-      setTimeout(ocultarAcaoEmAndamento, 1500);
+      setTimeout(fecharModalLoading, 800);
     }}
 
     function filtrarChamadosSAC() {{
@@ -1213,6 +1243,7 @@ html_code = f"""
         chamado = calcularPreviaProximoChamado(anoAtual);
       }}
 
+      // Validação de duplicidade
       const chamadoExiste = listaChamadosSAC.some(c => c.chamado.toUpperCase() === chamado.toUpperCase());
       if (!ehEdicao && chamadoExiste) {{
         alert('⛔ Chamado Duplicado! O número "' + chamado + '" já existe.');
@@ -1220,10 +1251,10 @@ html_code = f"""
         return;
       }}
 
-      // MENSAGEM VISUAL DE AÇÃO EM ANDAMENTO PARA O ATENDENTE
-      mostrarAcaoEmAndamento(
-        ehEdicao ? 'Atualizando Ocorrência...' : 'Lançando Ocorrência no SAC...',
-        ehEdicao ? 'Gravando alterações do chamado ' + chamado + ' na planilha.' : 'Registrando ' + chamado + ' e sincronizando base de dados.'
+      // ABRE O MODAL NA TELA INFORMANDO QUE A AÇÃO ESTÁ SENDO REALIZADA
+      abrirModalLoading(
+        ehEdicao ? 'Atualizando Ocorrência...' : 'Lançando no Sistema...',
+        ehEdicao ? 'Gravando alterações do chamado ' + chamado + ' na planilha Chamados.' : 'Registrando a ocorrência ' + chamado + ' na planilha oficial.'
       );
 
       const data = document.getElementById('sacData').value;
@@ -1270,10 +1301,10 @@ html_code = f"""
         "Data/Hora do lançamento": dataHoraLancamento
       }};
 
-      // Dispara envio em background
+      // 1. Envia em segundo plano
       enviarParaPlanilhaGarantido(payloadSAC);
 
-      // Atualiza a tabela na tela imediatamente
+      // 2. Atualiza a lista visual imediatamente
       const novoItem = {{
         linha: ehEdicao && chamadoEmEdicao.linha ? chamadoEmEdicao.linha : listaChamadosSAC.length + 2,
         chamado,
@@ -1309,13 +1340,13 @@ html_code = f"""
         dadosSAC.maior_sac_ano[ano] = Math.max(dadosSAC.maior_sac_ano[ano] || 0, seq);
       }}
 
-      // Limpa os campos do formulário imediatamente
+      // 3. Limpeza total do formulário
       limparFormSAC();
       renderizarTabelaChamadosSAC();
 
-      // Esconde o banner de carregamento e mostra sucesso
+      // 4. Fecha modal de loading após confirmação visual
       setTimeout(() => {{
-        ocultarAcaoEmAndamento();
+        fecharModalLoading();
         const alertBox = document.getElementById('alertSACSuccess');
         document.getElementById('alertSACSuccessTitle').innerText = ehEdicao ?
           '✅ Ocorrência ' + chamado + ' atualizada com sucesso!' :
@@ -1323,11 +1354,11 @@ html_code = f"""
         document.getElementById('alertSACSuccessSub').innerText = 'Cliente: ' + cliente + ' (' + localInterno + ') · Atendente: ' + atendente + ' · Valor: ' + formatCurrency(valor);
         alertBox.classList.remove('hidden');
         alertBox.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
-      }}, 500);
+      }}, 600);
     }}
 
     // =========================================================================
-    // DASHBOARD SAC (SUBSTITUTO DA ANTIGA RETIRADAS)
+    // DASHBOARD SAC
     // =========================================================================
     const filterSACCliente = document.getElementById('filterSACCliente');
     const filterSACProduto = document.getElementById('filterSACProduto');
@@ -1528,7 +1559,7 @@ html_code = f"""
     let abaInicial = 'dashboardSAC';
     try {{
       abaInicial = sessionStorage.getItem('aba_ativa_atual') || 'dashboardSAC';
-      if (abaInicial === 'dashboardRetiradas' || abaInicial === 'dashboard') {{
+      if (abaInicial !== 'dashboardSAC' && abaInicial !== 'sac') {{
         abaInicial = 'dashboardSAC';
       }}
     }} catch(e) {{}}
