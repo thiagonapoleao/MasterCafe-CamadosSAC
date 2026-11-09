@@ -414,15 +414,6 @@ html_code = f"""
 </head>
 <body class="bg-slate-100 min-h-screen">
 
-  <iframe name="target_post_frame" id="target_post_frame" style="display:none; width:0; height:0; border:0;"></iframe>
-  <form id="hiddenSubmissionForm" action="{APPS_SCRIPT_WEBAPP_URL}" method="POST" target="target_post_frame" style="display:none;">
-    <input type="hidden" name="data" id="hiddenSubmissionData">
-  </form>
-
-  <form id="hiddenSACSubmissionForm" action="{APPS_SCRIPT_SAC_WEBAPP_URL}" method="POST" target="target_post_frame" style="display:none;">
-    <input type="hidden" name="data" id="hiddenSACSubmissionData">
-  </form>
-
   <!-- Header Superior -->
   <header class="sticky top-0 z-40 bg-white/95 border-b border-slate-200 backdrop-blur-md px-6 py-3">
     <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
@@ -952,7 +943,7 @@ html_code = f"""
               <p id="alertSACSuccessSub" class="text-xs text-emerald-700">Gravado na aba Chamados da planilha oficial.</p>
             </div>
           </div>
-          <button type="button" onclick="document.getElementById('alertSACSuccess').classList.add('hidden')" class="px-3 py-2 rounded-xl hover:bg-emerald-100 text-xs font-semibold text-emerald-800 transition">
+          <button type="button" onclick="document.getElementById('alertSACSuccess').classList.add('hidden')" class="px-3 py-2 rounded-xl hover:bg-emerald-100 text-xs font-semibold text-emerald-800 transition cursor-pointer">
             Fechar
           </button>
         </div>
@@ -1186,27 +1177,29 @@ html_code = f"""
       atendenteSACLogado = sessionStorage.getItem('sac_atendente_conectado') || "";
     }} catch(e) {{}}
 
-    // ENVIO RÁPIDO E NÃO-BLOQUEANTE (Fire and Forget)
+    // ENVIO DESACOPLADO E INSTANTÂNEO (Não congela o navegador nem o Streamlit)
     function enviarParaPlanilhaGarantido(payload, isSAC = false) {{
       const endpoint = isSAC ? APPS_SCRIPT_SAC_URL : APPS_SCRIPT_URL;
+      const strData = JSON.stringify(payload);
 
+      // 1. Tenta envio por Beacon nativo
+      if (navigator.sendBeacon) {{
+        try {{
+          const blob = new Blob([strData], {{ type: 'text/plain;charset=utf-8' }});
+          navigator.sendBeacon(endpoint, blob);
+          return Promise.resolve(true);
+        }} catch (err) {{}}
+      }}
+
+      // 2. Disparo assíncrono via fetch desacoplado
       try {{
         fetch(endpoint, {{
           method: "POST",
           mode: "no-cors",
           headers: {{ "Content-Type": "text/plain;charset=utf-8" }},
-          body: JSON.stringify(payload)
+          body: strData
         }}).catch(() => {{}});
-      }} catch (e) {{}}
-
-      try {{
-        const form = document.getElementById(isSAC ? 'hiddenSACSubmissionForm' : 'hiddenSubmissionForm');
-        const input = document.getElementById(isSAC ? 'hiddenSACSubmissionData' : 'hiddenSubmissionData');
-        if (form && input) {{
-          input.value = JSON.stringify(payload);
-          form.submit();
-        }}
-      }} catch (e) {{}}
+      }} catch (err) {{}}
 
       return Promise.resolve(true);
     }}
@@ -1263,7 +1256,7 @@ html_code = f"""
     }}
 
     // =========================================================================
-    // ROTINAS SAC COM GERAÇÃO CONCORRENTE SEM DUPLICIDADE
+    // ROTINAS SAC
     // =========================================================================
     function verificarSessaoSAC() {{
       const authScreen = document.getElementById('sacAuthScreen');
@@ -1317,7 +1310,7 @@ html_code = f"""
         if (c.chamado) {{
           const m = c.chamado.match(new RegExp('SAC-' + ano + '-(\\\\d+)', 'i'));
           if (m) {{
-            const seq = parseInt(m[1]);
+            const seq = parseInt(m[1], 10);
             if (seq > maior) maior = seq;
           }}
         }}
@@ -1333,6 +1326,7 @@ html_code = f"""
       document.getElementById('sacChamado').value = calcularPreviaProximoChamado(anoAtual);
       document.getElementById('sacData').value = new Date().toISOString().split('T')[0];
       
+      // Limpeza forçada de todos os inputs
       document.getElementById('sacDataTransacao').value = "";
       document.getElementById('sacHoraTransacao').value = "";
       document.getElementById('sacReembolso').value = "";
@@ -1430,12 +1424,35 @@ html_code = f"""
 
     function limparFormSAC() {{
       chamadoEmEdicao = null;
+      
+      // Reseta form
       document.getElementById('sacForm').reset();
+      
+      // Força limpeza dos campos que podem reter dados
+      document.getElementById('sacLocalInterno').innerHTML = '<option value="">Selecione primeiro o Cliente...</option>';
+      document.getElementById('sacCidade').value = "";
+      document.getElementById('sacDataTransacao').value = "";
+      document.getElementById('sacHoraTransacao').value = "";
+      document.getElementById('sacReembolso').value = "";
+      document.getElementById('sacPix').value = "";
+      document.getElementById('sacValor').value = "";
+      document.getElementById('sacNome').value = "";
+      document.getElementById('sacCelular').value = "";
+      document.getElementById('sacProblema').value = "";
+      document.getElementById('sacDescricao').value = "";
+      document.getElementById('sacFormaPgto').value = "";
+      document.getElementById('sacCliente').value = "";
+
       document.getElementById('alertSACEditMode').classList.add('hidden');
       document.getElementById('sacFormTitleText').innerText = "Lançamento de Ocorrências do SAC";
       document.getElementById('btnSalvarSACText').innerText = "Lançar Ocorrência SAC";
-      inicializarFormularioSAC();
+      
+      // Gera nova numeração automática atualizada
+      const anoAtual = new Date().getFullYear();
+      document.getElementById('sacChamado').value = calcularPreviaProximoChamado(anoAtual);
+      document.getElementById('sacData').value = new Date().toISOString().split('T')[0];
       document.getElementById('sacAtendente').value = atendenteSACLogado;
+
       lucide.createIcons();
     }}
 
@@ -1478,7 +1495,7 @@ html_code = f"""
       limparFormSAC();
     }}
 
-    async function excluirChamadoSAC(numeroChamado) {{
+    function excluirChamadoSAC(numeroChamado) {{
       if (!confirm('Deseja realmente excluir o chamado ' + numeroChamado + '? Esta ação solicitará a remoção na planilha.')) {{
         return;
       }}
@@ -1494,8 +1511,10 @@ html_code = f"""
         "linha": item && item.linha ? item.linha : ""
       }};
 
+      // Disparo em background
       enviarParaPlanilhaGarantido(payloadExcluir, true);
 
+      // Remoção instantânea da lista visual
       listaChamadosSAC = listaChamadosSAC.filter(c => c.chamado !== numeroChamado);
       renderizarTabelaChamadosSAC();
 
@@ -1560,18 +1579,24 @@ html_code = f"""
       lucide.createIcons();
     }}
 
-    let enviandoSAC = false;
-    async function handleSACSubmit(e) {{
+    function handleSACSubmit(e) {{
       e.preventDefault();
-      if (enviandoSAC) return;
 
       const ehEdicao = (chamadoEmEdicao !== null);
       let chamado = document.getElementById('sacChamado').value.trim();
       const anoAtual = new Date().getFullYear();
 
-      // Se for novo, recalcula a melhor prévia no instante do envio antes de gravar
+      // Recalcula número se for novo chamado
       if (!ehEdicao) {{
         chamado = calcularPreviaProximoChamado(anoAtual);
+      }}
+
+      // Validação de duplicidade
+      const chamadoExiste = listaChamadosSAC.some(c => c.chamado.toUpperCase() === chamado.toUpperCase());
+      if (!ehEdicao && chamadoExiste) {{
+        alert('⛔ Chamado Duplicado! O número "' + chamado + '" já existe.');
+        document.getElementById('sacChamado').value = calcularPreviaProximoChamado(anoAtual);
+        return;
       }}
 
       const data = document.getElementById('sacData').value;
@@ -1593,10 +1618,6 @@ html_code = f"""
       
       const agora = new Date();
       const dataHoraLancamento = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR');
-
-      enviandoSAC = true;
-      const btn = document.getElementById('btnSalvarSAC');
-      btn.disabled = true;
 
       const payloadSAC = {{
         "acao": ehEdicao ? "editar" : "inserir",
@@ -1622,9 +1643,10 @@ html_code = f"""
         "Data/Hora do lançamento": dataHoraLancamento
       }};
 
-      // Dispara envio atômico
+      // 1. Dispara o envio desacoplado sem travar o navegador
       enviarParaPlanilhaGarantido(payloadSAC, true);
 
+      // 2. Atualiza a lista visual imediatamente
       const novoItem = {{
         linha: ehEdicao && chamadoEmEdicao.linha ? chamadoEmEdicao.linha : listaChamadosSAC.length + 2,
         chamado,
@@ -1656,17 +1678,15 @@ html_code = f"""
       const m = chamado.match(/SAC-(\d{{4}})-(\d+)/i);
       if (m) {{
         const ano = m[1];
-        const seq = parseInt(m[2]);
+        const seq = parseInt(m[2], 10);
         dadosSAC.maior_sac_ano[ano] = Math.max(dadosSAC.maior_sac_ano[ano] || 0, seq);
       }}
 
-      // Limpeza imediata do formulário
+      // 3. Limpeza instantânea do formulário e re-renderização da tabela
       limparFormSAC();
       renderizarTabelaChamadosSAC();
 
-      enviandoSAC = false;
-      btn.disabled = false;
-
+      // 4. Exibe banner de sucesso
       const alertBox = document.getElementById('alertSACSuccess');
       document.getElementById('alertSACSuccessTitle').innerText = ehEdicao ?
         '✅ Ocorrência ' + chamado + ' atualizada com sucesso!' :
@@ -1674,12 +1694,565 @@ html_code = f"""
       document.getElementById('alertSACSuccessSub').innerText = 'Cliente: ' + cliente + ' (' + localInterno + ') · Atendente: ' + atendente + ' · Valor: ' + formatCurrency(valor);
       alertBox.classList.remove('hidden');
       alertBox.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
-      lucide.createIcons();
     }}
 
     // =========================================================================
-    // INICIALIZAÇÃO DA ABA ATIVA
+    // DASHBOARD RETIRADAS
     // =========================================================================
+    const filterRetTecnico = document.getElementById('filterRetiradaTecnico');
+    const filterRetDevolvida = document.getElementById('filterRetiradaDevolvida');
+    const filterRetCondicao = document.getElementById('filterRetiradaCondicao');
+
+    function getHorizontalRetiradaBarOptions() {{
+      const textColor = '#475569';
+      const gridColor = 'rgba(226, 232, 240, 0.7)';
+      return {{
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {{ padding: {{ right: 40, left: 10, top: 10, bottom: 10 }} }},
+        plugins: {{
+          legend: {{ display: false }},
+          tooltip: {{
+            backgroundColor: '#ffffff',
+            titleColor: '#0f172a',
+            bodyColor: '#334155',
+            borderColor: '#e2e8f0',
+            borderWidth: 1,
+            padding: 10,
+            callbacks: {{
+              label: (context) => 'Quantidade: ' + context.raw.toLocaleString('pt-BR') + ' un'
+            }}
+          }},
+          datalabels: {{
+            anchor: 'end',
+            align: 'right',
+            offset: 4,
+            color: '#0f172a',
+            font: {{ family: 'Inter', weight: 'bold', size: 10 }},
+            formatter: (v) => v ? v.toLocaleString('pt-BR') : ''
+          }}
+        }},
+        scales: {{
+          x: {{
+            grid: {{ color: gridColor }},
+            ticks: {{ color: textColor, font: {{ size: 10 }} }},
+            beginAtZero: true
+          }},
+          y: {{
+            grid: {{ display: false }},
+            ticks: {{ color: textColor, font: {{ size: 10, weight: '600' }} }}
+          }}
+        }}
+      }};
+    }}
+
+    const chartTopPecasRetiradas = new Chart(document.getElementById('chartTopPecasRetiradas').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(217, 119, 6, 0.85)', borderRadius: 6 }}] }},
+      options: getHorizontalRetiradaBarOptions()
+    }});
+
+    const chartRetiradasPorTecnico = new Chart(document.getElementById('chartRetiradasPorTecnico').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(2, 132, 199, 0.85)', borderRadius: 6 }}] }},
+      options: getHorizontalRetiradaBarOptions()
+    }});
+
+    function inicializarFiltrosRetiradas() {{
+      const tecnicosUnicos = [...new Set(rawRetiradasData.map(r => r.tecnico).filter(Boolean))].sort();
+      filterRetTecnico.innerHTML = '<option value="ALL">Todos os Técnicos</option>';
+      tecnicosUnicos.forEach(t => {{
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        filterRetTecnico.appendChild(opt);
+      }});
+    }}
+    inicializarFiltrosRetiradas();
+
+    function atualizarDashboardRetiradas() {{
+      const tecVal = filterRetTecnico.value;
+      const devVal = filterRetDevolvida.value;
+      const condVal = filterRetCondicao.value;
+      const searchVal = (document.getElementById('searchRetiradasGeral')?.value || '').trim().toLowerCase();
+
+      const filtrados = rawRetiradasData.filter(item => {{
+        const matchTec = (tecVal === 'ALL' || item.tecnico === tecVal);
+        const matchDev = (devVal === 'ALL' || item.devolvida.toLowerCase() === devVal.toLowerCase());
+        const matchCond = (condVal === 'ALL' || item.novaUsada.toLowerCase() === condVal.toLowerCase());
+        const matchSearch = !searchVal || (
+          (item.tecnico && item.tecnico.toLowerCase().includes(searchVal)) ||
+          (item.os && item.os.toLowerCase().includes(searchVal)) ||
+          (item.cliente && item.cliente.toLowerCase().includes(searchVal)) ||
+          (item.codigo && item.codigo.toLowerCase().includes(searchVal)) ||
+          (item.descricao && item.descricao.toLowerCase().includes(searchVal))
+        );
+        return matchTec && matchDev && matchCond && matchSearch;
+      }});
+
+      document.getElementById('badgeFiltroRetirada').innerText = 'Filtrando: Técnico [' + tecVal + '] · Status [' + devVal + '] · Condição [' + condVal + ']';
+
+      const totalRegistrosRetirada = filtrados.length;
+      let totalPecas = 0;
+      let naoDevolvidas = 0;
+      let devolvidas = 0;
+      let instalacoes = 0;
+
+      filtrados.forEach(r => {{
+        const q = parseInt(r.quantidade, 10) || 1;
+        totalPecas += q;
+        const stLower = (r.devolvida || '').toLowerCase();
+        if (stLower === 'não' || stLower === 'nao') naoDevolvidas += q;
+        else if (stLower === 'sim') devolvidas += q;
+        else if (stLower.includes('instalação') || stLower.includes('instalacao')) instalacoes += q;
+      }});
+
+      const pctNaoDevolvidas = totalPecas > 0 ? Math.round((naoDevolvidas / totalPecas) * 100) : 0;
+      const pctDevolvidas = totalPecas > 0 ? Math.round((devolvidas / totalPecas) * 100) : 0;
+
+      document.getElementById('kpiRetiradaTotal').innerText = totalRegistrosRetirada.toLocaleString('pt-BR');
+      document.getElementById('kpiRetiradaTotalSub').innerText = 'Total: ' + totalPecas.toLocaleString('pt-BR') + ' peças retiradas';
+
+      document.getElementById('kpiRetiradaNaoDevolvidas').innerText = naoDevolvidas.toLocaleString('pt-BR') + ' un';
+      document.getElementById('kpiRetiradaNaoDevolvidasPct').innerText = pctNaoDevolvidas + '%';
+      document.getElementById('kpiRetiradaDevolvidas').innerText = devolvidas.toLocaleString('pt-BR') + ' un';
+      document.getElementById('kpiRetiradaDevolvidasPct').innerText = pctDevolvidas + '%';
+      document.getElementById('kpiRetiradaInstalacao').innerText = instalacoes.toLocaleString('pt-BR') + ' un';
+      document.getElementById('kpiRetiradaTecnicos').innerText = new Set(filtrados.map(r => r.tecnico)).size;
+      document.getElementById('kpiRetiradaClientes').innerText = new Set(filtrados.map(r => r.cliente)).size;
+
+      const pecasContagem = {{}};
+      filtrados.forEach(r => {{
+        const nome = (r.descricao || r.codigo || 'Peça').trim();
+        pecasContagem[nome] = (pecasContagem[nome] || 0) + (parseInt(r.quantidade, 10) || 1);
+      }});
+      const truncar = (t, max = 28) => t.length > max ? t.substring(0, max) + '...' : t;
+      const top10Pecas = Object.entries(pecasContagem).map(([nome, qt]) => ({{ nome, qt }})).sort((a,b) => b.qt - a.qt).slice(0, 10);
+      chartTopPecasRetiradas.data.labels = top10Pecas.map(p => truncar(p.nome));
+      chartTopPecasRetiradas.data.datasets[0].data = top10Pecas.map(p => p.qt);
+      chartTopPecasRetiradas.update();
+
+      const tecContagem = {{}};
+      filtrados.forEach(r => {{
+        const t = (r.tecnico || 'Indefinido').trim();
+        tecContagem[t] = (tecContagem[t] || 0) + (parseInt(r.quantidade, 10) || 1);
+      }});
+      const topTecnicos = Object.entries(tecContagem).map(([nome, qt]) => ({{ nome, qt }})).sort((a,b) => b.qt - a.qt).slice(0, 10);
+      chartRetiradasPorTecnico.data.labels = topTecnicos.map(t => truncar(t.nome));
+      chartRetiradasPorTecnico.data.datasets[0].data = topTecnicos.map(t => t.qt);
+      chartRetiradasPorTecnico.update();
+
+      const tbGeral = document.getElementById('tableRetiradasGeralBody');
+      if (filtrados.length === 0) {{
+        tbGeral.innerHTML = '<tr><td colspan="9" class="text-center py-6 text-slate-400 font-semibold">Nenhuma retirada encontrada.</td></tr>';
+      }} else {{
+        tbGeral.innerHTML = filtrados.map(item => {{
+          const dLower = (item.devolvida || '').toLowerCase();
+          let badgeClass = 'bg-rose-100 text-rose-800';
+          if (dLower === 'sim') badgeClass = 'bg-emerald-100 text-emerald-800';
+          else if (dLower.includes('instalação') || dLower.includes('instalacao')) badgeClass = 'bg-indigo-100 text-indigo-800';
+
+          return `
+            <tr class="hover:bg-slate-50 transition">
+              <td class="py-2.5 px-3">${{item.data}}</td>
+              <td class="py-2.5 px-3 font-semibold text-slate-800">${{item.tecnico}}</td>
+              <td class="py-2.5 px-3">${{item.cliente}}</td>
+              <td class="py-2.5 px-3 font-mono font-bold text-blue-700">${{item.os}}</td>
+              <td class="py-2.5 px-3 font-mono text-slate-600">${{item.codigo}}</td>
+              <td class="py-2.5 px-3 font-medium text-slate-800">${{item.descricao}}</td>
+              <td class="py-2.5 px-3 text-center"><span class="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-700 font-semibold">${{item.novaUsada}}</span></td>
+              <td class="py-2.5 px-3 text-center font-bold text-slate-800">${{item.quantidade}} un</td>
+              <td class="py-2.5 px-3 text-center"><span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${{badgeClass}}">${{item.devolvida}}</span></td>
+            </tr>
+          `;
+        }}).join('');
+      }}
+      lucide.createIcons();
+    }}
+
+    [filterRetTecnico, filterRetDevolvida, filterRetCondicao].forEach(el => el.addEventListener('change', atualizarDashboardRetiradas));
+    document.getElementById('btnLimparFiltrosRetirada').addEventListener('click', () => {{
+      filterRetTecnico.value = 'ALL';
+      filterRetDevolvida.value = 'ALL';
+      filterRetCondicao.value = 'ALL';
+      document.getElementById('searchRetiradasGeral').value = '';
+      atualizarDashboardRetiradas();
+    }});
+
+    // =========================================================================
+    // DASHBOARD SOLICITAÇÕES
+    // =========================================================================
+    function formatCurrency(val) {{
+      return (val || 0).toLocaleString('pt-BR', {{ style: 'currency', currency: 'BRL' }});
+    }}
+
+    const filterYear = document.getElementById('filterYear');
+    const filterMonth = document.getElementById('filterMonth');
+    const filterCategory = document.getElementById('filterCategory');
+    const filterRequester = document.getElementById('filterRequester');
+    const resetFiltersBtn = document.getElementById('resetFilters');
+    const activeFilterBadge = document.getElementById('activeFilterBadge');
+
+    const kpiTotalCost = document.getElementById('kpiTotalCost');
+    const kpiTotalRequests = document.getElementById('kpiTotalRequests');
+    const kpiItemsQty = document.getElementById('kpiItemsQty');
+    const kpiApprovedQty = document.getElementById('kpiApprovedQty');
+    const kpiApprovedPercent = document.getElementById('kpiApprovedPercent');
+    const kpiUnapprovedQty = document.getElementById('kpiUnapprovedQty');
+    const kpiUnapprovedPercent = document.getElementById('kpiUnapprovedPercent');
+    const kpiAvgCost = document.getElementById('kpiAvgCost');
+
+    const tableBody = document.getElementById('tableBody');
+    const tableSearch = document.getElementById('tableSearch');
+    const tableCountBadge = document.getElementById('tableCountBadge');
+
+    function populateDropdowns() {{
+      filterYear.innerHTML = '<option value="ALL">Todos os Anos</option>';
+      filterMonth.innerHTML = '<option value="ALL">Todos os Meses</option>';
+      filterCategory.innerHTML = '<option value="ALL">Todas as Categorias</option>';
+      filterRequester.innerHTML = '<option value="ALL">Todos os Solicitantes</option>';
+
+      const years = [...new Set(rawOrdersData.map(d => d.ano).filter(Boolean))].sort();
+      const months = [...new Set(rawOrdersData.map(d => d.mes).filter(Boolean))];
+      const categories = [...new Set(rawOrdersData.map(d => d.categoria).filter(Boolean))].sort();
+      const requesters = [...new Set(rawOrdersData.map(d => d.solicitante).filter(Boolean))].sort();
+
+      years.forEach(y => {{ const opt = document.createElement('option'); opt.value = y; opt.textContent = y; filterYear.appendChild(opt); }});
+      months.forEach(m => {{ const opt = document.createElement('option'); opt.value = m; opt.textContent = m; filterMonth.appendChild(opt); }});
+      categories.forEach(c => {{ const opt = document.createElement('option'); opt.value = c; opt.textContent = c; filterCategory.appendChild(opt); }});
+      requesters.forEach(r => {{ const opt = document.createElement('option'); opt.value = r; opt.textContent = r; filterRequester.appendChild(opt); }});
+    }}
+    populateDropdowns();
+
+    function getHorizontalBarOptions(isCurrency = false) {{
+      const textColor = '#475569';
+      const gridColor = 'rgba(226, 232, 240, 0.7)';
+      return {{
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {{ padding: {{ right: 40, left: 10, top: 10, bottom: 10 }} }},
+        plugins: {{
+          legend: {{ display: false }},
+          tooltip: {{
+            backgroundColor: '#ffffff',
+            titleColor: '#0f172a',
+            bodyColor: '#334155',
+            borderColor: '#e2e8f0',
+            borderWidth: 1,
+            padding: 10,
+            callbacks: {{
+              label: (context) => isCurrency ? 'Custo: ' + formatCurrency(context.raw) : 'Quantidade: ' + context.raw.toLocaleString('pt-BR') + ' un'
+            }}
+          }},
+          datalabels: {{
+            anchor: 'end',
+            align: 'right',
+            offset: 4,
+            color: '#0f172a',
+            font: {{ family: 'Inter', weight: 'bold', size: 10 }},
+            formatter: (v) => {{
+              if (!v) return '';
+              return isCurrency ? formatCurrency(v) : v.toLocaleString('pt-BR');
+            }}
+          }}
+        }},
+        scales: {{
+          x: {{
+            grid: {{ color: gridColor }},
+            ticks: {{ color: textColor, font: {{ size: 10 }} }},
+            beginAtZero: true
+          }},
+          y: {{
+            grid: {{ display: false }},
+            ticks: {{ color: textColor, font: {{ size: 10, weight: '600' }} }}
+          }}
+        }}
+      }};
+    }}
+
+    const chartPecasPorMesQt = new Chart(document.getElementById('chartPecasPorMesQt').getContext('2d'), {{
+      type: 'bar',
+      data: {{
+        labels: [],
+        datasets: [
+          {{ label: 'Qt Solicitada', data: [], backgroundColor: 'rgba(2, 132, 199, 0.85)', borderRadius: 6 }},
+          {{ label: 'Qt Atendida', data: [], backgroundColor: 'rgba(16, 185, 129, 0.85)', borderRadius: 6 }}
+        ]
+      }},
+      options: {{
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {{ padding: {{ top: 22, bottom: 6, left: 6, right: 6 }} }},
+        plugins: {{
+          legend: {{ display: true, position: 'top', labels: {{ font: {{ family: 'Inter', size: 11, weight: '600' }}, color: '#334155', boxWidth: 12 }} }},
+          datalabels: {{
+            anchor: 'end',
+            align: 'top',
+            offset: 2,
+            color: '#0f172a',
+            font: {{ family: 'Inter', weight: 'bold', size: 10 }},
+            formatter: (v) => v ? v.toLocaleString('pt-BR') : ''
+          }}
+        }},
+        scales: {{
+          x: {{ grid: {{ color: 'rgba(226, 232, 240, 0.8)' }}, ticks: {{ color: '#64748b', font: {{ size: 10 }} }} }},
+          y: {{ grid: {{ color: 'rgba(226, 232, 240, 0.8)' }}, ticks: {{ color: '#64748b', font: {{ size: 10 }} }}, beginAtZero: true }}
+        }}
+      }}
+    }});
+
+    const chartPecasPorMesValor = new Chart(document.getElementById('chartPecasPorMesValor').getContext('2d'), {{
+      type: 'bar',
+      data: {{
+        labels: [],
+        datasets: [{{ label: 'Valor Total (R$)', data: [], backgroundColor: 'rgba(16, 185, 129, 0.85)', borderRadius: 8 }}]
+      }},
+      options: {{
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {{ padding: {{ top: 22, bottom: 6, left: 6, right: 6 }} }},
+        plugins: {{
+          legend: {{ display: false }},
+          datalabels: {{
+            anchor: 'end',
+            align: 'top',
+            offset: 2,
+            color: '#0f172a',
+            font: {{ family: 'Inter', weight: 'bold', size: 10 }},
+            formatter: (v) => v ? formatCurrency(v) : ''
+          }}
+        }},
+        scales: {{
+          x: {{ grid: {{ color: 'rgba(226, 232, 240, 0.8)' }}, ticks: {{ color: '#64748b', font: {{ size: 10 }} }} }},
+          y: {{ grid: {{ color: 'rgba(226, 232, 240, 0.8)' }}, ticks: {{ color: '#64748b', font: {{ size: 10 }} }}, beginAtZero: true }}
+        }}
+      }}
+    }});
+
+    const chartTopPecasQt = new Chart(document.getElementById('chartTopPecasQt').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(2, 132, 199, 0.85)', borderRadius: 6 }}] }},
+      options: getHorizontalBarOptions(false)
+    }});
+
+    const chartTopPecasCusto = new Chart(document.getElementById('chartTopPecasCusto').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(16, 185, 129, 0.85)', borderRadius: 6 }}] }},
+      options: getHorizontalBarOptions(true)
+    }});
+
+    const chartCategory = new Chart(document.getElementById('chartCategoryDist').getContext('2d'), {{
+      type: 'doughnut',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: ['#0284c7', '#06b6d4', '#f59e0b', '#6366f1', '#10b981'], borderWidth: 2, borderColor: '#ffffff' }}] }},
+      options: {{ responsive: true, maintainAspectRatio: false, cutout: '62%' }}
+    }});
+
+    const chartSupplier = new Chart(document.getElementById('chartSupplierCost').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(245, 158, 11, 0.85)', borderRadius: 8 }}] }},
+      options: {{
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {{ padding: {{ top: 22, bottom: 6, left: 6, right: 6 }} }},
+        plugins: {{
+          legend: {{ display: false }},
+          datalabels: {{
+            anchor: 'end',
+            align: 'top',
+            offset: 2,
+            color: '#0f172a',
+            font: {{ family: 'Inter', weight: 'bold', size: 11 }},
+            formatter: (v) => v ? formatCurrency(v) : ''
+          }}
+        }},
+        scales: {{
+          x: {{ grid: {{ color: 'rgba(226, 232, 240, 0.8)' }}, ticks: {{ color: '#64748b', font: {{ size: 10 }} }} }},
+          y: {{ grid: {{ color: 'rgba(226, 232, 240, 0.8)' }}, ticks: {{ color: '#64748b', font: {{ size: 10 }} }}, beginAtZero: true }}
+        }}
+      }}
+    }});
+
+    function normalizarMes(item) {{
+      if (item.mes && item.mes.trim()) return item.mes.trim();
+      if (item.data) {{
+        const partes = item.data.split(/[-/]/);
+        if (partes.length >= 2) {{
+          let m = parseInt(partes[1], 10);
+          const nomes = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+          if (!isNaN(m) && m >= 1 && m <= 12) return nomes[m - 1];
+        }}
+      }}
+      return "Outros";
+    }}
+
+    function updateDashboard() {{
+      const yearVal = filterYear.value;
+      const monthVal = filterMonth.value;
+      const catVal = filterCategory.value;
+      const reqVal = filterRequester.value;
+      const searchVal = tableSearch.value.trim().toLowerCase();
+
+      const filtered = rawOrdersData.filter(item => {{
+        const matchYear = (yearVal === 'ALL' || item.ano === yearVal);
+        const matchMonth = (monthVal === 'ALL' || item.mes === monthVal);
+        const matchCat = (catVal === 'ALL' || item.categoria === catVal);
+        const matchReq = (reqVal === 'ALL' || item.solicitante === reqVal);
+        return matchYear && matchMonth && matchCat && matchReq;
+      }});
+
+      activeFilterBadge.innerText = 'Filtrando: Ano [' + yearVal + '] · Mês [' + monthVal + '] · Categoria [' + catVal + ']';
+
+      const totalCusto = filtered.reduce((acc, cur) => acc + (cur.custoTotal || 0), 0);
+      const totalItens = filtered.reduce((acc, cur) => acc + (cur.qt || 0), 0);
+      const totalAtendidas = filtered.reduce((acc, cur) => acc + (cur.qtAprovada || 0), 0);
+      const totalNaoAtendidas = filtered.reduce((acc, cur) => acc + (cur.qtNaoAprovada || 0), 0);
+      
+      const ocsUnicas = new Set(filtered.map(f => f.oc)).size;
+      const avgCost = ocsUnicas > 0 ? (totalCusto / ocsUnicas) : 0;
+
+      const pctAtendidas = totalItens > 0 ? Math.round((totalAtendidas / totalItens) * 100) : 0;
+      const pctNaoAtendidas = totalItens > 0 ? (100 - pctAtendidas) : 0;
+
+      kpiTotalCost.innerText = formatCurrency(totalCusto);
+      kpiTotalRequests.innerText = ocsUnicas;
+      kpiItemsQty.innerText = totalItens.toLocaleString('pt-BR') + ' un';
+      kpiApprovedQty.innerText = totalAtendidas.toLocaleString('pt-BR') + ' un';
+      kpiApprovedPercent.innerText = pctAtendidas + '%';
+      kpiUnapprovedQty.innerText = totalNaoAtendidas.toLocaleString('pt-BR') + ' un';
+      kpiUnapprovedPercent.innerText = pctNaoAtendidas + '%';
+      kpiAvgCost.innerText = formatCurrency(avgCost);
+
+      const mesesOrdem = [
+        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+      ];
+      const dadosPorMes = {{}};
+      mesesOrdem.forEach(m => {{ dadosPorMes[m] = {{ qtTotal: 0, qtAtendida: 0, valorTotal: 0 }}; }});
+
+      filtered.forEach(item => {{
+        const m = normalizarMes(item);
+        if (!dadosPorMes[m]) dadosPorMes[m] = {{ qtTotal: 0, qtAtendida: 0, valorTotal: 0 }};
+        dadosPorMes[m].qtTotal += (item.qt || 0);
+        dadosPorMes[m].qtAtendida += (item.qtAprovada || 0);
+        dadosPorMes[m].valorTotal += (item.custoTotal || 0);
+      }});
+
+      let mesesAtivos = mesesOrdem.filter(m => (dadosPorMes[m].qtTotal > 0 || dadosPorMes[m].valorTotal > 0));
+      if (mesesAtivos.length === 0) mesesAtivos = mesesOrdem.slice(0, 6);
+
+      chartPecasPorMesQt.data.labels = mesesAtivos;
+      chartPecasPorMesQt.data.datasets[0].data = mesesAtivos.map(m => dadosPorMes[m].qtTotal);
+      chartPecasPorMesQt.data.datasets[1].data = mesesAtivos.map(m => dadosPorMes[m].qtAtendida);
+      chartPecasPorMesQt.update();
+
+      chartPecasPorMesValor.data.labels = mesesAtivos;
+      chartPecasPorMesValor.data.datasets[0].data = mesesAtivos.map(m => dadosPorMes[m].valorTotal);
+      chartPecasPorMesValor.update();
+
+      const pecasAgrupadas = {{}};
+      filtered.forEach(item => {{
+        const nomePeca = (item.peca || item.codigoPeca || 'Indefinida').trim();
+        if (!pecasAgrupadas[nomePeca]) pecasAgrupadas[nomePeca] = {{ qt: 0, custo: 0 }};
+        pecasAgrupadas[nomePeca].qt += (item.qt || 0);
+        pecasAgrupadas[nomePeca].custo += (item.custoTotal || 0);
+      }});
+
+      const listaAgrupada = Object.entries(pecasAgrupadas).map(([nome, vals]) => ({{ nome, qt: vals.qt, custo: vals.custo }}));
+      const truncarTexto = (txt, max = 28) => txt.length > max ? txt.substring(0, max) + '...' : txt;
+
+      const top10Qt = [...listaAgrupada].sort((a, b) => b.qt - a.qt).slice(0, 10);
+      chartTopPecasQt.data.labels = top10Qt.map(p => truncarTexto(p.nome));
+      chartTopPecasQt.data.datasets[0].data = top10Qt.map(p => p.qt);
+      chartTopPecasQt.update();
+
+      const top10Custo = [...listaAgrupada].sort((a, b) => b.custo - a.custo).slice(0, 10);
+      chartTopPecasCusto.data.labels = top10Custo.map(p => truncarTexto(p.nome));
+      chartTopPecasCusto.data.datasets[0].data = top10Custo.map(p => p.custo);
+      chartTopPecasCusto.update();
+
+      const catCounts = {{}};
+      filtered.forEach(d => {{ if(d.categoria) catCounts[d.categoria] = (catCounts[d.categoria] || 0) + (d.qt || 0); }});
+      chartCategory.data.labels = Object.keys(catCounts);
+      chartCategory.data.datasets[0].data = Object.values(catCounts);
+      chartCategory.update();
+
+      const supplierCosts = {{}};
+      filtered.forEach(d => {{ if(d.fornecedor) supplierCosts[d.fornecedor] = (supplierCosts[d.fornecedor] || 0) + (d.custoTotal || 0); }});
+      chartSupplier.data.labels = Object.keys(supplierCosts);
+      chartSupplier.data.datasets[0].data = Object.values(supplierCosts);
+      chartSupplier.update();
+
+      renderTable(filtered, searchVal);
+    }}
+
+    function renderTable(dataList, searchTerm) {{
+      const grouped = {{}};
+      dataList.forEach(item => {{
+        const key = item.codigoPeca || item.peca;
+        if (!grouped[key]) {{
+          grouped[key] = {{
+            codigoPeca: item.codigoPeca || '—',
+            peca: item.peca,
+            categoria: item.categoria,
+            qtTotal: 0,
+            qtAtendida: 0,
+            qtNaoAtendida: 0,
+            pedidosCount: 0,
+            custoTotal: 0
+          }};
+        }}
+        grouped[key].qtTotal += (item.qt || 0);
+        grouped[key].qtAtendida += (item.qtAprovada || 0);
+        grouped[key].qtNaoAtendida += (item.qtNaoAprovada || 0);
+        grouped[key].pedidosCount += 1;
+        grouped[key].custoTotal += (item.custoTotal || 0);
+      }});
+
+      let itemsArray = Object.values(grouped);
+      if (searchTerm) {{
+        itemsArray = itemsArray.filter(i => 
+          (i.peca && i.peca.toLowerCase().includes(searchTerm)) || 
+          (i.codigoPeca && i.codigoPeca.toLowerCase().includes(searchTerm)) || 
+          (i.categoria && i.categoria.toLowerCase().includes(searchTerm))
+        );
+      }}
+
+      itemsArray.sort((a, b) => b.custoTotal - a.custoTotal);
+      tableCountBadge.innerText = itemsArray.length + ' itens';
+
+      if (itemsArray.length === 0) {{
+        tableBody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400">Nenhuma peça encontrada.</td></tr>';
+        return;
+      }}
+
+      tableBody.innerHTML = itemsArray.map(item => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-3 px-4 font-mono font-semibold text-blue-600">${{item.codigoPeca}}</td>
+          <td class="py-3 px-4 font-semibold text-slate-800">${{item.peca}}</td>
+          <td class="py-3 px-4"><span class="inline-block px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700">${{item.categoria}}</span></td>
+          <td class="py-3 px-4 text-center font-bold text-slate-700">${{item.qtTotal.toLocaleString('pt-BR')}} un</td>
+          <td class="py-3 px-4 text-center font-semibold text-emerald-600">${{item.qtAtendida.toLocaleString('pt-BR')}} un</td>
+          <td class="py-3 px-4 text-center font-semibold text-rose-500">${{item.qtNaoAtendida.toLocaleString('pt-BR')}} un</td>
+          <td class="py-3 px-4 text-center text-slate-500">${{item.pedidosCount}}</td>
+          <td class="py-3 px-4 text-right font-bold text-amber-600">${{formatCurrency(item.custoTotal)}}</td>
+        </tr>
+      `).join('');
+    }}
+
+    [filterYear, filterMonth, filterCategory, filterRequester].forEach(select => select.addEventListener('change', updateDashboard));
+    tableSearch.addEventListener('input', updateDashboard);
+    resetFiltersBtn.addEventListener('click', () => {{
+      filterYear.value = 'ALL';
+      filterMonth.value = 'ALL';
+      filterCategory.value = 'ALL';
+      filterRequester.value = 'ALL';
+      tableSearch.value = '';
+      updateDashboard();
+    }});
+
+    // Inicialização da primeira aba
     let abaInicial = 'dashboardRetiradas';
     try {{
       abaInicial = sessionStorage.getItem('aba_ativa_atual') || 'dashboardRetiradas';
