@@ -202,6 +202,8 @@ def carregar_dados_sac():
             col_pix = get_col(["Pix - Reembolso", "Pix", "pix"])
             col_atend = get_col(["Atendente", "atendente"])
             col_dthr = get_col(["Data/Hora do lançamento", "Data/Hora", "dataHoraLancamento"])
+            # Coluna S - Reembolso Realizado
+            col_reemb_realizado = get_col(["Reembolso Realizado", "reembolsoRealizado", "Reembolso feito", "Reembolso Realizado?"]) or (cols[18] if len(cols) > 18 else "")
 
             for idx, r in df_ch.iterrows():
                 val = str(r[col_chamado]).strip() if col_chamado and pd.notna(r[col_chamado]) else ""
@@ -236,7 +238,8 @@ def carregar_dados_sac():
                     "reembolso": get_val(col_reemb),
                     "pix": get_val(col_pix),
                     "atendente": get_val(col_atend),
-                    "dataHoraLancamento": get_val(col_dthr)
+                    "dataHoraLancamento": get_val(col_dthr),
+                    "reembolsoRealizado": get_val(col_reemb_realizado) or "Não"
                 })
     except Exception:
         pass
@@ -757,6 +760,15 @@ html_code = f"""
                   <input type="text" id="sacPix" placeholder="Chave Pix (CPF, Celular, E-mail ou Aleatória)..." class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
 
+                <!-- NOVO CAMPO: Reembolso Realizado (Coluna S) -->
+                <div>
+                  <label class="block text-xs font-bold text-emerald-800 mb-1">Reembolso Realizado? *</label>
+                  <select id="sacReembolsoRealizado" required class="w-full text-sm font-bold rounded-xl border border-emerald-300 bg-white px-3 py-2 text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm">
+                    <option value="Não" selected>Não</option>
+                    <option value="Sim">Sim</option>
+                  </select>
+                </div>
+
                 <!-- Atendente (Coluna A) -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Atendente *</label>
@@ -764,7 +776,7 @@ html_code = f"""
                 </div>
 
                 <!-- Data/Hora Lançamento -->
-                <div>
+                <div class="md:col-span-2 lg:col-span-2">
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Data/Hora Lançamento</label>
                   <input type="text" id="sacDataHoraAuto" readonly value="Automático no Envio" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-slate-500 cursor-not-allowed">
                 </div>
@@ -818,13 +830,14 @@ html_code = f"""
                     <th class="py-2.5 px-3 text-right">Valor</th>
                     <th class="py-2.5 px-3">Nome Cliente</th>
                     <th class="py-2.5 px-3">Reembolso</th>
+                    <th class="py-2.5 px-3 text-center">Reemb. Pago?</th>
                     <th class="py-2.5 px-3">Atendente</th>
                     <th class="py-2.5 px-3 rounded-r-lg">Data Lançamento</th>
                   </tr>
                 </thead>
                 <tbody id="tableSACChamadosBody" class="divide-y divide-slate-100">
                   <tr>
-                    <td colspan="12" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado registrado ainda.</td>
+                    <td colspan="13" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado registrado ainda.</td>
                   </tr>
                 </tbody>
               </table>
@@ -846,7 +859,7 @@ html_code = f"""
                 <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
                   Todos os Chamados Abertos
                 </h2>
-                <p class="text-xs text-slate-500">Lista dedicada com edição direta no formulário oficial do SAC</p>
+                <p class="text-xs text-slate-500">Lista dedicada com status de reembolso e edição direta no formulário do SAC</p>
               </div>
             </div>
 
@@ -872,12 +885,13 @@ html_code = f"""
                   <th class="py-2.5 px-3">Nome do Cliente</th>
                   <th class="py-2.5 px-3">Reembolso</th>
                   <th class="py-2.5 px-3">Pix - Reembolso</th>
+                  <th class="py-2.5 px-3 text-center">Reemb. Pago?</th>
                   <th class="py-2.5 px-3 rounded-r-lg text-center w-24">Ações</th>
                 </tr>
               </thead>
               <tbody id="tableChamadosAbertosBody" class="divide-y divide-slate-100">
                 <tr>
-                  <td colspan="8" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado aberto encontrado.</td>
+                  <td colspan="9" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado aberto encontrado.</td>
                 </tr>
               </tbody>
             </table>
@@ -1470,6 +1484,7 @@ html_code = f"""
       document.getElementById('sacHoraTransacao').value = "";
       document.getElementById('sacReembolso').value = "";
       document.getElementById('sacPix').value = "";
+      document.getElementById('sacReembolsoRealizado').value = "Não";
       document.getElementById('sacValor').value = "";
       document.getElementById('sacNome').value = "";
       document.getElementById('sacCelular').value = "";
@@ -1573,6 +1588,7 @@ html_code = f"""
       document.getElementById('sacHoraTransacao').value = "";
       document.getElementById('sacReembolso').value = "";
       document.getElementById('sacPix').value = "";
+      document.getElementById('sacReembolsoRealizado').value = "Não";
       document.getElementById('sacValor').value = "";
       document.getElementById('sacNome').value = "";
       document.getElementById('sacCelular').value = "";
@@ -1620,6 +1636,10 @@ html_code = f"""
       document.getElementById('sacFormaPgto').value = item.formaPgto;
       document.getElementById('sacReembolso').value = item.reembolso || '';
       document.getElementById('sacPix').value = item.pix || '';
+      
+      // Carrega o campo Reembolso Realizado
+      var rReal = (item.reembolsoRealizado || 'Não').trim().toLowerCase();
+      document.getElementById('sacReembolsoRealizado').value = (rReal === 'sim' || rReal === 's') ? 'Sim' : 'Não';
       
       // Preserva e exibe o atendente e a data/hora originais
       document.getElementById('sacAtendente').value = item.atendente || atendenteSACLogado;
@@ -1704,7 +1724,8 @@ html_code = f"""
         (c.nomeSobrenome && c.nomeSobrenome.toLowerCase().includes(termo)) ||
         (c.localInterno && c.localInterno.toLowerCase().includes(termo)) ||
         (c.cidade && c.cidade.toLowerCase().includes(termo)) ||
-        (c.problemas && c.problemas.toLowerCase().includes(termo))
+        (c.problemas && c.problemas.toLowerCase().includes(termo)) ||
+        (c.reembolsoRealizado && c.reembolsoRealizado.toLowerCase().includes(termo))
       );
       renderizarTabelaChamadosSAC(filtrados);
     }}
@@ -1715,37 +1736,45 @@ html_code = f"""
       if (badge) badge.innerText = lista.length + ' chamado(s)';
 
       if (!lista || lista.length === 0) {{
-        tbody.innerHTML = '<tr><td colspan="12" class="text-center py-6 text-slate-400 font-semibold">Nenhuma ocorrência encontrada.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" class="text-center py-6 text-slate-400 font-semibold">Nenhuma ocorrência encontrada.</td></tr>';
         return;
       }}
 
-      tbody.innerHTML = lista.map(c => `
-        <tr class="hover:bg-slate-50 transition">
-          <td class="py-2 px-3 whitespace-nowrap">
-            <div class="flex items-center gap-1.5">
-              <button type="button" onclick="editarChamadoSAC('${{c.chamado}}', 'sac')" title="Editar chamado ${{c.chamado}}" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
-                <i data-lucide="edit-2" class="w-3 h-3"></i>
-                Editar
-              </button>
-              <button type="button" onclick="excluirChamadoSAC('${{c.chamado}}')" title="Excluir chamado ${{c.chamado}}" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition cursor-pointer">
-                <i data-lucide="trash-2" class="w-3 h-3"></i>
-                Excluir
-              </button>
-            </div>
-          </td>
-          <td class="py-2.5 px-3 font-mono font-bold text-sky-700">${{c.chamado}}</td>
-          <td class="py-2.5 px-3">${{c.data || '-'}}</td>
-          <td class="py-2.5 px-3 font-semibold text-slate-800">${{c.cliente || '-'}}</td>
-          <td class="py-2.5 px-3 text-slate-600">${{c.localInterno || '-'}}</td>
-          <td class="py-2.5 px-3 text-slate-600">${{c.cidade || '-'}}</td>
-          <td class="py-2.5 px-3 font-medium text-slate-700">${{c.produto || '-'}}</td>
-          <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
-          <td class="py-2.5 px-3 font-medium text-slate-800">${{c.nomeSobrenome || '-'}}</td>
-          <td class="py-2.5 px-3 text-sky-900 font-semibold">${{c.reembolso || '-'}}</td>
-          <td class="py-2.5 px-3 font-medium text-slate-600">${{c.atendente || '-'}}</td>
-          <td class="py-2.5 px-3 text-slate-400 text-[11px]">${{c.dataHoraLancamento || '-'}}</td>
-        </tr>
-      `).join('');
+      tbody.innerHTML = lista.map(c => {{
+        const pago = (c.reembolsoRealizado || 'Não').trim().toLowerCase() === 'sim';
+        const badgePago = pago 
+          ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Sim</span>'
+          : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Não</span>';
+
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-2 px-3 whitespace-nowrap">
+              <div class="flex items-center gap-1.5">
+                <button type="button" onclick="editarChamadoSAC('${{c.chamado}}', 'sac')" title="Editar chamado ${{c.chamado}}" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
+                  <i data-lucide="edit-2" class="w-3 h-3"></i>
+                  Editar
+                </button>
+                <button type="button" onclick="excluirChamadoSAC('${{c.chamado}}')" title="Excluir chamado ${{c.chamado}}" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition cursor-pointer">
+                  <i data-lucide="trash-2" class="w-3 h-3"></i>
+                  Excluir
+                </button>
+              </div>
+            </td>
+            <td class="py-2.5 px-3 font-mono font-bold text-sky-700">${{c.chamado}}</td>
+            <td class="py-2.5 px-3">${{c.data || '-'}}</td>
+            <td class="py-2.5 px-3 font-semibold text-slate-800">${{c.cliente || '-'}}</td>
+            <td class="py-2.5 px-3 text-slate-600">${{c.localInterno || '-'}}</td>
+            <td class="py-2.5 px-3 text-slate-600">${{c.cidade || '-'}}</td>
+            <td class="py-2.5 px-3 font-medium text-slate-700">${{c.produto || '-'}}</td>
+            <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
+            <td class="py-2.5 px-3 font-medium text-slate-800">${{c.nomeSobrenome || '-'}}</td>
+            <td class="py-2.5 px-3 text-sky-900 font-semibold">${{c.reembolso || '-'}}</td>
+            <td class="py-2.5 px-3 text-center">${{badgePago}}</td>
+            <td class="py-2.5 px-3 font-medium text-slate-600">${{c.atendente || '-'}}</td>
+            <td class="py-2.5 px-3 text-slate-400 text-[11px]">${{c.dataHoraLancamento || '-'}}</td>
+          </tr>
+        `;
+      }}).join('');
 
       lucide.createIcons();
     }}
@@ -1761,27 +1790,35 @@ html_code = f"""
       if (!tbody) return;
 
       if (!lista || lista.length === 0) {{
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado aberto encontrado.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado aberto encontrado.</td></tr>';
         return;
       }}
 
-      tbody.innerHTML = lista.map(c => `
-        <tr class="hover:bg-slate-50 transition">
-          <td class="py-2.5 px-3 font-mono font-bold text-sky-700">${{c.chamado}}</td>
-          <td class="py-2.5 px-3 text-slate-700">${{c.data || '-'}}</td>
-          <td class="py-2.5 px-3 font-semibold text-slate-800">${{c.cliente || '-'}}</td>
-          <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
-          <td class="py-2.5 px-3 font-medium text-slate-800">${{c.nomeSobrenome || '-'}}</td>
-          <td class="py-2.5 px-3 text-sky-900 font-semibold">${{c.reembolso || '-'}}</td>
-          <td class="py-2.5 px-3 font-mono text-slate-600">${{c.pix || '-'}}</td>
-          <td class="py-2.5 px-3 text-center whitespace-nowrap">
-            <button type="button" onclick="editarChamadoSAC('${{c.chamado}}', 'chamadosAbertos')" title="Editar chamado ${{c.chamado}}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
-              <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
-              Editar
-            </button>
-          </td>
-        </tr>
-      `).join('');
+      tbody.innerHTML = lista.map(c => {{
+        const pago = (c.reembolsoRealizado || 'Não').trim().toLowerCase() === 'sim';
+        const badgePago = pago 
+          ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Sim</span>'
+          : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Não</span>';
+
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-2.5 px-3 font-mono font-bold text-sky-700">${{c.chamado}}</td>
+            <td class="py-2.5 px-3 text-slate-700">${{c.data || '-'}}</td>
+            <td class="py-2.5 px-3 font-semibold text-slate-800">${{c.cliente || '-'}}</td>
+            <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
+            <td class="py-2.5 px-3 font-medium text-slate-800">${{c.nomeSobrenome || '-'}}</td>
+            <td class="py-2.5 px-3 text-sky-900 font-semibold">${{c.reembolso || '-'}}</td>
+            <td class="py-2.5 px-3 font-mono text-slate-600">${{c.pix || '-'}}</td>
+            <td class="py-2.5 px-3 text-center">${{badgePago}}</td>
+            <td class="py-2.5 px-3 text-center whitespace-nowrap">
+              <button type="button" onclick="editarChamadoSAC('${{c.chamado}}', 'chamadosAbertos')" title="Editar chamado ${{c.chamado}}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
+                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                Editar
+              </button>
+            </td>
+          </tr>
+        `;
+      }}).join('');
 
       lucide.createIcons();
     }}
@@ -1797,7 +1834,8 @@ html_code = f"""
         (c.cliente && c.cliente.toLowerCase().includes(termo)) ||
         (c.nomeSobrenome && c.nomeSobrenome.toLowerCase().includes(termo)) ||
         (c.reembolso && c.reembolso.toLowerCase().includes(termo)) ||
-        (c.pix && c.pix.toLowerCase().includes(termo))
+        (c.pix && c.pix.toLowerCase().includes(termo)) ||
+        (c.reembolsoRealizado && c.reembolsoRealizado.toLowerCase().includes(termo))
       );
       renderizarTabelaChamadosAbertos(filtrados);
     }}
@@ -1870,6 +1908,7 @@ html_code = f"""
       const formaPgto = document.getElementById('sacFormaPgto').value.trim();
       const reembolso = converterParaPrimeirasMaiusculas(document.getElementById('sacReembolso').value.trim());
       const pix = document.getElementById('sacPix').value.trim();
+      const reembolsoRealizado = document.getElementById('sacReembolsoRealizado').value || "Não";
 
       // REGRA: Preserva atendente original e data/hora original se estiver em modo edição
       let atendente = "";
@@ -1905,7 +1944,8 @@ html_code = f"""
         "Reembolso": reembolso,
         "Pix - Reembolso": pix,
         "Atendente": atendente,
-        "Data/Hora do lançamento": dataHoraLancamento
+        "Data/Hora do lançamento": dataHoraLancamento,
+        "Reembolso Realizado": reembolsoRealizado
       }};
 
       enviarParaPlanilhaGarantido(payloadSAC);
@@ -1929,7 +1969,8 @@ html_code = f"""
         reembolso,
         pix,
         atendente,
-        dataHoraLancamento
+        dataHoraLancamento,
+        reembolsoRealizado
       }};
 
       if (ehEdicao) {{
