@@ -202,8 +202,14 @@ def carregar_dados_sac():
             col_pix = get_col(["Pix - Reembolso", "Pix", "pix"])
             col_atend = get_col(["Atendente", "atendente"])
             col_dthr = get_col(["Data/Hora do lançamento", "Data/Hora", "dataHoraLancamento"])
-            # Coluna S - Reembolso Realizado
-            col_reemb_realizado = get_col(["Reembolso Realizado", "reembolsoRealizado", "Reembolso feito", "Reembolso Realizado?"]) or (cols[18] if len(cols) > 18 else "")
+            
+            # Reconhecimento amplo da Coluna S (Reembolso Realizado / Reemb. Pago?)
+            col_reemb_realizado = get_col([
+                "Reembolso Realizado", "reembolsoRealizado", "Reembolso Realizado?", 
+                "Reemb. Pago?", "Reemb Pago", "Reembolso Pago", "Pago", "reembolso_realizado"
+            ])
+            if not col_reemb_realizado and len(cols) >= 19:
+                col_reemb_realizado = cols[18]
 
             for idx, r in df_ch.iterrows():
                 val = str(r[col_chamado]).strip() if col_chamado and pd.notna(r[col_chamado]) else ""
@@ -218,6 +224,10 @@ def carregar_dados_sac():
 
                 def get_val(col_name):
                     return str(r[col_name]).strip() if col_name and col_name in r and pd.notna(r[col_name]) else ""
+
+                val_reemb_real = get_val(col_reemb_realizado)
+                if not val_reemb_real:
+                    val_reemb_real = "Não"
 
                 chamados_salvos.append({
                     "linha": idx + 2,
@@ -239,7 +249,7 @@ def carregar_dados_sac():
                     "pix": get_val(col_pix),
                     "atendente": get_val(col_atend),
                     "dataHoraLancamento": get_val(col_dthr),
-                    "reembolsoRealizado": get_val(col_reemb_realizado) or "Não"
+                    "reembolsoRealizado": val_reemb_real
                 })
     except Exception:
         pass
@@ -1446,6 +1456,8 @@ html_code = f"""
         atualizarDashboardSAC();
       }} else if (page === 'chamadosAbertos') {{
         renderizarTabelaChamadosAbertos();
+      }} else if (page === 'sac') {{
+        renderizarTabelaChamadosSAC();
       }} else if (page === 'cadastroClientes') {{
         aplicarRegrasDeAcesso();
         renderizarTabelaClientes();
@@ -1741,7 +1753,8 @@ html_code = f"""
       }}
 
       tbody.innerHTML = lista.map(c => {{
-        const pago = (c.reembolsoRealizado || 'Não').trim().toLowerCase() === 'sim';
+        const rVal = (c.reembolsoRealizado || 'Não').toString().trim().toLowerCase();
+        const pago = (rVal === 'sim' || rVal === 's' || rVal === 'true');
         const badgePago = pago 
           ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Sim</span>'
           : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Não</span>';
@@ -1769,7 +1782,7 @@ html_code = f"""
             <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
             <td class="py-2.5 px-3 font-medium text-slate-800">${{c.nomeSobrenome || '-'}}</td>
             <td class="py-2.5 px-3 text-sky-900 font-semibold">${{c.reembolso || '-'}}</td>
-            <td class="py-2.5 px-3 text-center">${{badgePago}}</td>
+            <td class="py-2.5 px-3 text-center whitespace-nowrap">${{badgePago}}</td>
             <td class="py-2.5 px-3 font-medium text-slate-600">${{c.atendente || '-'}}</td>
             <td class="py-2.5 px-3 text-slate-400 text-[11px]">${{c.dataHoraLancamento || '-'}}</td>
           </tr>
@@ -1795,7 +1808,8 @@ html_code = f"""
       }}
 
       tbody.innerHTML = lista.map(c => {{
-        const pago = (c.reembolsoRealizado || 'Não').trim().toLowerCase() === 'sim';
+        const rVal = (c.reembolsoRealizado || 'Não').toString().trim().toLowerCase();
+        const pago = (rVal === 'sim' || rVal === 's' || rVal === 'true');
         const badgePago = pago 
           ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Sim</span>'
           : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Não</span>';
@@ -1809,7 +1823,7 @@ html_code = f"""
             <td class="py-2.5 px-3 font-medium text-slate-800">${{c.nomeSobrenome || '-'}}</td>
             <td class="py-2.5 px-3 text-sky-900 font-semibold">${{c.reembolso || '-'}}</td>
             <td class="py-2.5 px-3 font-mono text-slate-600">${{c.pix || '-'}}</td>
-            <td class="py-2.5 px-3 text-center">${{badgePago}}</td>
+            <td class="py-2.5 px-3 text-center whitespace-nowrap">${{badgePago}}</td>
             <td class="py-2.5 px-3 text-center whitespace-nowrap">
               <button type="button" onclick="editarChamadoSAC('${{c.chamado}}', 'chamadosAbertos')" title="Editar chamado ${{c.chamado}}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
                 <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
@@ -2007,7 +2021,7 @@ html_code = f"""
 
         exibirMensagemTopo(
           ehEdicao ? '✅ Ocorrência ' + chamado + ' atualizada com sucesso!' : '✅ Ocorrência ' + chamado + ' lançada com sucesso!',
-          'Cliente: ' + cliente + ' (' + localInterno + ') · Filial: ' + cidade + ' · Atendente Original: ' + atendente + ' · Valor: ' + formatCurrency(valor),
+          'Cliente: ' + cliente + ' (' + localInterno + ') · Filial: ' + cidade + ' · Reemb. Pago: ' + reembolsoRealizado + ' · Valor: ' + formatCurrency(valor),
           ehEdicao ? 'editar' : 'sucesso'
         );
 
