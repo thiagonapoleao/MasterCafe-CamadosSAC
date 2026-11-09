@@ -203,7 +203,7 @@ def carregar_dados_sac():
             col_atend = get_col(["Atendente", "atendente"])
             col_dthr = get_col(["Data/Hora do lançamento", "Data/Hora", "dataHoraLancamento"])
             
-            # Reconhecimento da Coluna S
+            # Reconhecimento amplo da Coluna S
             col_reemb_realizado = get_col([
                 "Reembolso Realizado", "reembolsoRealizado", "Reembolso Realizado?", 
                 "Reemb. Pago?", "Reemb Pago", "Reembolso Pago", "Pago", "reembolso_realizado"
@@ -310,12 +310,23 @@ html_code = f"""
       color: #64748b; 
       border: 1px solid #e2e8f0; 
     }}
-    /* Tabela compacta sem quebra de página */
-    .table-compact th, .table-compact td {{
-      padding-top: 0.375rem !important;
-      padding-bottom: 0.375rem !important;
-      padding-left: 0.4rem !important;
-      padding-right: 0.4rem !important;
+
+    /* TABELA COM LARGURA RIGOROSAMENTE FIXADA PARA NÃO TRANSBORDAR O CARD */
+    .table-fixed-layout {{
+      table-layout: fixed !important;
+      width: 100% !important;
+      border-collapse: collapse;
+    }}
+    .table-fixed-layout th, 
+    .table-fixed-layout td {{
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      white-space: nowrap !important;
+      padding-top: 0.35rem !important;
+      padding-bottom: 0.35rem !important;
+      padding-left: 0.25rem !important;
+      padding-right: 0.25rem !important;
+      font-size: 10.5px !important;
     }}
   </style>
 </head>
@@ -812,8 +823,8 @@ html_code = f"""
             </form>
           </section>
 
-          <!-- LISTA DE TODOS OS CHAMADOS REALIZADOS (COMPACTA) -->
-          <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <!-- LISTA DE TODOS OS CHAMADOS REALIZADOS (RIGOROSAMENTE ENQUADRADA NO CARD) -->
+          <section class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 overflow-hidden">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
               <div>
                 <h2 class="text-base font-bold flex items-center gap-2 text-slate-800">
@@ -833,23 +844,23 @@ html_code = f"""
               </div>
             </div>
 
-            <div class="w-full">
-              <table class="w-full text-left text-[11px] text-slate-600 table-compact">
-                <thead class="bg-slate-50 uppercase font-semibold text-slate-500 text-[10px]">
+            <div class="w-full overflow-hidden">
+              <table class="table-fixed-layout text-slate-600">
+                <thead class="bg-slate-50 uppercase font-bold text-slate-500 text-[10px]">
                   <tr>
-                    <th class="py-2 px-2 rounded-l-lg text-center w-16">Ações</th>
-                    <th class="py-2 px-2 font-mono">Chamado</th>
-                    <th class="py-2 px-2">Data</th>
-                    <th class="py-2 px-2">Cliente</th>
-                    <th class="py-2 px-2">Local</th>
-                    <th class="py-2 px-2">Filial</th>
-                    <th class="py-2 px-2">Produto</th>
-                    <th class="py-2 px-2 text-right">Valor</th>
-                    <th class="py-2 px-2">Nome Cliente</th>
-                    <th class="py-2 px-2">Reembolso</th>
-                    <th class="py-2 px-2 text-center">Reemb. Pago?</th>
-                    <th class="py-2 px-2">Atendente</th>
-                    <th class="py-2 px-2 rounded-r-lg">Data Lançamento</th>
+                    <th style="width: 5%;" class="rounded-l-lg text-center">Ações</th>
+                    <th style="width: 9%;" class="font-mono">Chamado</th>
+                    <th style="width: 7%;">Data</th>
+                    <th style="width: 12%;">Cliente</th>
+                    <th style="width: 10%;">Local</th>
+                    <th style="width: 9%;">Filial</th>
+                    <th style="width: 7%;">Produto</th>
+                    <th style="width: 8%;" class="text-right">Valor</th>
+                    <th style="width: 11%;">Nome Cliente</th>
+                    <th style="width: 8%;">Reembolso</th>
+                    <th style="width: 6%;" class="text-center">Pago?</th>
+                    <th style="width: 8%;">Atendente</th>
+                    <th style="width: 0%;" class="rounded-r-lg">Lançamento</th>
                   </tr>
                 </thead>
                 <tbody id="tableSACChamadosBody" class="divide-y divide-slate-100">
@@ -864,9 +875,9 @@ html_code = f"""
         </div>
       </div>
 
-      <!-- PÁGINA 3: TODOS OS CHAMADOS ABERTOS (ACESSO: ATENDENTE E GERAL - COMPACTA) -->
+      <!-- PÁGINA 3: TODOS OS CHAMADOS ABERTOS (ACESSO: ATENDENTE E GERAL - RIGOROSAMENTE ENQUADRADA NO CARD) -->
       <div id="pageChamadosAbertos" class="space-y-6 hidden">
-        <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <section class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 overflow-hidden">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
             <div class="flex items-center gap-3">
               <div class="p-2.5 bg-sky-600 text-white rounded-xl shadow-lg shadow-sky-500/20">
@@ -891,19 +902,19 @@ html_code = f"""
             </div>
           </div>
 
-          <div class="w-full">
-            <table class="w-full text-left text-[11px] text-slate-600 table-compact">
-              <thead class="bg-slate-50 uppercase font-semibold text-slate-500 text-[10px]">
+          <div class="w-full overflow-hidden">
+            <table class="table-fixed-layout text-slate-600">
+              <thead class="bg-slate-50 uppercase font-bold text-slate-500 text-[10px]">
                 <tr>
-                  <th class="py-2 px-2 rounded-l-lg font-mono">Chamado</th>
-                  <th class="py-2 px-2">Data</th>
-                  <th class="py-2 px-2">Cliente</th>
-                  <th class="py-2 px-2 text-right">Valor</th>
-                  <th class="py-2 px-2">Nome do Cliente</th>
-                  <th class="py-2 px-2">Reembolso</th>
-                  <th class="py-2 px-2">Pix - Reembolso</th>
-                  <th class="py-2 px-2 text-center">Reemb. Pago?</th>
-                  <th class="py-2 px-2 rounded-r-lg text-center w-12">Ação</th>
+                  <th style="width: 10%;" class="rounded-l-lg font-mono">Chamado</th>
+                  <th style="width: 8%;">Data</th>
+                  <th style="width: 15%;">Cliente</th>
+                  <th style="width: 9%;" class="text-right">Valor</th>
+                  <th style="width: 16%;">Nome do Cliente</th>
+                  <th style="width: 11%;">Reembolso</th>
+                  <th style="width: 16%;">Pix - Reembolso</th>
+                  <th style="width: 9%;" class="text-center">Pago?</th>
+                  <th style="width: 6%;" class="rounded-r-lg text-center">Ação</th>
                 </tr>
               </thead>
               <tbody id="tableChamadosAbertosBody" class="divide-y divide-slate-100">
@@ -916,7 +927,7 @@ html_code = f"""
         </section>
       </div>
 
-      <!-- PÁGINA 4: CADASTRO DE CLIENTES (ACESSO EXCLUSIVO: GERAL) -->
+      <!-- PÁGINA 4: CADASTRO DE CLIENTES (ACESSO EXCLUSIVO: GERAL - ENQUADRADA NO CARD) -->
       <div id="pageCadastroClientes" class="hidden space-y-6">
 
         <!-- BLOQUEIO DE SEGURANÇA PARA ATENDENTE SEM PERMISSÃO -->
@@ -1036,8 +1047,8 @@ html_code = f"""
             </form>
           </section>
 
-          <!-- LISTA DE CLIENTES CADASTRADOS -->
-          <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <!-- LISTA DE CLIENTES CADASTRADOS (RIGOROSAMENTE ENQUADRADA NO CARD) -->
+          <section class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 overflow-hidden">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
               <div>
                 <h2 class="text-base font-bold flex items-center gap-2 text-slate-800">
@@ -1057,17 +1068,17 @@ html_code = f"""
               </div>
             </div>
 
-            <div class="w-full">
-              <table class="w-full text-left text-[11px] text-slate-600 table-compact">
-                <thead class="bg-slate-50 uppercase font-semibold text-slate-500 text-[10px]">
+            <div class="w-full overflow-hidden">
+              <table class="table-fixed-layout text-slate-600">
+                <thead class="bg-slate-50 uppercase font-bold text-slate-500 text-[10px]">
                   <tr>
-                    <th class="py-2 px-2 rounded-l-lg w-16 text-center">Ações</th>
-                    <th class="py-2 px-2">Cliente</th>
-                    <th class="py-2 px-2">Local</th>
-                    <th class="py-2 px-2">Local interno</th>
-                    <th class="py-2 px-2">Máquina</th>
-                    <th class="py-2 px-2">Modelo de máquina</th>
-                    <th class="py-2 px-2 rounded-r-lg">Filial Responsavel</th>
+                    <th style="width: 7%;" class="rounded-l-lg text-center">Ações</th>
+                    <th style="width: 22%;">Cliente</th>
+                    <th style="width: 17%;">Local</th>
+                    <th style="width: 18%;">Local interno</th>
+                    <th style="width: 12%;">Máquina</th>
+                    <th style="width: 12%;">Modelo</th>
+                    <th style="width: 12%;" class="rounded-r-lg">Filial</th>
                   </tr>
                 </thead>
                 <tbody id="tableClientesBody" class="divide-y divide-slate-100">
@@ -1768,28 +1779,28 @@ html_code = f"""
 
         return `
           <tr class="hover:bg-slate-50 transition border-b border-slate-100">
-            <td class="py-1.5 px-2 text-center whitespace-nowrap">
+            <td class="text-center whitespace-nowrap">
               <div class="inline-flex items-center gap-1 justify-center">
-                <button type="button" onclick="editarChamadoSAC('${{c.chamado}}', 'sac')" title="Editar chamado ${{c.chamado}}" class="p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition cursor-pointer">
+                <button type="button" onclick="editarChamadoSAC('${{c.chamado}}', 'sac')" title="Editar chamado ${{c.chamado}}" class="p-1 rounded bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition cursor-pointer">
                   <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
                 </button>
-                <button type="button" onclick="excluirChamadoSAC('${{c.chamado}}')" title="Excluir chamado ${{c.chamado}}" class="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition cursor-pointer">
+                <button type="button" onclick="excluirChamadoSAC('${{c.chamado}}')" title="Excluir chamado ${{c.chamado}}" class="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition cursor-pointer">
                   <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 </button>
               </div>
             </td>
-            <td class="py-1.5 px-2 font-mono font-bold text-sky-700 whitespace-nowrap">${{c.chamado}}</td>
-            <td class="py-1.5 px-2 whitespace-nowrap">${{c.data || '-'}}</td>
-            <td class="py-1.5 px-2 font-semibold text-slate-800 max-w-[120px] truncate" title="${{c.cliente || ''}}">${{c.cliente || '-'}}</td>
-            <td class="py-1.5 px-2 text-slate-600 max-w-[100px] truncate" title="${{c.localInterno || ''}}">${{c.localInterno || '-'}}</td>
-            <td class="py-1.5 px-2 text-slate-600 max-w-[90px] truncate" title="${{c.cidade || ''}}">${{c.cidade || '-'}}</td>
-            <td class="py-1.5 px-2 font-medium text-slate-700 whitespace-nowrap">${{c.produto || '-'}}</td>
-            <td class="py-1.5 px-2 text-right font-bold text-emerald-700 whitespace-nowrap">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
-            <td class="py-1.5 px-2 font-medium text-slate-800 max-w-[120px] truncate" title="${{c.nomeSobrenome || ''}}">${{c.nomeSobrenome || '-'}}</td>
-            <td class="py-1.5 px-2 text-sky-900 font-semibold max-w-[90px] truncate" title="${{c.reembolso || ''}}">${{c.reembolso || '-'}}</td>
-            <td class="py-1.5 px-2 text-center whitespace-nowrap">${{badgePago}}</td>
-            <td class="py-1.5 px-2 font-medium text-slate-600 max-w-[90px] truncate" title="${{c.atendente || ''}}">${{c.atendente || '-'}}</td>
-            <td class="py-1.5 px-2 text-slate-400 text-[10px] whitespace-nowrap">${{c.dataHoraLancamento || '-'}}</td>
+            <td class="font-mono font-bold text-sky-700 truncate" title="${{c.chamado}}">${{c.chamado}}</td>
+            <td class="truncate" title="${{c.data || '-'}}">${{c.data || '-'}}</td>
+            <td class="font-semibold text-slate-800 truncate" title="${{c.cliente || ''}}">${{c.cliente || '-'}}</td>
+            <td class="text-slate-600 truncate" title="${{c.localInterno || ''}}">${{c.localInterno || '-'}}</td>
+            <td class="text-slate-600 truncate" title="${{c.cidade || ''}}">${{c.cidade || '-'}}</td>
+            <td class="font-medium text-slate-700 truncate" title="${{c.produto || '-'}}">${{c.produto || '-'}}</td>
+            <td class="text-right font-bold text-emerald-700 truncate" title="${{c.valor || ''}}">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
+            <td class="font-medium text-slate-800 truncate" title="${{c.nomeSobrenome || ''}}">${{c.nomeSobrenome || '-'}}</td>
+            <td class="text-sky-900 font-semibold truncate" title="${{c.reembolso || ''}}">${{c.reembolso || '-'}}</td>
+            <td class="text-center whitespace-nowrap">${{badgePago}}</td>
+            <td class="font-medium text-slate-600 truncate" title="${{c.atendente || ''}}">${{c.atendente || '-'}}</td>
+            <td class="text-slate-400 text-[10px] truncate" title="${{c.dataHoraLancamento || ''}}">${{c.dataHoraLancamento || '-'}}</td>
           </tr>
         `;
       }}).join('');
@@ -1821,16 +1832,16 @@ html_code = f"""
 
         return `
           <tr class="hover:bg-slate-50 transition border-b border-slate-100">
-            <td class="py-1.5 px-2 font-mono font-bold text-sky-700 whitespace-nowrap">${{c.chamado}}</td>
-            <td class="py-1.5 px-2 text-slate-700 whitespace-nowrap">${{c.data || '-'}}</td>
-            <td class="py-1.5 px-2 font-semibold text-slate-800 max-w-[150px] truncate" title="${{c.cliente || ''}}">${{c.cliente || '-'}}</td>
-            <td class="py-1.5 px-2 text-right font-bold text-emerald-700 whitespace-nowrap">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
-            <td class="py-1.5 px-2 font-medium text-slate-800 max-w-[160px] truncate" title="${{c.nomeSobrenome || ''}}">${{c.nomeSobrenome || '-'}}</td>
-            <td class="py-1.5 px-2 text-sky-900 font-semibold max-w-[110px] truncate" title="${{c.reembolso || ''}}">${{c.reembolso || '-'}}</td>
-            <td class="py-1.5 px-2 font-mono text-slate-600 max-w-[150px] truncate" title="${{c.pix || ''}}">${{c.pix || '-'}}</td>
-            <td class="py-1.5 px-2 text-center whitespace-nowrap">${{badgePago}}</td>
-            <td class="py-1.5 px-2 text-center whitespace-nowrap">
-              <button type="button" onclick="editarChamadoSAC('${{c.chamado}}', 'chamadosAbertos')" title="Editar chamado ${{c.chamado}}" class="p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition cursor-pointer inline-flex items-center justify-center">
+            <td class="font-mono font-bold text-sky-700 truncate" title="${{c.chamado}}">${{c.chamado}}</td>
+            <td class="text-slate-700 truncate" title="${{c.data || '-'}}">${{c.data || '-'}}</td>
+            <td class="font-semibold text-slate-800 truncate" title="${{c.cliente || ''}}">${{c.cliente || '-'}}</td>
+            <td class="text-right font-bold text-emerald-700 truncate" title="${{c.valor || ''}}">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
+            <td class="font-medium text-slate-800 truncate" title="${{c.nomeSobrenome || ''}}">${{c.nomeSobrenome || '-'}}</td>
+            <td class="text-sky-900 font-semibold truncate" title="${{c.reembolso || ''}}">${{c.reembolso || '-'}}</td>
+            <td class="font-mono text-slate-600 truncate" title="${{c.pix || ''}}">${{c.pix || '-'}}</td>
+            <td class="text-center whitespace-nowrap">${{badgePago}}</td>
+            <td class="text-center whitespace-nowrap">
+              <button type="button" onclick="editarChamadoSAC('${{c.chamado}}', 'chamadosAbertos')" title="Editar chamado ${{c.chamado}}" class="p-1 rounded bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition cursor-pointer inline-flex items-center justify-center">
                 <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
               </button>
             </td>
@@ -2004,7 +2015,6 @@ html_code = f"""
         dadosSAC.maior_sac_ano[ano] = Math.max(dadosSAC.maior_sac_ano[ano] || 0, seq);
       }}
 
-      // Memoriza para onde redirecionar antes de limpar o formulário
       const destinoAposSalvar = (ehEdicao && origemEdicaoSAC === 'chamadosAbertos') ? 'chamadosAbertos' : 'sac';
 
       limparFormSAC();
@@ -2166,22 +2176,22 @@ html_code = f"""
 
       tbody.innerHTML = lista.map((c, idx) => `
         <tr class="hover:bg-slate-50 transition border-b border-slate-100">
-          <td class="py-1.5 px-2 text-center whitespace-nowrap">
+          <td class="text-center whitespace-nowrap">
             <div class="inline-flex items-center gap-1 justify-center">
-              <button type="button" onclick="editarCliente(${{idx}})" title="Editar cadastro" class="p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition cursor-pointer">
+              <button type="button" onclick="editarCliente(${{idx}})" title="Editar cadastro" class="p-1 rounded bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition cursor-pointer">
                 <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
               </button>
-              <button type="button" onclick="excluirCliente(${{idx}})" title="Excluir cadastro" class="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition cursor-pointer">
+              <button type="button" onclick="excluirCliente(${{idx}})" title="Excluir cadastro" class="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition cursor-pointer">
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
               </button>
             </div>
           </td>
-          <td class="py-1.5 px-2 font-bold text-slate-800">${{c.cliente || '-'}}</td>
-          <td class="py-1.5 px-2 text-slate-600">${{c.local || '-'}}</td>
-          <td class="py-1.5 px-2 text-slate-700 font-medium">${{c.localInterno || '-'}}</td>
-          <td class="py-1.5 px-2 text-slate-600 font-mono">${{c.maquina || '-'}}</td>
-          <td class="py-1.5 px-2 text-slate-600">${{c.modeloMaquina || '-'}}</td>
-          <td class="py-1.5 px-2 font-semibold text-sky-800">${{c.filialResponsavel || '-'}}</td>
+          <td class="font-bold text-slate-800 truncate" title="${{c.cliente || ''}}">${{c.cliente || '-'}}</td>
+          <td class="text-slate-600 truncate" title="${{c.local || ''}}">${{c.local || '-'}}</td>
+          <td class="text-slate-700 font-medium truncate" title="${{c.localInterno || ''}}">${{c.localInterno || '-'}}</td>
+          <td class="text-slate-600 font-mono truncate" title="${{c.maquina || ''}}">${{c.maquina || '-'}}</td>
+          <td class="text-slate-600 truncate" title="${{c.modeloMaquina || ''}}">${{c.modeloMaquina || '-'}}</td>
+          <td class="font-semibold text-sky-800 truncate" title="${{c.filialResponsavel || ''}}">${{c.filialResponsavel || '-'}}</td>
         </tr>
       `).join('');
 
