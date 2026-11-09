@@ -614,64 +614,124 @@ html_code = f"""
           </div>
         </section>
 
-        <!-- NOVO: COMPARATIVO TOP 5 LOCAIS (MÊS ATUAL VS ANTERIOR) & CHAMADOS POR MÊS -->
+        <!-- SEPARADOS: TOP 5 LOCAIS NO MÊS ANTERIOR & TOP 5 LOCAIS NO MÊS ATUAL -->
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <!-- Comparativo Top 5 Locais Internos -->
+          <!-- Top 5 Locais Internos: Mês Anterior -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
               <div>
                 <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
-                  <i data-lucide="git-compare" class="w-4 h-4 text-indigo-600"></i>
-                  Top 5 Locais: Mês Atual vs. Anterior
+                  <i data-lucide="calendar-arrow-down" class="w-4 h-4 text-slate-600"></i>
+                  Top 5 Locais: Mês Anterior
                 </h3>
-                <p class="text-xs text-slate-400">Comparativo dinâmico de quantidade de chamados</p>
+                <p class="text-xs text-slate-400">Ranking dos 5 locais mais demandados no mês anterior</p>
               </div>
               <div class="flex items-center gap-2">
-                <label class="text-[11px] font-bold text-slate-500">Mês Ref:</label>
-                <input type="month" id="filterMesRefComparativo" onchange="atualizarGraficoComparativoLocais()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2 py-1 text-slate-700">
+                <label class="text-[11px] font-bold text-slate-500">Mês Anterior:</label>
+                <input type="month" id="filterMesLocaisAnterior" onchange="atualizarGraficoLocaisAnterior()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2 py-1 text-slate-700">
               </div>
             </div>
-            <div class="relative h-80"><canvas id="chartComparativoLocais"></canvas></div>
+            <div class="relative h-80"><canvas id="chartLocaisAnterior"></canvas></div>
           </div>
 
-          <!-- Chamados por Mês (Qtd e Valor) -->
+          <!-- Top 5 Locais Internos: Mês Atual -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
               <div>
                 <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
-                  <i data-lucide="calendar" class="w-4 h-4 text-sky-600"></i>
-                  Chamados por Mês (Qtd & Valores R$)
+                  <i data-lucide="calendar-check" class="w-4 h-4 text-indigo-600"></i>
+                  Top 5 Locais: Mês Atual
                 </h3>
-                <p class="text-xs text-slate-400">Volume mensal e total ressarcido</p>
+                <p class="text-xs text-slate-400">Ranking dos 5 locais mais demandados no mês atual</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="text-[11px] font-bold text-slate-500">Mês Atual:</label>
+                <input type="month" id="filterMesLocaisAtual" onchange="atualizarGraficoLocaisAtual()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2 py-1 text-slate-700">
+              </div>
+            </div>
+            <div class="relative h-80"><canvas id="chartLocaisAtual"></canvas></div>
+          </div>
+        </section>
+
+        <!-- SEPARADOS: CHAMADOS POR MÊS (QUANTIDADE) & CHAMADOS POR MÊS (VALORES R$) -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Quantidade de Chamados por Mês -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+              <div>
+                <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                  <i data-lucide="bar-chart" class="w-4 h-4 text-sky-600"></i>
+                  Chamados por Mês (Quantidade)
+                </h3>
+                <p class="text-xs text-slate-400">Total mensal de ocorrências registradas</p>
               </div>
               <div class="flex items-center gap-2">
                 <label class="text-[11px] font-bold text-slate-500">Ano:</label>
-                <select id="filterAnoMeses" onchange="atualizarGraficoChamadosPorMes()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1 text-slate-700 font-semibold"></select>
+                <select id="filterAnoMesesQtd" onchange="atualizarGraficoMesesQtd()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1 text-slate-700 font-semibold"></select>
               </div>
             </div>
-            <div class="relative h-80"><canvas id="chartChamadosPorMes"></canvas></div>
+            <div class="relative h-80"><canvas id="chartMesesQtd"></canvas></div>
+          </div>
+
+          <!-- Valores de Chamados por Mês (R$) -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+              <div>
+                <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                  <i data-lucide="badge-dollar-sign" class="w-4 h-4 text-emerald-600"></i>
+                  Valores Ressarcidos por Mês (R$)
+                </h3>
+                <p class="text-xs text-slate-400">Total financeiro mensal reembolsado</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="text-[11px] font-bold text-slate-500">Ano:</label>
+                <select id="filterAnoMesesVal" onchange="atualizarGraficoMesesVal()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1 text-slate-700 font-semibold"></select>
+              </div>
+            </div>
+            <div class="relative h-80"><canvas id="chartMesesVal"></canvas></div>
           </div>
         </section>
 
-        <!-- NOVO: CHAMADOS POR DIA (MÊS ATUAL) -->
-        <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
-            <div>
-              <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
-                <i data-lucide="activity" class="w-4 h-4 text-emerald-600"></i>
-                Chamados por Dia (Valores e Quantidade)
-              </h3>
-              <p class="text-xs text-slate-400">Distribuição diária com foco dinâmico no mês de referência</p>
+        <!-- SEPARADOS: CHAMADOS POR DIA (QUANTIDADE) & CHAMADOS POR DIA (VALORES R$) -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Quantidade de Chamados por Dia -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+              <div>
+                <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                  <i data-lucide="calendar-days" class="w-4 h-4 text-sky-600"></i>
+                  Chamados por Dia (Quantidade)
+                </h3>
+                <p class="text-xs text-slate-400">Evolução diária de atendimentos no mês</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="text-[11px] font-bold text-slate-500">Mês:</label>
+                <input type="month" id="filterMesDiasQtd" onchange="atualizarGraficoDiasQtd()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2 py-1 text-slate-700">
+              </div>
             </div>
-            <div class="flex items-center gap-2">
-              <label class="text-[11px] font-bold text-slate-500">Mês em Foco:</label>
-              <input type="month" id="filterMesDias" onchange="atualizarGraficoChamadosPorDia()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2 py-1 text-slate-700">
-            </div>
+            <div class="relative h-80"><canvas id="chartDiasQtd"></canvas></div>
           </div>
-          <div class="relative h-80"><canvas id="chartChamadosPorDia"></canvas></div>
+
+          <!-- Valores de Chamados por Dia (R$) -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+              <div>
+                <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                  <i data-lucide="trending-up" class="w-4 h-4 text-amber-600"></i>
+                  Valores por Dia (R$)
+                </h3>
+                <p class="text-xs text-slate-400">Soma diária de reembolsos no mês</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="text-[11px] font-bold text-slate-500">Mês:</label>
+                <input type="month" id="filterMesDiasVal" onchange="atualizarGraficoDiasVal()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2 py-1 text-slate-700">
+              </div>
+            </div>
+            <div class="relative h-80"><canvas id="chartDiasVal"></canvas></div>
+          </div>
         </section>
 
-        <!-- NOVO: TOP 10 LOCAIS NA SEMANA/PERÍODO & TOP 3 LOCAIS POR FILIAL -->
+        <!-- TOP 10 LOCAIS NA SEMANA/PERÍODO & TOP 3 LOCAIS POR FILIAL -->
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <!-- Top 10 Locais na Semana / Período -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
@@ -1476,7 +1536,9 @@ html_code = f"""
         }}
       }});
 
-      if (pages[page]) pages[page].classList.remove('hidden');
+      if (pages[page]) {{
+        pages[page].classList.remove('hidden');
+      }}
       if (buttons[page]) {{
         buttons[page].classList.add('active');
         buttons[page].classList.remove('inactive');
@@ -2102,27 +2164,32 @@ html_code = f"""
       options: getHorizontalSACBarOptions()
     }});
 
-    // 1. Gráfico Comparativo Top 5 Locais (Mês Atual vs. Anterior)
-    const chartComparativoLocais = new Chart(document.getElementById('chartComparativoLocais').getContext('2d'), {{
+    // 1. Gráficos Divididos de Top 5 Locais (Mês Anterior & Mês Atual)
+    const chartLocaisAnterior = new Chart(document.getElementById('chartLocaisAnterior').getContext('2d'), {{
       type: 'bar',
-      data: {{
-        labels: [],
-        datasets: [
-          {{ label: 'Mês Anterior', data: [], backgroundColor: 'rgba(148, 163, 184, 0.8)', borderRadius: 4 }},
-          {{ label: 'Mês Atual', data: [], backgroundColor: 'rgba(79, 70, 229, 0.85)', borderRadius: 4 }}
-        ]
-      }},
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(100, 116, 139, 0.85)', borderRadius: 6 }}] }},
+      options: getHorizontalSACBarOptions()
+    }});
+
+    const chartLocaisAtual = new Chart(document.getElementById('chartLocaisAtual').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(79, 70, 229, 0.85)', borderRadius: 6 }}] }},
+      options: getHorizontalSACBarOptions()
+    }});
+
+    // 2. Gráficos Divididos de Chamados por Mês (Qtd & Valores R$)
+    const chartMesesQtd = new Chart(document.getElementById('chartMesesQtd').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ label: 'Quantidade', data: [], backgroundColor: 'rgba(2, 132, 199, 0.85)', borderRadius: 6 }}] }},
       options: {{
         responsive: true,
         maintainAspectRatio: false,
         plugins: {{
-          legend: {{ display: true, position: 'top', labels: {{ font: {{ size: 10, weight: '600' }} }} }},
-          tooltip: {{
-            callbacks: {{ label: (c) => c.dataset.label + ': ' + c.raw.toLocaleString('pt-BR') + ' chamados' }}
-          }},
+          legend: {{ display: false }},
+          tooltip: {{ callbacks: {{ label: (c) => 'Chamados: ' + c.raw.toLocaleString('pt-BR') }} }},
           datalabels: {{
-            anchor: 'end', align: 'top', offset: 2, color: '#334155',
-            font: {{ family: 'Inter', weight: 'bold', size: 9 }},
+            anchor: 'end', align: 'top', offset: 2, color: '#0284c7',
+            font: {{ family: 'Inter', weight: 'bold', size: 10 }},
             formatter: (v) => v || ''
           }}
         }},
@@ -2133,68 +2200,81 @@ html_code = f"""
       }}
     }});
 
-    // 2. Gráfico Chamados por Mês (Qtd & Valores R$)
-    const chartChamadosPorMes = new Chart(document.getElementById('chartChamadosPorMes').getContext('2d'), {{
-      type: 'bar',
+    const chartMesesVal = new Chart(document.getElementById('chartMesesVal').getContext('2d'), {{
+      type: 'line',
       data: {{
         labels: [],
-        datasets: [
-          {{ type: 'bar', label: 'Qtd Chamados', data: [], backgroundColor: 'rgba(2, 132, 199, 0.8)', yAxisID: 'yQtd', borderRadius: 6 }},
-          {{ type: 'line', label: 'Valor (R$)', data: [], borderColor: 'rgba(16, 185, 129, 1)', backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 2.5, tension: 0.25, yAxisID: 'yVal', fill: false }}
-        ]
+        datasets: [{{
+          label: 'Valor Ressarcido',
+          data: [],
+          borderColor: 'rgba(16, 185, 129, 1)',
+          backgroundColor: 'rgba(16, 185, 129, 0.15)',
+          fill: true,
+          borderWidth: 2.5,
+          tension: 0.25,
+          pointRadius: 3.5
+        }}]
       }},
       options: {{
         responsive: true,
         maintainAspectRatio: false,
         plugins: {{
-          legend: {{ display: true, position: 'top', labels: {{ font: {{ size: 10, weight: '600' }} }} }},
-          tooltip: {{
-            callbacks: {{
-              label: (c) => c.datasetIndex === 0 
-                ? 'Quantidade: ' + c.raw.toLocaleString('pt-BR') 
-                : 'Valor Total: ' + formatCurrency(c.raw)
-            }}
-          }},
-          datalabels: {{
-            display: (ctx) => ctx.datasetIndex === 0,
-            anchor: 'end', align: 'top', offset: 2, color: '#0284c7',
-            font: {{ size: 9, weight: 'bold' }},
-            formatter: (v) => v || ''
-          }}
+          legend: {{ display: false }},
+          tooltip: {{ callbacks: {{ label: (c) => 'Ressarcido: ' + formatCurrency(c.raw) }} }},
+          datalabels: {{ display: false }}
         }},
         scales: {{
-          yQtd: {{ type: 'linear', position: 'left', beginAtZero: true, ticks: {{ font: {{ size: 9 }} }} }},
-          yVal: {{ type: 'linear', position: 'right', beginAtZero: true, grid: {{ drawOnChartArea: false }}, ticks: {{ font: {{ size: 9 }}, callback: (v) => 'R$' + v.toLocaleString('pt-BR') }} }}
+          x: {{ ticks: {{ font: {{ size: 10 }} }} }},
+          y: {{ beginAtZero: true, ticks: {{ font: {{ size: 10 }}, callback: (v) => 'R$ ' + v.toLocaleString('pt-BR') }} }}
         }}
       }}
     }});
 
-    // 3. Gráfico Chamados por Dia (Mês em Foco)
-    const chartChamadosPorDia = new Chart(document.getElementById('chartChamadosPorDia').getContext('2d'), {{
+    // 3. Gráficos Divididos de Chamados por Dia (Qtd & Valores R$)
+    const chartDiasQtd = new Chart(document.getElementById('chartDiasQtd').getContext('2d'), {{
       type: 'bar',
+      data: {{ labels: [], datasets: [{{ label: 'Quantidade', data: [], backgroundColor: 'rgba(14, 165, 233, 0.85)', borderRadius: 4 }}] }},
+      options: {{
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {{
+          legend: {{ display: false }},
+          tooltip: {{ callbacks: {{ label: (c) => 'Chamados: ' + c.raw }} }},
+          datalabels: {{ display: false }}
+        }},
+        scales: {{
+          x: {{ ticks: {{ font: {{ size: 9 }} }} }},
+          y: {{ beginAtZero: true, ticks: {{ font: {{ size: 9 }} }} }}
+        }}
+      }}
+    }});
+
+    const chartDiasVal = new Chart(document.getElementById('chartDiasVal').getContext('2d'), {{
+      type: 'line',
       data: {{
         labels: [],
-        datasets: [
-          {{ type: 'bar', label: 'Quantidade', data: [], backgroundColor: 'rgba(14, 165, 233, 0.75)', yAxisID: 'yQtd', borderRadius: 4 }},
-          {{ type: 'line', label: 'Valor (R$)', data: [], borderColor: 'rgba(245, 158, 11, 1)', borderWidth: 2, pointRadius: 2.5, yAxisID: 'yVal', fill: false }}
-        ]
+        datasets: [{{
+          label: 'Valor (R$)',
+          data: [],
+          borderColor: 'rgba(245, 158, 11, 1)',
+          backgroundColor: 'rgba(245, 158, 11, 0.15)',
+          fill: true,
+          borderWidth: 2,
+          pointRadius: 2.5,
+          tension: 0.2
+        }}]
       }},
       options: {{
         responsive: true,
         maintainAspectRatio: false,
         plugins: {{
-          legend: {{ display: true, position: 'top', labels: {{ font: {{ size: 10, weight: '600' }} }} }},
-          tooltip: {{
-            callbacks: {{
-              label: (c) => c.datasetIndex === 0 ? 'Qtd: ' + c.raw : 'Valor: ' + formatCurrency(c.raw)
-            }}
-          }},
+          legend: {{ display: false }},
+          tooltip: {{ callbacks: {{ label: (c) => 'Valor: ' + formatCurrency(c.raw) }} }},
           datalabels: {{ display: false }}
         }},
         scales: {{
           x: {{ ticks: {{ font: {{ size: 9 }} }} }},
-          yQtd: {{ type: 'linear', position: 'left', beginAtZero: true, ticks: {{ font: {{ size: 9 }} }} }},
-          yVal: {{ type: 'linear', position: 'right', beginAtZero: true, grid: {{ drawOnChartArea: false }}, ticks: {{ font: {{ size: 9 }}, callback: (v) => 'R$' + v }} }}
+          y: {{ beginAtZero: true, ticks: {{ font: {{ size: 9 }}, callback: (v) => 'R$' + v.toLocaleString('pt-BR') }} }}
         }}
       }}
     }});
@@ -2214,7 +2294,7 @@ html_code = f"""
     }});
 
     // =========================================================================
-    // ATUALIZAÇÃO DOS NOVOS GRÁFICOS DINÂMICOS
+    // ATUALIZAÇÃO DOS GRÁFICOS DINÂMICOS
     // =========================================================================
     function parseDateToYMD(dStr) {{
       if (!dStr) return '';
@@ -2228,83 +2308,76 @@ html_code = f"""
       return '';
     }}
 
-    function atualizarGraficoComparativoLocais() {{
-      const mesRefInput = document.getElementById('filterMesRefComparativo')?.value;
-      let anoRef, mesRef;
-      if (mesRefInput) {{
-        const parts = mesRefInput.split('-');
-        anoRef = parseInt(parts[0], 10);
-        mesRef = parseInt(parts[1], 10);
-      }} else {{
-        const hoje = new Date();
-        anoRef = hoje.getFullYear();
-        mesRef = hoje.getMonth() + 1;
-      }}
-
-      let mesAnt = mesRef - 1;
-      let anoAnt = anoRef;
-      if (mesAnt === 0) {{ mesAnt = 12; anoAnt--; }}
-
-      const pad = (n) => String(n).padStart(2, '0');
-      const strMesAtual = anoRef + '-' + pad(mesRef);
-      const strMesAnt = anoAnt + '-' + pad(mesAnt);
-
-      const contAtual = {{}};
-      const contAnt = {{}};
-
+    function atualizarGraficoLocaisAnterior() {{
+      const mesAntInput = document.getElementById('filterMesLocaisAnterior')?.value;
+      if (!mesAntInput) return;
+      const cont = {{}};
       listaChamadosSAC.forEach(c => {{
         const ymd = parseDateToYMD(c.data);
-        const loc = (c.localInterno || c.cliente || 'Outros').trim();
-        if (ymd.startsWith(strMesAtual)) {{
-          contAtual[loc] = (contAtual[loc] || 0) + 1;
-        }} else if (ymd.startsWith(strMesAnt)) {{
-          contAnt[loc] = (contAnt[loc] || 0) + 1;
+        if (ymd && ymd.startsWith(mesAntInput)) {{
+          const loc = (c.localInterno || c.cliente || 'Outros').trim();
+          cont[loc] = (cont[loc] || 0) + 1;
         }}
       }});
-
-      // Top 5 baseado na soma de ambos os meses
-      const todosLocais = new Set([...Object.keys(contAtual), ...Object.keys(contAnt)]);
-      const ranqueados = Array.from(todosLocais).map(l => ({{
-        local: l,
-        total: (contAtual[l] || 0) + (contAnt[l] || 0),
-        qtdAtual: contAtual[l] || 0,
-        qtdAnt: contAnt[l] || 0
-      }})).sort((a,b) => b.total - a.total).slice(0, 5);
-
-      const truncar = (t, max = 20) => t.length > max ? t.substring(0, max) + '...' : t;
-      chartComparativoLocais.data.labels = ranqueados.map(r => truncar(r.local));
-      chartComparativoLocais.data.datasets[0].label = 'Mês ' + pad(mesAnt) + '/' + anoAnt;
-      chartComparativoLocais.data.datasets[1].label = 'Mês ' + pad(mesRef) + '/' + anoRef;
-      chartComparativoLocais.data.datasets[0].data = ranqueados.map(r => r.qtdAnt);
-      chartComparativoLocais.data.datasets[1].data = ranqueados.map(r => r.qtdAtual);
-      chartComparativoLocais.update();
+      const truncar = (t, max = 22) => t.length > max ? t.substring(0, max) + '...' : t;
+      const top5 = Object.entries(cont).map(([nome, qt]) => ({{ nome, qt }})).sort((a,b) => b.qt - a.qt).slice(0, 5);
+      chartLocaisAnterior.data.labels = top5.map(t => truncar(t.nome));
+      chartLocaisAnterior.data.datasets[0].data = top5.map(t => t.qt);
+      chartLocaisAnterior.update();
     }}
 
-    function atualizarGraficoChamadosPorMes() {{
-      const selAno = document.getElementById('filterAnoMeses')?.value || new Date().getFullYear();
+    function atualizarGraficoLocaisAtual() {{
+      const mesAtualInput = document.getElementById('filterMesLocaisAtual')?.value;
+      if (!mesAtualInput) return;
+      const cont = {{}};
+      listaChamadosSAC.forEach(c => {{
+        const ymd = parseDateToYMD(c.data);
+        if (ymd && ymd.startsWith(mesAtualInput)) {{
+          const loc = (c.localInterno || c.cliente || 'Outros').trim();
+          cont[loc] = (cont[loc] || 0) + 1;
+        }}
+      }});
+      const truncar = (t, max = 22) => t.length > max ? t.substring(0, max) + '...' : t;
+      const top5 = Object.entries(cont).map(([nome, qt]) => ({{ nome, qt }})).sort((a,b) => b.qt - a.qt).slice(0, 5);
+      chartLocaisAtual.data.labels = top5.map(t => truncar(t.nome));
+      chartLocaisAtual.data.datasets[0].data = top5.map(t => t.qt);
+      chartLocaisAtual.update();
+    }}
+
+    function atualizarGraficoMesesQtd() {{
+      const selAno = document.getElementById('filterAnoMesesQtd')?.value || new Date().getFullYear();
       const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
       const contQtd = Array(12).fill(0);
-      const somaVal = Array(12).fill(0);
-
       listaChamadosSAC.forEach(c => {{
         const ymd = parseDateToYMD(c.data);
         if (ymd && ymd.startsWith(String(selAno))) {{
           const mIdx = parseInt(ymd.substring(5, 7), 10) - 1;
-          if (mIdx >= 0 && mIdx < 12) {{
-            contQtd[mIdx]++;
-            somaVal[mIdx] += parseValorNumerico(c.valor);
-          }}
+          if (mIdx >= 0 && mIdx < 12) contQtd[mIdx]++;
         }}
       }});
-
-      chartChamadosPorMes.data.labels = mesesNomes;
-      chartChamadosPorMes.data.datasets[0].data = contQtd;
-      chartChamadosPorMes.data.datasets[1].data = somaVal;
-      chartChamadosPorMes.update();
+      chartMesesQtd.data.labels = mesesNomes;
+      chartMesesQtd.data.datasets[0].data = contQtd;
+      chartMesesQtd.update();
     }}
 
-    function atualizarGraficoChamadosPorDia() {{
-      const mesDiasInput = document.getElementById('filterMesDias')?.value;
+    function atualizarGraficoMesesVal() {{
+      const selAno = document.getElementById('filterAnoMesesVal')?.value || new Date().getFullYear();
+      const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      const somaVal = Array(12).fill(0);
+      listaChamadosSAC.forEach(c => {{
+        const ymd = parseDateToYMD(c.data);
+        if (ymd && ymd.startsWith(String(selAno))) {{
+          const mIdx = parseInt(ymd.substring(5, 7), 10) - 1;
+          if (mIdx >= 0 && mIdx < 12) somaVal[mIdx] += parseValorNumerico(c.valor);
+        }}
+      }});
+      chartMesesVal.data.labels = mesesNomes;
+      chartMesesVal.data.datasets[0].data = somaVal;
+      chartMesesVal.update();
+    }}
+
+    function atualizarGraficoDiasQtd() {{
+      const mesDiasInput = document.getElementById('filterMesDiasQtd')?.value;
       let anoRef, mesRef;
       if (mesDiasInput) {{
         const parts = mesDiasInput.split('-');
@@ -2315,32 +2388,54 @@ html_code = f"""
         anoRef = hoje.getFullYear();
         mesRef = hoje.getMonth() + 1;
       }}
-
       const pad = (n) => String(n).padStart(2, '0');
       const strAnoMes = anoRef + '-' + pad(mesRef);
       const totalDias = new Date(anoRef, mesRef, 0).getDate();
-
       const labels = [];
       const dataQtd = Array(totalDias).fill(0);
-      const dataVal = Array(totalDias).fill(0);
-
       for (let i = 1; i <= totalDias; i++) labels.push(pad(i));
 
       listaChamadosSAC.forEach(c => {{
         const ymd = parseDateToYMD(c.data);
         if (ymd && ymd.startsWith(strAnoMes)) {{
           const dia = parseInt(ymd.substring(8, 10), 10);
-          if (dia >= 1 && dia <= totalDias) {{
-            dataQtd[dia - 1]++;
-            dataVal[dia - 1] += parseValorNumerico(c.valor);
-          }}
+          if (dia >= 1 && dia <= totalDias) dataQtd[dia - 1]++;
         }}
       }});
+      chartDiasQtd.data.labels = labels;
+      chartDiasQtd.data.datasets[0].data = dataQtd;
+      chartDiasQtd.update();
+    }}
 
-      chartChamadosPorDia.data.labels = labels;
-      chartChamadosPorDia.data.datasets[0].data = dataQtd;
-      chartChamadosPorDia.data.datasets[1].data = dataVal;
-      chartChamadosPorDia.update();
+    function atualizarGraficoDiasVal() {{
+      const mesDiasInput = document.getElementById('filterMesDiasVal')?.value;
+      let anoRef, mesRef;
+      if (mesDiasInput) {{
+        const parts = mesDiasInput.split('-');
+        anoRef = parseInt(parts[0], 10);
+        mesRef = parseInt(parts[1], 10);
+      }} else {{
+        const hoje = new Date();
+        anoRef = hoje.getFullYear();
+        mesRef = hoje.getMonth() + 1;
+      }}
+      const pad = (n) => String(n).padStart(2, '0');
+      const strAnoMes = anoRef + '-' + pad(mesRef);
+      const totalDias = new Date(anoRef, mesRef, 0).getDate();
+      const labels = [];
+      const dataVal = Array(totalDias).fill(0);
+      for (let i = 1; i <= totalDias; i++) labels.push(pad(i));
+
+      listaChamadosSAC.forEach(c => {{
+        const ymd = parseDateToYMD(c.data);
+        if (ymd && ymd.startsWith(strAnoMes)) {{
+          const dia = parseInt(ymd.substring(8, 10), 10);
+          if (dia >= 1 && dia <= totalDias) dataVal[dia - 1] += parseValorNumerico(c.valor);
+        }}
+      }});
+      chartDiasVal.data.labels = labels;
+      chartDiasVal.data.datasets[0].data = dataVal;
+      chartDiasVal.update();
     }}
 
     function atualizarGraficoTopSemana() {{
@@ -2402,29 +2497,46 @@ html_code = f"""
         filterSACAtendente.appendChild(opt);
       }});
 
-      // Inicializa anos dinâmicos
       const anosUnicos = [...new Set(listaChamadosSAC.map(c => {{
         const ymd = parseDateToYMD(c.data);
         return ymd ? ymd.substring(0, 4) : '';
       }}).filter(Boolean))].sort().reverse();
-      const selAnoEl = document.getElementById('filterAnoMeses');
-      selAnoEl.innerHTML = '';
-      if (!anosUnicos.length) anosUnicos.push(String(new Date().getFullYear()));
-      anosUnicos.forEach(a => {{
-        const opt = document.createElement('option'); opt.value = a; opt.textContent = a;
-        selAnoEl.appendChild(opt);
-      }});
+      const anoAtual = String(new Date().getFullYear());
+      if (!anosUnicos.length) anosUnicos.push(anoAtual);
 
-      // Inicializa inputs de mês e data padrão (Últimos 7 dias)
+      const selAnoQtd = document.getElementById('filterAnoMesesQtd');
+      const selAnoVal = document.getElementById('filterAnoMesesVal');
+      selAnoQtd.innerHTML = '';
+      selAnoVal.innerHTML = '';
+      anosUnicos.forEach(a => {{
+        const opt1 = document.createElement('option'); opt1.value = a; opt1.textContent = a; selAnoQtd.appendChild(opt1);
+        const opt2 = document.createElement('option'); opt2.value = a; opt2.textContent = a; selAnoVal.appendChild(opt2);
+      }});
+      selAnoQtd.value = anosUnicos.includes(anoAtual) ? anoAtual : anosUnicos[0];
+      selAnoVal.value = anosUnicos.includes(anoAtual) ? anoAtual : anosUnicos[0];
+
       const hoje = new Date();
       const pad = (n) => String(n).padStart(2, '0');
-      const strMesAtual = hoje.getFullYear() + '-' + pad(hoje.getMonth() + 1);
-      
-      const elMesRefComp = document.getElementById('filterMesRefComparativo');
-      if (elMesRefComp) elMesRefComp.value = strMesAtual;
+      const anoHoje = hoje.getFullYear();
+      const mesHoje = hoje.getMonth() + 1;
+      const strMesAtual = anoHoje + '-' + pad(mesHoje);
 
-      const elMesDias = document.getElementById('filterMesDias');
-      if (elMesDias) elMesDias.value = strMesAtual;
+      let mesAnt = mesHoje - 1;
+      let anoAnt = anoHoje;
+      if (mesAnt === 0) {{ mesAnt = 12; anoAnt--; }}
+      const strMesAnt = anoAnt + '-' + pad(mesAnt);
+
+      const elLocAnt = document.getElementById('filterMesLocaisAnterior');
+      if (elLocAnt) elLocAnt.value = strMesAnt;
+
+      const elLocAtu = document.getElementById('filterMesLocaisAtual');
+      if (elLocAtu) elLocAtu.value = strMesAtual;
+
+      const elDiasQtd = document.getElementById('filterMesDiasQtd');
+      if (elDiasQtd) elDiasQtd.value = strMesAtual;
+
+      const elDiasVal = document.getElementById('filterMesDiasVal');
+      if (elDiasVal) elDiasVal.value = strMesAtual;
 
       const dFim = hoje.toISOString().split('T')[0];
       const dIniDate = new Date();
@@ -2514,10 +2626,13 @@ html_code = f"""
       chartAtendentesSAC.data.datasets[0].data = topAtendentes.map(a => a.qt);
       chartAtendentesSAC.update();
 
-      // Dispara renderização dos gráficos com filtros dinâmicos
-      atualizarGraficoComparativoLocais();
-      atualizarGraficoChamadosPorMes();
-      atualizarGraficoChamadosPorDia();
+      // Dispara renderização dos gráficos divididos com filtros dinâmicos
+      atualizarGraficoLocaisAnterior();
+      atualizarGraficoLocaisAtual();
+      atualizarGraficoMesesQtd();
+      atualizarGraficoMesesVal();
+      atualizarGraficoDiasQtd();
+      atualizarGraficoDiasVal();
       atualizarGraficoTopSemana();
       atualizarGraficoTopFilial();
     }}
@@ -2536,4 +2651,4 @@ html_code = f"""
 </html>
 """
 
-components.html(html_code, height=3600, scrolling=True)
+components.html(html_code, height=4200, scrolling=True)
