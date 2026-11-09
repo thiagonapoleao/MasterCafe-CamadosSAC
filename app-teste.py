@@ -306,7 +306,7 @@ html_code = f"""
       </div>
       <div>
         <h3 id="modalLoadingTitle" class="text-base font-bold text-slate-900">Processando Ação...</h3>
-        <p id="modalLoadingSub" class="text-xs text-slate-500 mt-1">Sua solicitação está sendo transmitida e registrada na planilha Chamados.</p>
+        <p id="modalLoadingSub" class="text-xs text-slate-500 mt-1">Sua solicitação está sendo transmitida e registrada.</p>
       </div>
       <div id="modalProgressBar" class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
         <div class="bg-sky-500 h-full w-2/3 animate-pulse"></div>
@@ -625,21 +625,21 @@ html_code = f"""
                 </select>
               </div>
 
-              <!-- Filial Responsável (Antiga Cidade, vinculada ao Cliente/Local da aba Clientes coluna F com datalist) -->
+              <!-- Filial Responsável -->
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Filial Responsável *</label>
                 <input list="listaSACCidades" id="sacCidade" placeholder="Filial de atendimento..." required onchange="validarInputComLista('sacCidade', 'listaSACCidades', 'Filial Responsável')" onblur="validarInputComLista('sacCidade', 'listaSACCidades', 'Filial Responsável')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 <datalist id="listaSACCidades"></datalist>
               </div>
 
-              <!-- Descrição (Travada na pré-lista da coluna N) -->
+              <!-- Descrição -->
               <div class="md:col-span-2 lg:col-span-3">
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Descrição *</label>
                 <input list="listaSACDescricoes" id="sacDescricao" placeholder="Selecione a descrição do ocorrido..." required onchange="validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição')" onblur="validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 <datalist id="listaSACDescricoes"></datalist>
               </div>
 
-              <!-- Produto (Começa limpo/vazio) -->
+              <!-- Produto -->
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Produto *</label>
                 <select id="sacProduto" required class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
@@ -649,13 +649,13 @@ html_code = f"""
                 </select>
               </div>
 
-              <!-- Data da Transação (Começa Zerado/Vazio e é OBRIGATÓRIO) -->
+              <!-- Data da Transação -->
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Data da Transação *</label>
                 <input type="date" id="sacDataTransacao" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
               </div>
 
-              <!-- Hora da Transação (Começa Zerado/Vazio e é OBRIGATÓRIO) -->
+              <!-- Hora da Transação -->
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Hora da Transação *</label>
                 <input type="time" id="sacHoraTransacao" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
@@ -679,24 +679,24 @@ html_code = f"""
                 <input type="text" id="sacCelular" placeholder="(00) 00000-0000" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
               </div>
 
-              <!-- Problemas (Travado na pré-lista da coluna L) -->
+              <!-- Problemas -->
               <div class="md:col-span-2">
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Problemas *</label>
                 <input list="listaSACProblemas" id="sacProblema" placeholder="Selecione o problema..." required onchange="validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas')" onblur="validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 <datalist id="listaSACProblemas"></datalist>
               </div>
 
-              <!-- Forma de Pagamento (Travada na pré-lista da coluna A) -->
+              <!-- Forma de Pagamento -->
               <div class="md:col-span-2">
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Forma de Pagamento *</label>
                 <input list="listaSACFormasPgto" id="sacFormaPgto" placeholder="Selecione a forma de pagamento..." required onchange="validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento')" onblur="validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 <datalist id="listaSACFormasPgto"></datalist>
               </div>
 
-              <!-- Reembolso (Não obrigatório) -->
+              <!-- Reembolso -->
               <div class="md:col-span-2">
                 <label class="block text-xs font-bold text-sky-900 mb-1">Reembolso</label>
-                <input type="text" id="sacReembolso" placeholder="Como foi feito o reembolso (Ex: Pix, Crédito Máquina, Dinheiro)..." class="w-full text-sm rounded-xl border border-sky-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <input type="text" id="sacReembolso" placeholder="Como foi feito o reembolso (Ex: Pix, Crédito Máquina, Dinheiro)..." onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-sky-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
               </div>
 
               <!-- Pix - Reembolso -->
@@ -731,7 +731,7 @@ html_code = f"""
           </form>
         </section>
 
-        <!-- LISTA DE TODOS OS CHAMADOS REALIZADOS (HISTÓRICO COM EDITAR E EXCLUIR) -->
+        <!-- LISTA DE TODOS OS CHAMADOS REALIZADOS -->
         <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
             <div>
@@ -799,7 +799,7 @@ html_code = f"""
         </button>
       </div>
 
-      <!-- MENSAGEM NO TOPO DINÂMICA (SUCESSO / EDIÇÃO / EXCLUSÃO DE CLIENTE) -->
+      <!-- MENSAGEM NO TOPO DINÂMICA -->
       <div id="alertCliSuccess" class="hidden p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition">
         <div class="flex items-center gap-3">
           <div id="alertCliIconBadge" class="p-2 bg-emerald-600 text-white rounded-xl">
@@ -840,37 +840,37 @@ html_code = f"""
             <!-- Cliente -->
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1">Cliente *</label>
-              <input type="text" id="cadCliCliente" placeholder="Ex: Embraer, Coca Cola..." required class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              <input type="text" id="cadCliCliente" placeholder="Ex: Embraer, Coca Cola..." required onblur="formatarNomeProprio(this)" class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
             </div>
 
             <!-- Local -->
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1">Local *</label>
-              <input type="text" id="cadCliLocal" placeholder="Ex: Fábrica 1, Administrativo..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              <input type="text" id="cadCliLocal" placeholder="Ex: Fábrica 1, Administrativo..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
             </div>
 
             <!-- Local interno -->
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1">Local interno *</label>
-              <input type="text" id="cadCliLocalInterno" placeholder="Ex: Refeitório, Recepção, Bloco B..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              <input type="text" id="cadCliLocalInterno" placeholder="Ex: Refeitório, Recepção, Bloco B..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
             </div>
 
             <!-- Máquina -->
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1">Máquina *</label>
-              <input type="text" id="cadCliMaquina" placeholder="Ex: Máquina 01, M05..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              <input type="text" id="cadCliMaquina" placeholder="Ex: Máquina 01, M05..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
             </div>
 
             <!-- Modelo de máquina -->
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1">Modelo de máquina *</label>
-              <input type="text" id="cadCliModeloMaquina" placeholder="Ex: Lei Saeco, Krea, Snaky..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              <input type="text" id="cadCliModeloMaquina" placeholder="Ex: Lei Saeco, Krea, Snaky..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
             </div>
 
             <!-- Filial Responsavel -->
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1">Filial Responsavel *</label>
-              <input list="listaSACCidades" id="cadCliFilial" placeholder="Ex: Ribeirão Preto, São Carlos..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              <input list="listaSACCidades" id="cadCliFilial" placeholder="Ex: Ribeirão Preto, São Carlos..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
             </div>
 
           </div>
@@ -945,11 +945,35 @@ html_code = f"""
     let chamadoEmEdicao = null;
     let clienteEmEdicao = null;
     
-    // Tratamento seguro de Storage
     let atendenteSACLogado = "";
     try {{
       atendenteSACLogado = sessionStorage.getItem('sac_atendente_conectado') || "";
     }} catch(e) {{}}
+
+    // =========================================================================
+    // FORMATAÇÃO DE TEXTO: PRIMEIRAS MAIÚSCULAS (TITLE CASE INTELIGENTE)
+    // =========================================================================
+    function converterParaPrimeirasMaiusculas(texto) {{
+      if (!texto) return '';
+      const preposicoes = ['de', 'da', 'do', 'das', 'dos', 'e'];
+      return texto
+        .toString()
+        .trim()
+        .toLowerCase()
+        .split(/\s+/)
+        .map((palavra, index) => {{
+          if (index > 0 && preposicoes.includes(palavra)) {{
+            return palavra;
+          }}
+          return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+        }})
+        .join(' ');
+    }}
+
+    function formatarNomeProprio(input) {{
+      if (!input || !input.value) return;
+      input.value = converterParaPrimeirasMaiusculas(input.value);
+    }}
 
     // =========================================================================
     // TRAVAMENTO RÍGIDO DE PRÉ-LISTA
@@ -987,7 +1011,6 @@ html_code = f"""
       }}
     }}
 
-    // CONTROLE DINÂMICO DE MODAL DE PROCESSAMENTO
     function abrirModalLoading(titulo, subtitulo, tipoAcao = 'loading') {{
       const modal = document.getElementById('modalLoadingAcao');
       if (!modal) return;
@@ -1028,7 +1051,6 @@ html_code = f"""
       if (modal) modal.classList.add('hidden');
     }}
 
-    // EXIBE MENSAGEM NO BANNER DO TOPO COM ATUALIZAÇÃO DE TIPO
     function exibirMensagemTopo(titulo, subtitulo, tipo = 'sucesso') {{
       const alertBox = document.getElementById('alertSACSuccess');
       const alertTitle = document.getElementById('alertSACSuccessTitle');
@@ -1060,7 +1082,6 @@ html_code = f"""
       lucide.createIcons();
     }}
 
-    // EXIBE MENSAGEM NO BANNER DE CLIENTES
     function exibirMensagemTopoCliente(titulo, subtitulo, tipo = 'sucesso') {{
       const alertBox = document.getElementById('alertCliSuccess');
       const alertTitle = document.getElementById('alertCliSuccessTitle');
@@ -1092,7 +1113,6 @@ html_code = f"""
       lucide.createIcons();
     }}
 
-    // ENVIO DESACOPLADO E INSTANTÂNEO
     function enviarParaPlanilhaGarantido(payload) {{
       const endpoint = APPS_SCRIPT_SAC_URL;
       const strData = JSON.stringify(payload);
@@ -1126,7 +1146,7 @@ html_code = f"""
     }}
 
     // =========================================================================
-    // NAVEGAÇÃO ENTRE PÁGINAS (Dashboard SAC x Lançamento SAC x Cadastro Clientes)
+    // NAVEGAÇÃO ENTRE PÁGINAS
     // =========================================================================
     function switchPage(page) {{
       try {{
@@ -1173,7 +1193,7 @@ html_code = f"""
     }}
 
     // =========================================================================
-    // ROTINAS SAC COM GERAÇÃO CONCORRENTE SEM DUPLICIDADE
+    // ROTINAS SAC
     // =========================================================================
     function verificarSessaoSAC() {{
       const authScreen = document.getElementById('sacAuthScreen');
@@ -1243,10 +1263,7 @@ html_code = f"""
       document.getElementById('sacChamado').value = calcularPreviaProximoChamado(anoAtual);
       document.getElementById('sacData').value = new Date().toISOString().split('T')[0];
       
-      // Produto começa limpo/vazio
       document.getElementById('sacProduto').value = "";
-      
-      // Data e Hora de transação começam ZERADOS/VAZIOS
       document.getElementById('sacDataTransacao').value = "";
       document.getElementById('sacHoraTransacao').value = "";
       document.getElementById('sacReembolso').value = "";
@@ -1263,7 +1280,6 @@ html_code = f"""
       const selectLocal = document.getElementById('sacLocalInterno');
       selectLocal.innerHTML = '<option value="">Selecione primeiro o Cliente...</option>';
 
-      // Datalist de Clientes da aba Clientes coluna A
       const dlCli = document.getElementById('listaSACClientes');
       dlCli.innerHTML = '';
       const clientesUnicos = [...new Set(dadosSAC.clientes.map(c => c.cliente).filter(Boolean))].sort();
@@ -1273,7 +1289,6 @@ html_code = f"""
         dlCli.appendChild(opt);
       }});
 
-      // Datalist de Filiais Responsáveis da aba Clientes coluna F
       const dlCid = document.getElementById('listaSACCidades');
       dlCid.innerHTML = '';
       const cidadesGerais = dadosSAC.cidades && dadosSAC.cidades.length > 0 
@@ -1285,7 +1300,6 @@ html_code = f"""
         dlCid.appendChild(opt);
       }});
 
-      // Datalist de Descrições da coluna N
       const dlDesc = document.getElementById('listaSACDescricoes');
       dlDesc.innerHTML = '';
       dadosSAC.descricoes.forEach(d => {{
@@ -1294,7 +1308,6 @@ html_code = f"""
         dlDesc.appendChild(opt);
       }});
 
-      // Datalist de Problemas da coluna L
       const dlProb = document.getElementById('listaSACProblemas');
       dlProb.innerHTML = '';
       dadosSAC.problemas.forEach(p => {{
@@ -1303,7 +1316,6 @@ html_code = f"""
         dlProb.appendChild(opt);
       }});
 
-      // Datalist de Formas de Pagamento da coluna A
       const dlPgto = document.getElementById('listaSACFormasPgto');
       dlPgto.innerHTML = '';
       dadosSAC.formas_pagamento.forEach(f => {{
@@ -1346,15 +1358,6 @@ html_code = f"""
       if (achado && achado.cidade) {{
         document.getElementById('sacCidade').value = achado.cidade;
       }}
-    }}
-
-    function formatarNomeProprio(input) {{
-      if (!input.value) return;
-      input.value = input.value
-        .toLowerCase()
-        .split(' ')
-        .map(palavra => palavra.charAt(0).toUpperCase() + palavra.slice(1))
-        .join(' ');
     }}
 
     function limparFormSAC() {{
@@ -1595,11 +1598,11 @@ html_code = f"""
       const dataTransacao = document.getElementById('sacDataTransacao').value;
       const horaTransacao = document.getElementById('sacHoraTransacao').value;
       const valor = parseFloat(document.getElementById('sacValor').value) || 0;
-      const nomeSobrenome = document.getElementById('sacNome').value.trim();
+      const nomeSobrenome = converterParaPrimeirasMaiusculas(document.getElementById('sacNome').value.trim());
       const celular = document.getElementById('sacCelular').value.trim();
       const problemas = document.getElementById('sacProblema').value.trim();
       const formaPgto = document.getElementById('sacFormaPgto').value.trim();
-      const reembolso = document.getElementById('sacReembolso').value.trim();
+      const reembolso = converterParaPrimeirasMaiusculas(document.getElementById('sacReembolso').value.trim());
       const pix = document.getElementById('sacPix').value.trim();
       const atendente = atendenteSACLogado || document.getElementById('sacAtendente').value;
       
@@ -1709,12 +1712,12 @@ html_code = f"""
 
       clienteEmEdicao = {{ ...item, indexOriginal: index }};
 
-      document.getElementById('cadCliCliente').value = item.cliente || '';
-      document.getElementById('cadCliLocal').value = item.local || '';
-      document.getElementById('cadCliLocalInterno').value = item.localInterno || item.local || '';
-      document.getElementById('cadCliMaquina').value = item.maquina || '';
-      document.getElementById('cadCliModeloMaquina').value = item.modeloMaquina || '';
-      document.getElementById('cadCliFilial').value = item.filialResponsavel || '';
+      document.getElementById('cadCliCliente').value = converterParaPrimeirasMaiusculas(item.cliente || '');
+      document.getElementById('cadCliLocal').value = converterParaPrimeirasMaiusculas(item.local || '');
+      document.getElementById('cadCliLocalInterno').value = converterParaPrimeirasMaiusculas(item.localInterno || item.local || '');
+      document.getElementById('cadCliMaquina').value = converterParaPrimeirasMaiusculas(item.maquina || '');
+      document.getElementById('cadCliModeloMaquina').value = converterParaPrimeirasMaiusculas(item.modeloMaquina || '');
+      document.getElementById('cadCliFilial').value = converterParaPrimeirasMaiusculas(item.filialResponsavel || '');
 
       document.getElementById('alertCliEditMode').classList.remove('hidden');
       document.getElementById('labelCliEditNome').innerText = item.cliente + ' (' + (item.localInterno || item.local || '') + ')';
@@ -1837,12 +1840,13 @@ html_code = f"""
     function handleClienteSubmit(e) {{
       e.preventDefault();
 
-      const cliente = document.getElementById('cadCliCliente').value.trim();
-      const local = document.getElementById('cadCliLocal').value.trim();
-      const localInterno = document.getElementById('cadCliLocalInterno').value.trim();
-      const maquina = document.getElementById('cadCliMaquina').value.trim();
-      const modeloMaquina = document.getElementById('cadCliModeloMaquina').value.trim();
-      const filialResponsavel = document.getElementById('cadCliFilial').value.trim();
+      // Garante conversão de primeiras letras maiúsculas em todos os 6 campos
+      const cliente = converterParaPrimeirasMaiusculas(document.getElementById('cadCliCliente').value.trim());
+      const local = converterParaPrimeirasMaiusculas(document.getElementById('cadCliLocal').value.trim());
+      const localInterno = converterParaPrimeirasMaiusculas(document.getElementById('cadCliLocalInterno').value.trim());
+      const maquina = converterParaPrimeirasMaiusculas(document.getElementById('cadCliMaquina').value.trim());
+      const modeloMaquina = converterParaPrimeirasMaiusculas(document.getElementById('cadCliModeloMaquina').value.trim());
+      const filialResponsavel = converterParaPrimeirasMaiusculas(document.getElementById('cadCliFilial').value.trim());
 
       if (!cliente || !local || !localInterno || !maquina || !modeloMaquina || !filialResponsavel) {{
         alert('Por favor, preencha todos os campos obrigatórios do formulário.');
@@ -1890,7 +1894,7 @@ html_code = f"""
         listaCadastroClientes.unshift(novoItem);
       }}
 
-      // Atualiza também a lista em memória usada nos selects do formulário SAC
+      // Atualiza também a lista em memória dos selects do SAC
       dadosSAC.clientes.push({{
         cliente: cliente,
         local: localInterno,
