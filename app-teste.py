@@ -794,10 +794,14 @@ html_code = f"""
                   <datalist id="listaSACFormasPgto"></datalist>
                 </div>
 
-                <!-- Reembolso (Predefinido como: Devolução Stone ou Pendente) -->
+                <!-- Reembolso (Começa limpo com opção de seleção) -->
                 <div class="md:col-span-2">
                   <label class="block text-xs font-bold text-sky-900 mb-1">Reembolso</label>
-                  <input type="text" id="sacReembolso" value="Devolução Stone ou Pendente" placeholder="Como foi feito o reembolso (Ex: Pix, Crédito Máquina, Dinheiro)..." onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-sky-300 bg-white px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                  <select id="sacReembolso" class="w-full text-sm font-semibold rounded-xl border border-sky-300 bg-white px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    <option value="" selected>Selecione o reembolso...</option>
+                    <option value="Devolução Stone">Devolução Stone</option>
+                    <option value="Pendente">Pendente</option>
+                  </select>
                 </div>
 
                 <!-- Pix - Reembolso -->
@@ -1538,7 +1542,7 @@ html_code = f"""
       document.getElementById('sacProduto').value = "";
       document.getElementById('sacDataTransacao').value = "";
       document.getElementById('sacHoraTransacao').value = "";
-      document.getElementById('sacReembolso').value = "Devolução Stone ou Pendente";
+      document.getElementById('sacReembolso').value = "";
       document.getElementById('sacPix').value = "";
       document.getElementById('sacReembolsoRealizado').value = "Não";
       document.getElementById('sacValor').value = "";
@@ -1643,7 +1647,7 @@ html_code = f"""
       document.getElementById('sacCidade').value = "";
       document.getElementById('sacDataTransacao').value = "";
       document.getElementById('sacHoraTransacao').value = "";
-      document.getElementById('sacReembolso').value = "Devolução Stone ou Pendente";
+      document.getElementById('sacReembolso').value = "";
       document.getElementById('sacPix').value = "";
       document.getElementById('sacReembolsoRealizado').value = "Não";
       document.getElementById('sacValor').value = "";
@@ -1692,7 +1696,17 @@ html_code = f"""
       document.getElementById('sacCelular').value = item.celular;
       document.getElementById('sacProblema').value = item.problemas;
       document.getElementById('sacFormaPgto').value = item.formaPgto;
-      document.getElementById('sacReembolso').value = item.reembolso || 'Devolução Stone ou Pendente';
+
+      // Ajusta o select de Reembolso para as opções válidas
+      const rmbVal = (item.reembolso || '').trim().toLowerCase();
+      if (rmbVal.includes('pendente')) {{
+        document.getElementById('sacReembolso').value = 'Pendente';
+      }} else if (rmbVal.includes('stone') || rmbVal.includes('devolução') || rmbVal.includes('devolucao')) {{
+        document.getElementById('sacReembolso').value = 'Devolução Stone';
+      }} else {{
+        document.getElementById('sacReembolso').value = '';
+      }}
+
       document.getElementById('sacPix').value = item.pix || '';
       document.getElementById('sacObservacao').value = item.observacao || '';
       
@@ -1970,7 +1984,7 @@ html_code = f"""
       const celular = document.getElementById('sacCelular').value.trim();
       const problemas = document.getElementById('sacProblema').value.trim();
       const formaPgto = document.getElementById('sacFormaPgto').value.trim();
-      const reembolso = converterParaPrimeirasMaiusculas(document.getElementById('sacReembolso').value.trim());
+      const reembolso = (document.getElementById('sacReembolso').value || '').trim();
       const pix = document.getElementById('sacPix').value.trim();
       const reembolsoRealizado = document.getElementById('sacReembolsoRealizado').value || "Não";
       const observacao = document.getElementById('sacObservacao').value.trim();
