@@ -1,1463 +1,2265 @@
-# -*- coding: utf-8 -*-
-from datetime import datetime
-import io
-import os
-import pandas as pd
-import plotly.express as px
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.pdfgen import canvas
-from reportlab.platypus import (
-    HRFlowable,
-    KeepTogether,
-    PageBreak,
-    Paragraph,
-    SimpleDocTemplate,
-    Spacer,
-    Table,
-    TableStyle,
-)
 import streamlit as st
+import streamlit.components.v1 as components
+import json
+import pandas as pd
+import re
+import os
+import base64
+
+# Links oficiais dos Web Apps do Google Apps Script
+APPS_SCRIPT_SAC_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyGRxQBo5j-gWQ4OEeGFqfwzgjcfQRzDKE2kKbyQeSvOKOdIMr1snR8YV766KBfE7RY9w/exec"
 
 st.set_page_config(
-    page_title="Dashboard Executivo SAC - Master Café",
+    page_title="Painel Executivo de Gestão & SAC",
     page_icon="☕",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed"
 )
 
-# --- CSS POWER BI EXECUTIVE THEME ---
-st.markdown(
-    """
+st.markdown("""
 <style>
-    .main { 
-        background-color: #0f172a; 
-        color: #f8fafc; 
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-    }
-    
-    /* Header Card Power BI Style */
-    .header-card {
-        background: linear-gradient(90deg, #1e293b 0%, #0f172a 100%);
-        padding: 20px 24px;
-        border-radius: 8px;
-        border: 1px solid #334155;
-        border-left: 6px solid #0284c7;
-        margin-bottom: 20px;
-    }
-    .header-title {
-        color: #ffffff !important;
-        font-weight: 700;
-        font-size: 1.85rem;
-        margin-bottom: 4px;
-        letter-spacing: -0.5px;
-    }
-    .header-subtitle {
-        color: #94a3b8 !important;
-        font-size: 0.95rem;
-        font-weight: 400;
-    }
-
-    /* Cards de KPI no padrão Power BI Card Visual */
-    .stMetric { 
-        background-color: #1e293b !important; 
-        padding: 18px !important; 
-        border-radius: 8px !important; 
-        border: 1px solid #334155 !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-    }
-    div[data-testid="stMetricValue"] { 
-        color: #38bdf8 !important; 
-        font-weight: 700 !important; 
-        font-size: 1.9rem !important; 
-        font-family: 'Segoe UI', sans-serif !important;
-    }
-    div[data-testid="stMetricLabel"], 
-    div[data-testid="stMetricLabel"] > label,
-    div[data-testid="stMetricLabel"] p { 
-        color: #94a3b8 !important; 
-        font-size: 0.85rem !important; 
-        font-weight: 600 !important;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    /* Cards de Insights */
-    .insight-card {
-        background: #1e293b;
-        border: 1px solid #334155;
-        border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 12px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .block-container {
+        padding-top: 0rem !important;
+        padding-bottom: 0rem !important;
+        padding-left: 0rem !important;
+        padding-right: 0rem !important;
+        max-width: 100% !important;
     }
 </style>
-""",
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
-
-# --- FUNÇÃO DE ESTILIZAÇÃO POWER BI PARA PLOTLY ---
-def apply_powerbi_theme(fig, title="", height=320):
-    fig.update_layout(
-        title=dict(
-            text=f"<b>{title}</b>" if title else "",
-            font=dict(family="Segoe UI, Roboto, sans-serif", size=13, color="#cbd5e1"),
-            x=0.01,
-            y=0.96,
-        ),
-        paper_bgcolor="#1e293b",
-        plot_bgcolor="#1e293b",
-        font=dict(family="Segoe UI, Roboto, sans-serif", size=11, color="#94a3b8"),
-        margin=dict(l=20, r=20, t=45 if title else 25, b=25),
-        height=height,
-        hoverlabel=dict(
-            bgcolor="#0f172a",
-            font_size=12,
-            font_family="Segoe UI",
-            font_color="#ffffff",
-            bordercolor="#334155",
-        ),
-        xaxis=dict(
-            showgrid=True,
-            gridcolor="#334155",
-            gridwidth=1,
-            griddash="dot",
-            linecolor="#334155",
-            tickfont=dict(color="#94a3b8", size=10),
-            title_font=dict(color="#cbd5e1", size=11),
-        ),
-        yaxis=dict(
-            showgrid=True,
-            gridcolor="#334155",
-            gridwidth=1,
-            griddash="dot",
-            linecolor="#334155",
-            tickfont=dict(color="#94a3b8", size=10),
-            title_font=dict(color="#cbd5e1", size=11),
-        ),
-    )
-    fig.update_traces(
-        textposition="outside",
-        cliponaxis=False,
-        textfont=dict(color="#f8fafc", size=10, family="Segoe UI"),
-    )
-    return fig
-
-
-# --- CANVAS COM NUMERAÇÃO DE PÁGINAS PARA REPORTLAB ---
-class NumberedCanvas(canvas.Canvas):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._saved_page_states = []
-
-    def showPage(self):
-        self._saved_page_states.append(dict(self.__dict__))
-        self._startPage()
-
-    def save(self):
-        num_pages = len(self._saved_page_states)
-        for state in self._saved_page_states:
-            self.__dict__.update(state)
-            self.draw_page_decorations(num_pages)
-            canvas.Canvas.showPage(self)
-        canvas.Canvas.save(self)
-
-    def draw_page_decorations(self, page_count):
-        self.saveState()
-        self.setFont("Helvetica", 8)
-        self.setFillColor(colors.HexColor("#64748b"))
-        self.drawString(
-            36, 22, "Master Café SAC — Relatório Gerencial e Operacional Completo"
-        )
-        self.drawRightString(
-            576, 22, f"Página {self._pageNumber} de {page_count}"
-        )
-        self.setStrokeColor(colors.HexColor("#cbd5e1"))
-        self.setLineWidth(0.5)
-        self.line(36, 34, 576, 34)
-        self.restoreState()
-
-
-# --- GERADOR DE RELATÓRIO PDF COMPLETO ---
-def generate_full_pdf_report(
-    df_filtered,
-    tot_chamados,
-    tot_reembolso,
-    top_cli,
-    top_falha,
-    active_filters,
-):
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter,
-        rightMargin=36,
-        leftMargin=36,
-        topMargin=36,
-        bottomMargin=45,
-    )
-    elements = []
-    styles = getSampleStyleSheet()
-
-    title_style = ParagraphStyle(
-        name="DocTitle",
-        parent=styles["Heading1"],
-        fontName="Helvetica-Bold",
-        fontSize=18,
-        leading=22,
-        textColor=colors.HexColor("#0f172a"),
-        spaceAfter=2,
-    )
-    subtitle_style = ParagraphStyle(
-        name="DocSubtitle",
-        parent=styles["Normal"],
-        fontSize=9,
-        textColor=colors.HexColor("#64748b"),
-        leading=13,
-    )
-    section_style = ParagraphStyle(
-        name="SectionTitle",
-        parent=styles["Heading2"],
-        fontName="Helvetica-Bold",
-        fontSize=12,
-        leading=16,
-        textColor=colors.HexColor("#0284c7"),
-        spaceBefore=10,
-        spaceAfter=6,
-    )
-    table_cell = ParagraphStyle(
-        name="TableCell",
-        parent=styles["Normal"],
-        fontSize=8,
-        leading=11,
-        textColor=colors.HexColor("#1e293b"),
-    )
-    table_header = ParagraphStyle(
-        name="TableHeader",
-        parent=styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=8.5,
-        leading=11,
-        textColor=colors.whitesmoke,
-    )
-
-    # 1. Cabeçalho Principal
-    elements.append(
-        Paragraph("☕ Master Café — Relatório Executivo do SAC", title_style)
-    )
-    dt_now = datetime.now().strftime("%d/%m/%Y às %H:%M")
-    elements.append(
-        Paragraph(
-            f"Relatório Consolidado de Gestão da Qualidade, Atendimento e Reembolsos • Gerado em: <b>{dt_now}</b>",
-            subtitle_style,
-        )
-    )
-    elements.append(Spacer(1, 8))
-    elements.append(
-        HRFlowable(
-            width="100%", thickness=1.5, color=colors.HexColor("#0284c7"), spaceAfter=10
-        )
-    )
-
-    # 2. Quadro de Filtros Ativos
-    filtros_txt = f"<b>Filtros Atuais Aplicados:</b> Ano: <code>{active_filters.get('ano', 'Todos')}</code>"
-    t_filtros = Table(
-        [[Paragraph(filtros_txt, table_cell)]],
-        colWidths=[540],
-    )
-    t_filtros.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f1f5f9")),
-                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
-                ("PADDING", (0, 0), (-1, -1), 6),
-            ]
-        )
-    )
-    elements.append(t_filtros)
-    elements.append(Spacer(1, 10))
-
-    # 3. Cartões de KPIs Principais
-    elements.append(
-        Paragraph("1. Principais Indicadores de Desempenho (KPIs)", section_style)
-    )
-    reembolso_str = (
-        f"R$ {tot_reembolso:,.2f}".replace(",", "v")
-        .replace(".", ",")
-        .replace("v", ".")
-    )
-    tkt_medio = (tot_reembolso / tot_chamados) if tot_chamados > 0 else 0
-    tkt_medio_str = (
-        f"R$ {tkt_medio:,.2f}".replace(",", "v")
-        .replace(".", ",")
-        .replace("v", ".")
-    )
-
-    kpi_card_data = [
-        [
-            Paragraph("<b>TOTAL DE CHAMADOS</b>", subtitle_style),
-            Paragraph("<b>TOTAL REEMBOLSADO</b>", subtitle_style),
-            Paragraph("<b>TICKET MÉDIO REEMBOLSO</b>", subtitle_style),
-            Paragraph("<b>PRINCIPAL CLIENTE</b>", subtitle_style),
-        ],
-        [
-            Paragraph(
-                f"<font size=13 color='#0284c7'><b>{tot_chamados:,}</b></font>".replace(
-                    ",", "."
-                ),
-                styles["Normal"],
-            ),
-            Paragraph(
-                f"<font size=13 color='#10b981'><b>{reembolso_str}</b></font>",
-                styles["Normal"],
-            ),
-            Paragraph(
-                f"<font size=12 color='#f59e0b'><b>{tkt_medio_str}</b></font>",
-                styles["Normal"],
-            ),
-            Paragraph(
-                f"<font size=9><b>{str(top_cli)[:25]}</b></font>",
-                styles["Normal"],
-            ),
-        ],
+# ==============================================================================
+# CARREGAMENTO DO LOGOTIPO
+# ==============================================================================
+def obter_logo_base64():
+    pastas_busca = [
+        os.path.dirname(os.path.abspath(__file__)) if "__file__" in locals() else "",
+        os.getcwd(),
+        "."
     ]
-    t_kpis = Table(kpi_card_data, colWidths=[135, 140, 135, 130])
-    t_kpis.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
-                ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#cbd5e1")),
-                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
-                ("TOPPADDING", (0, 0), (-1, -1), 7),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-            ]
-        )
-    )
-    elements.append(t_kpis)
-    elements.append(Spacer(1, 12))
-
-    # 4. Tabela Mensal Consolidada
-    elements.append(
-        Paragraph("2. Demonstrativo Mensal Consolidado", section_style)
-    )
-    months_valid = [
-        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    nomes_alvo = [
+        "Logotipo.PNG", "Logotipo.png", "logotipo.PNG", "logotipo.png",
+        "LOGOTIPO.PNG", "logo.PNG", "logo.png"
     ]
-    summary_mes = (
-        df_filtered.groupby("Mês_Clean")
-        .agg(Chamados=("Valor", "count"), Reembolso=("Valor", "sum"))
-        .reindex(months_valid)
-        .dropna(how="all")
-        .reset_index()
-    )
+    for pasta in pastas_busca:
+        if not pasta:
+            continue
+        for nome in nomes_alvo:
+            candidato = os.path.join(pasta, nome)
+            if os.path.isfile(candidato):
+                ext = os.path.splitext(candidato)[1].lower().replace(".", "")
+                mime = "jpeg" if ext in ["jpg", "jpeg"] else "png"
+                with open(candidato, "rb") as f:
+                    return f"data:image/{mime};base64,{base64.b64encode(f.read()).decode('utf-8')}"
+    return ""
 
-    t_mes_data = [[
-        Paragraph("Mês de Referência", table_header),
-        Paragraph("Chamados", table_header),
-        Paragraph("Reembolso Total (R$)", table_header),
-        Paragraph("Ticket Médio (R$)", table_header),
-    ]]
-    for _, row in summary_mes.iterrows():
-        val_f = (
-            f"R$ {row['Reembolso']:,.2f}".replace(",", "v")
-            .replace(".", ",")
-            .replace("v", ".")
-        )
-        tkt = (row["Reembolso"] / row["Chamados"]) if row["Chamados"] > 0 else 0
-        tkt_f = (
-            f"R$ {tkt:,.2f}".replace(",", "v").replace(".", ",").replace("v", ".")
-        )
-        t_mes_data.append([
-            Paragraph(str(row["Mês_Clean"]), table_cell),
-            Paragraph(
-                f"{int(row['Chamados']):,}".replace(",", "."), table_cell
-            ),
-            Paragraph(val_f, table_cell),
-            Paragraph(tkt_f, table_cell),
-        ])
+logo_base64_src = obter_logo_base64()
 
-    t_mes_tab = Table(t_mes_data, colWidths=[150, 110, 150, 130])
-    t_mes_tab.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
-                (
-                    "ROWBACKGROUNDS",
-                    (0, 1),
-                    (-1, -1),
-                    [colors.white, colors.HexColor("#f8fafc")],
-                ),
-                ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
-                ("PADDING", (0, 0), (-1, -1), 4.5),
-            ]
-        )
-    )
-    elements.append(t_mes_tab)
-    elements.append(Spacer(1, 14))
+# IDs e GIDs de Planilhas
+SPREADSHEET_SAC_ID = "1YUS9AwQti0Gl79X-TGCIqZSkOfF0bE0BX5gyDClo3rc"
+GID_SAC_CHAMADOS = "0"
+GID_SAC_CLIENTES = "1332839106"
 
-    doc.build(elements, canvasmaker=NumberedCanvas)
-    buffer.seek(0)
-    return buffer.getvalue()
+SPREADSHEET_SAC_CONFIG_ID = "1vOa6QpGPZ6rZ1doT2RRU1SAXWR5usPzv"
+GID_SAC_CONFIGS = "1833376686"
+GID_SAC_USUARIOS = "772646879"
 
+URL_CSV_SAC_CHAMADOS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_CHAMADOS}"
+URL_CSV_SAC_CLIENTES = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_CLIENTES}"
+URL_CSV_SAC_CONFIGS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_CONFIG_ID}/export?format=csv&gid={GID_SAC_CONFIGS}"
+URL_CSV_SAC_USUARIOS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_CONFIG_ID}/export?format=csv&gid={GID_SAC_USUARIOS}"
 
-# --- CARREGAMENTO E PARSER UNIVERSAL DE DATA ---
-@st.cache_data(ttl=600)
-def load_data():
-    sheet_id = "18flfeGQHTFhYNpECgQ1QZcuTQ8P7hUDS-379vQAD2Mc"
-    gid = "1403362399"
-    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+@st.cache_data(ttl=5)
+def carregar_dados_sac():
+    clientes_dados = []
+    cidades_clientes = []
+    lista_clientes_completa = []
+    try:
+        df_cli = pd.read_csv(URL_CSV_SAC_CLIENTES, dtype=str)
+        if df_cli is not None and not df_cli.empty:
+            cols = [c.strip() for c in df_cli.columns]
 
-    df = pd.read_csv(url)
+            def find_cli_col(candidates, default_idx):
+                for cand in candidates:
+                    for c in cols:
+                        if c.lower() == cand.lower():
+                            return c
+                return cols[default_idx] if len(cols) > default_idx else ""
 
-    def parse_smart_date(val):
-        if pd.isna(val):
-            return None
-        val_str = str(val).strip()
-        if not val_str or val_str.lower() in ["nan", "none", "nat", ""]:
-            return None
+            col_c_cliente = find_cli_col(["Cliente", "cliente"], 0)
+            col_c_local = find_cli_col(["Local", "local"], 1)
+            col_c_local_int = find_cli_col(["Local interno", "Local Interno", "local interno"], 2)
+            col_c_maquina = find_cli_col(["Máquina", "Maquina", "maquina"], 3)
+            col_c_modelo = find_cli_col(["Modelo de máquina", "Modelo de Máquina", "Modelo Maquina", "modelo de maquina"], 4)
+            col_c_filial = find_cli_col(["Filial Responsavel", "Filial Responsável", "Filial", "filial responsavel", "Cidade", "cidade"], 5)
 
-        # 1. Número de série do Excel
-        try:
-            val_num = float(val_str)
-            if 35000 <= val_num <= 65000:
-                return pd.to_datetime(val_num, unit="D", origin="1899-12-30").date()
-        except (ValueError, TypeError):
-            pass
+            for idx, r in df_cli.iterrows():
+                def val_de(col):
+                    return str(r[col]).strip() if col and col in r and pd.notna(r[col]) else ""
 
-        # 2. String de data
-        data_pura = val_str.split(" ")[0].split("T")[0].strip()
+                cli = val_de(col_c_cliente)
+                loc = val_de(col_c_local)
+                loc_int = val_de(col_c_local_int) or loc
+                maq = val_de(col_c_maquina)
+                mod = val_de(col_c_modelo)
+                filial = val_de(col_c_filial)
 
-        for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d/%m/%y", "%d-%m-%Y"):
-            try:
-                return datetime.strptime(data_pura, fmt).date()
-            except ValueError:
-                continue
+                if cli and cli.lower() not in ["nan", "cliente"]:
+                    clientes_dados.append({
+                        "cliente": cli,
+                        "local": loc_int,
+                        "cidade": filial
+                    })
+                    lista_clientes_completa.append({
+                        "linha": idx + 2,
+                        "cliente": cli,
+                        "local": loc,
+                        "localInterno": loc_int,
+                        "maquina": maq,
+                        "modeloMaquina": mod,
+                        "filialResponsavel": filial
+                    })
+                    if filial and filial.lower() not in ["nan", "cidade", "filial", "filial responsável", "filial responsavel"]:
+                        cidades_clientes.append(filial)
+    except Exception:
+        pass
 
-        # 3. Fallback Pandas
-        try:
-            dt = pd.to_datetime(data_pura, dayfirst=True, errors="coerce")
-            if pd.notna(dt):
-                return dt.date()
-        except Exception:
-            pass
+    formas_pagamento = []
+    problemas = []
+    descricoes = []
+    try:
+        df_cfg = pd.read_csv(URL_CSV_SAC_CONFIGS, dtype=str)
+        if df_cfg is not None and not df_cfg.empty:
+            if len(df_cfg.columns) > 0:
+                col_a = df_cfg.columns[0]
+                formas_pagamento = [str(x).strip() for x in df_cfg[col_a].dropna().unique() if str(x).strip() and str(x).lower() not in ["nan", "forma de pagamento", "forma"]]
+            if len(df_cfg.columns) > 11:
+                col_l = df_cfg.columns[11]
+                problemas = [str(x).strip() for x in df_cfg[col_l].dropna().unique() if str(x).strip() and str(x).lower() not in ["nan", "problemas", "problema"]]
+            if len(df_cfg.columns) > 13:
+                col_n = df_cfg.columns[13]
+                descricoes = [str(x).strip() for x in df_cfg[col_n].dropna().unique() if str(x).strip() and str(x).lower() not in ["nan", "descrição", "descricao"]]
+    except Exception:
+        pass
 
-        return None
+    # ==========================================================================
+    # USUÁRIOS: COLUNA A (NOME), B (USER), C (SENHA), D (ACESSO)
+    # ==========================================================================
+    usuarios_validos = []
+    try:
+        df_usr = pd.read_csv(URL_CSV_SAC_USUARIOS, dtype=str)
+        if df_usr is not None and not df_usr.empty:
+            col_nome = df_usr.columns[0]
+            col_u = df_usr.columns[1] if len(df_usr.columns) > 1 else col_nome
+            col_s = df_usr.columns[2] if len(df_usr.columns) > 2 else col_u
+            col_acesso = df_usr.columns[3] if len(df_usr.columns) > 3 else ""
 
-    if "Data" in df.columns:
-        df["Data_Date"] = df["Data"].apply(parse_smart_date)
-        df["Data_Str"] = df["Data_Date"].apply(
-            lambda d: d.strftime("%d/%m/%Y") if pd.notna(d) and d is not None else ""
-        )
-        df["Ano"] = df["Data_Date"].apply(
-            lambda d: str(d.year) if pd.notna(d) and d is not None else "Não informado"
-        )
-    else:
-        df["Data_Date"] = None
-        df["Data_Str"] = ""
-        df["Ano"] = "Não informado"
+            for _, r in df_usr.iterrows():
+                nome = str(r[col_nome]).strip() if pd.notna(r[col_nome]) else ""
+                u = str(r[col_u]).strip() if pd.notna(r[col_u]) else ""
+                s = str(r[col_s]).strip() if pd.notna(r[col_s]) else ""
+                acesso = str(r[col_acesso]).strip() if (col_acesso and pd.notna(r[col_acesso])) else "Atendente"
 
-    month_map = {
-        "Janeiro": "Janeiro",
-        "janeiro": "Janeiro",
-        "Fevereiro": "Fevereiro",
-        "Março": "Março",
-        "Abril": "Abril",
-        "Maio": "Maio",
-        "Junho": "Junho",
-        "Julho": "Julho",
-        "Agosto": "Agosto",
-        "Setembro": "Setembro",
-        "setembro": "Setembro",
-        "Outubro": "Outubro",
-        "Novembro": "Novembro",
-        "Dezembro": "Dezembro",
+                if u and u.lower() not in ["nan", "usuario", "usuário", "login"]:
+                    usuarios_validos.append({
+                        "nome": nome or u,
+                        "usuario": u,
+                        "senha": s,
+                        "acesso": acesso if acesso else "Atendente"
+                    })
+    except Exception:
+        pass
+
+    maior_sac_ano = {}
+    chamados_salvos = []
+    try:
+        df_ch = pd.read_csv(URL_CSV_SAC_CHAMADOS, dtype=str)
+        if df_ch is not None and not df_ch.empty:
+            cols = [c.strip() for c in df_ch.columns]
+            
+            def get_col(candidates):
+                for cand in candidates:
+                    for c in cols:
+                        if c.lower() == cand.lower():
+                            return c
+                return None
+
+            col_chamado = get_col(["Chamado", "chamado"]) or cols[0]
+            col_data = get_col(["Data", "data"]) or (cols[1] if len(cols) > 1 else "")
+            col_cli = get_col(["Cliente", "cliente"]) or (cols[2] if len(cols) > 2 else "")
+            col_loc = get_col(["Local Interno", "local interno", "localInterno"]) or (cols[3] if len(cols) > 3 else "")
+            col_cid = get_col(["Filial Responsável", "Filial Responsavel", "Cidade", "cidade"]) or (cols[4] if len(cols) > 4 else "")
+            col_desc = get_col(["Descrição", "Descricao", "descricao"]) or (cols[5] if len(cols) > 5 else "")
+            col_prod = get_col(["Produto", "produto"]) or (cols[6] if len(cols) > 6 else "")
+            col_dt_trans = get_col(["Data da Transação", "Data da Transacao", "dataTransacao"]) or (cols[7] if len(cols) > 7 else "")
+            col_hr_trans = get_col(["Hora da Transação", "Hora da Transacao", "horaTransacao"]) or (cols[8] if len(cols) > 8 else "")
+            col_val = get_col(["Valor", "Valor(R$)", "valor"]) or (cols[9] if len(cols) > 9 else "")
+            col_nome_atend = get_col(["Nome/Sobrenome", "Nome", "nomeSobrenome"]) or (cols[10] if len(cols) > 10 else "")
+            col_cel = get_col(["Celular", "celular"]) or (cols[11] if len(cols) > 11 else "")
+            col_prob = get_col(["Problemas", "Problema", "problemas"]) or (cols[12] if len(cols) > 12 else "")
+            col_pag = get_col(["Forma de Pagamento", "Forma Pagamento", "formaPgto"]) or (cols[13] if len(cols) > 13 else "")
+            col_reemb = get_col(["Reembolso", "reembolso", "Reebolso"])
+            col_pix = get_col(["Pix - Reembolso", "Pix", "pix"])
+            col_atend = get_col(["Atendente", "atendente"])
+            col_dthr = get_col(["Data/Hora do lançamento", "Data/Hora", "dataHoraLancamento"])
+
+            for idx, r in df_ch.iterrows():
+                val = str(r[col_chamado]).strip() if col_chamado and pd.notna(r[col_chamado]) else ""
+                if not val or val.lower() in ["nan", "chamado"]:
+                    continue
+
+                m = re.search(r'SAC-(\d{4})-(\d+)', val, re.IGNORECASE)
+                if m:
+                    ano = m.group(1)
+                    seq = int(m.group(2))
+                    maior_sac_ano[ano] = max(maior_sac_ano.get(ano, 0), seq)
+
+                def get_val(col_name):
+                    return str(r[col_name]).strip() if col_name and col_name in r and pd.notna(r[col_name]) else ""
+
+                chamados_salvos.append({
+                    "linha": idx + 2,
+                    "chamado": val,
+                    "data": get_val(col_data),
+                    "cliente": get_val(col_cli),
+                    "localInterno": get_val(col_loc),
+                    "cidade": get_val(col_cid),
+                    "descricao": get_val(col_desc),
+                    "produto": get_val(col_prod),
+                    "dataTransacao": get_val(col_dt_trans),
+                    "horaTransacao": get_val(col_hr_trans),
+                    "valor": get_val(col_val),
+                    "nomeSobrenome": get_val(col_nome_atend),
+                    "celular": get_val(col_cel),
+                    "problemas": get_val(col_prob),
+                    "formaPgto": get_val(col_pag),
+                    "reembolso": get_val(col_reemb),
+                    "pix": get_val(col_pix),
+                    "atendente": get_val(col_atend),
+                    "dataHoraLancamento": get_val(col_dthr)
+                })
+    except Exception:
+        pass
+
+    chamados_salvos.reverse()
+
+    return {
+        "clientes": clientes_dados,
+        "cadastro_clientes": lista_clientes_completa,
+        "formas_pagamento": sorted(formas_pagamento),
+        "cidades": sorted(list(set(cidades_clientes))),
+        "problemas": sorted(problemas),
+        "descricoes": sorted(descricoes),
+        "usuarios": usuarios_validos,
+        "maior_sac_ano": maior_sac_ano,
+        "chamados": chamados_salvos
     }
 
-    if "Mês" in df.columns:
-        df["Mês_Clean"] = (
-            df["Mês"]
-            .fillna("")
-            .astype(str)
-            .str.capitalize()
-            .str.strip()
-            .map(month_map)
-        )
-    else:
-        df["Mês_Clean"] = "Não informado"
+dados_sac = carregar_dados_sac()
+dados_sac_json = json.dumps(dados_sac, ensure_ascii=False)
+total_chamados_carregados = len(dados_sac["chamados"])
 
-    if "$" in df.columns:
-        df["Valor"] = pd.to_numeric(
-            df["$"]
-            .astype(str)
-            .str.replace("R$", "", regex=False)
-            .str.replace(",", ".")
-            .str.strip(),
-            errors="coerce",
-        ).fillna(0)
-    else:
-        df["Valor"] = 0.0
+html_code = f"""
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Executivo - Gestão SAC</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body {{ 
+      font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+      background-color: #f1f5f9; 
+      color: #1e293b; 
+      margin: 0;
+      padding: 0;
+    }}
+    .kpi-card {{
+      background-color: #ffffff;
+      border: 1px solid #e2e8f0;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }}
+    .kpi-card:hover {{
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }}
+    .nav-btn.active {{ 
+      background-color: #0284c7; 
+      color: #ffffff; 
+      box-shadow: 0 4px 6px -1px rgba(2, 132, 199, 0.25);
+    }}
+    .nav-btn.inactive {{ 
+      background-color: #ffffff; 
+      color: #64748b; 
+      border: 1px solid #e2e8f0; 
+    }}
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen">
 
-    df["Cliente"] = (
-        df["Cliente"].fillna("Não informado").astype(str)
-        if "Cliente" in df.columns
-        else "Não informado"
-    )
-    df["Local Interno"] = (
-        df["Local Interno"].fillna("Não informado").astype(str)
-        if "Local Interno" in df.columns
-        else "Não informado"
-    )
-    df["Problemas"] = (
-        df["Problemas"].fillna("Outros").astype(str)
-        if "Problemas" in df.columns
-        else "Outros"
-    )
-    df["Descrição"] = (
-        df["Descrição"].fillna("Sem descrição").astype(str)
-        if "Descrição" in df.columns
-        else "Sem descrição"
-    )
+  <iframe name="target_post_frame" id="target_post_frame" style="display:none; width:0; height:0; border:0;"></iframe>
+  <form id="hiddenSACSubmissionForm" action="{APPS_SCRIPT_SAC_WEBAPP_URL}" method="POST" target="target_post_frame" style="display:none;">
+    <input type="hidden" name="data" id="hiddenSACSubmissionData">
+  </form>
 
-    return df
-
-
-df = load_data()
-
-# Limites seguros do calendário
-hoje = datetime.now().date()
-datas_validas = df["Data_Date"].dropna()
-min_data_calendario = min(datas_validas.min(), hoje) if not datas_validas.empty else hoje
-max_data_calendario = max(datas_validas.max(), hoje) if not datas_validas.empty else hoje
-
-# Mapeamento do Mês Atual e Anterior
-meses_do_ano = {
-    1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril", 5: "Maio", 6: "Junho",
-    7: "Julho", 8: "Agosto", 9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro",
-}
-mes_atual_num = datetime.now().month
-mes_atual_nome = meses_do_ano.get(mes_atual_num, "Janeiro")
-mes_anterior_num = 12 if mes_atual_num == 1 else mes_atual_num - 1
-mes_anterior_nome = meses_do_ano.get(mes_anterior_num, "Dezembro")
-
-months_order = [
-    "Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
-]
-
-idx_mes_atual = months_order.index(mes_atual_nome) if mes_atual_nome in months_order else len(months_order) - 1
-
-# --- FILTROS EXECUTIVOS NA BARRA LATERAL ---
-st.sidebar.title("⚙️ Filtros & Ações")
-
-anos_disponiveis = sorted(
-    [str(a) for a in df["Ano"].unique() if str(a) not in ["Não informado", "nan", "None", ""]],
-    reverse=True,
-)
-anos_opcoes = ["Todos"] + anos_disponiveis
-selected_year = st.sidebar.selectbox("Ano de Referência", anos_opcoes, index=0)
-
-# Filtragem Global pelo Ano
-filtered_df = df.copy()
-if selected_year != "Todos":
-    filtered_df = filtered_df[filtered_df["Ano"] == selected_year]
-
-# Variáveis globais de métricas
-total_chamados = len(filtered_df)
-total_devolvido = filtered_df["Valor"].sum()
-top_cliente = (
-    filtered_df["Cliente"].value_counts().index[0]
-    if len(filtered_df) > 0
-    else "-"
-)
-top_problema = (
-    filtered_df["Problemas"].value_counts().index[0]
-    if len(filtered_df) > 0
-    else "-"
-)
-
-# --- BOTÃO DE GERAR RELATÓRIO PDF NA BARRA LATERAL ---
-st.sidebar.markdown("---")
-st.sidebar.subheader("📄 Relatório Executivo")
-
-active_filters_dict = {
-    "ano": selected_year,
-}
-
-pdf_full_bytes = generate_full_pdf_report(
-    filtered_df,
-    total_chamados,
-    total_devolvido,
-    top_cliente,
-    top_problema,
-    active_filters_dict,
-)
-
-st.sidebar.download_button(
-    label="📥 Gerar Relatório Completo (PDF)",
-    data=pdf_full_bytes,
-    file_name=f"Relatorio_Executivo_SAC_MasterCafe_{selected_year}.pdf",
-    mime="application/pdf",
-    help="Exportar dados consolidados em formato PDF",
-    use_container_width=True,
-)
-
-if st.sidebar.button("🔄 Atualizar Dados", use_container_width=True):
-    st.cache_data.clear()
-    st.rerun()
-
-# --- CABEÇALHO PRINCIPAL ---
-st.markdown(
-    """
-    <div class="header-card">
-        <div class="header-title">☕ Master Café — Dashboard Executivo SAC</div>
-        <div class="header-subtitle">Painel de Gestão da Qualidade, Atendimento e Reembolsos Financeiros</div>
+  <!-- MODAL DE PROCESSAMENTO / AÇÃO EM ANDAMENTO -->
+  <div id="modalLoadingAcao" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl border border-slate-100 flex flex-col items-center text-center space-y-4 animate-in fade-in zoom-in duration-200">
+      <div id="modalIconContainer" class="w-16 h-16 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shadow-inner">
+        <svg id="modalSpinner" class="animate-spin h-8 w-8 text-sky-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        <i id="modalIconCheck" data-lucide="check" class="hidden w-8 h-8 text-emerald-600"></i>
+        <i id="modalIconTrash" data-lucide="trash-2" class="hidden w-8 h-8 text-rose-600"></i>
+      </div>
+      <div>
+        <h3 id="modalLoadingTitle" class="text-base font-bold text-slate-900">Processando Ação...</h3>
+        <p id="modalLoadingSub" class="text-xs text-slate-500 mt-1">Sua solicitação está sendo transmitida e registrada.</p>
+      </div>
+      <div id="modalProgressBar" class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+        <div class="bg-sky-500 h-full w-2/3 animate-pulse"></div>
+      </div>
     </div>
-    """,
-    unsafe_allow_html=True,
-)
+  </div>
 
-# --- 1. CARDS DE KPIS ---
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Total de Chamados", f"{total_chamados:,}".replace(",", "."))
-c2.metric(
-    "Total Reembolsado",
-    f"R$ {total_devolvido:,.2f}".replace(",", "v")
-    .replace(".", ",")
-    .replace("v", "."),
-)
-c3.metric("Principal Cliente", top_cliente)
-c4.metric("Principal Falha", top_problema)
-
-st.markdown("---")
-
-# --- 2. INSIGHTS AUTOMÁTICOS ---
-st.subheader("💡 Insights & Destaques Gerenciais Automáticos")
-i1, i2, i3 = st.columns(3)
-
-with i1:
-    st.markdown(
-        """
-        <div class="insight-card" style="border-left: 4px solid #38bdf8;">
-            <h4 style="color:#38bdf8; margin:0 0 8px 0; font-size: 15px;">Pico Operacional em Agosto</h4>
-            <p style="font-size:13px; color:#cbd5e1; margin:0; line-height: 1.4;">Agosto concentrou o maior volume com <b>1.495 chamados</b> e <b>R$ 8.128,78</b> reembolsados, impulsionado por Senac Araraquara e Shopee SBC.</p>
+  <!-- TELA INICIAL DE LOGIN DO SISTEMA (POSICIONADA DIRETAMENTE NO TOPO DA PÁGINA) -->
+  <div id="systemLoginScreen" class="w-full flex justify-center pt-8 sm:pt-12 px-4 pb-12">
+    <div class="max-w-md w-full bg-white p-8 sm:p-10 rounded-3xl border border-slate-200 shadow-2xl space-y-6">
+      
+      <div class="text-center space-y-3">
+        <div class="inline-flex items-center justify-center p-2 bg-white rounded-2xl border border-slate-200 shadow-sm mx-auto overflow-hidden" style="height: 64px; min-width: 64px;">
+          <img src="{logo_base64_src}" alt="Logotipo" class="max-h-12 w-auto object-contain" onerror="this.style.display='none'; document.getElementById('loginFallbackIcon').style.display='flex';">
+          <div id="loginFallbackIcon" style="display: {'none' if logo_base64_src else 'flex'};" class="w-12 h-12 bg-amber-700 text-white rounded-xl items-center justify-center font-black text-base">
+            ☕
+          </div>
         </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-with i2:
-    st.markdown(
-        """
-        <div class="insight-card" style="border-left: 4px solid #34d399;">
-            <h4 style="color:#34d399; margin:0 0 8px 0; font-size: 15px;">Gargalo Técnico em Bebidas e Snacks</h4>
-            <p style="font-size:13px; color:#cbd5e1; margin:0; line-height: 1.4;">"Produto Enroscado" e "Bebida Não Entregue" somam a maioria absoluta das reclamações, exigindo ajuste em molas e sensores.</p>
+        <div>
+          <h2 class="text-xl font-black text-slate-900">Acesso ao Sistema</h2>
+          <p class="text-xs text-slate-500 mt-0.5">Painel Executivo de Gestão, SAC & Atendimento</p>
         </div>
-        """,
-        unsafe_allow_html=True,
-    )
+      </div>
 
-with i3:
-    st.markdown(
-        """
-        <div class="insight-card" style="border-left: 4px solid #fbbf24;">
-            <h4 style="color:#fbbf24; margin:0 0 8px 0; font-size: 15px;">Concentração em Teleperformance</h4>
-            <p style="font-size:13px; color:#cbd5e1; margin:0; line-height: 1.4;">A conta Teleperformance responde por <b>1.949 chamados</b> no acumulado do ano, representando mais de 23% de toda a demanda do SAC.</p>
+      <form id="globalLoginForm" onsubmit="realizarLoginGlobal(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Usuário para Login *</label>
+          <input type="text" id="globalLoginUser" placeholder="Digite seu usuário..." required class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium">
         </div>
-        """,
-        unsafe_allow_html=True,
-    )
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Senha *</label>
+          <input type="password" id="globalLoginPass" placeholder="••••••••" required class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+        </div>
+        <div id="globalLoginErro" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+          <i data-lucide="alert-circle" class="w-4 h-4"></i>
+          <span>Usuário ou senha incorretos!</span>
+        </div>
+        <button type="submit" class="w-full py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-lg shadow-sky-600/25 transition flex items-center justify-center gap-2 cursor-pointer">
+          <i data-lucide="log-in" class="w-4 h-4"></i>
+          Entrar no Sistema
+        </button>
+      </form>
 
-# --- 3. DESTAQUES MÊS A MÊS COM FILTROS DE COMPARAÇÃO ---
-st.markdown("### 📌 Destaques Mês a Mês & Locais Críticos")
+      <div class="pt-2 border-t border-slate-100 text-center">
+        <span class="text-[11px] text-slate-400">Validação oficial por níveis de acesso: <strong class="text-slate-600">Geral</strong> e <strong class="text-slate-600">Atendente</strong></span>
+      </div>
+    </div>
+  </div>
 
-months_choices = [
-    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-]
+  <!-- CONTAINER DO SISTEMA LOGADO -->
+  <div id="systemAppContainer" class="hidden">
 
-default_idx_a = months_choices.index(mes_anterior_nome) if mes_anterior_nome in months_choices else len(months_choices) - 2
-default_idx_b = months_choices.index(mes_atual_nome) if mes_atual_nome in months_choices else len(months_choices) - 1
-
-f_c1, f_c2, _ = st.columns([1, 1, 1.2])
-with f_c1:
-    mes_comp_a = st.selectbox(
-        "Mês A (Mês Anterior):",
-        months_choices,
-        index=default_idx_a,
-        key="comp_mes_a",
-    )
-with f_c2:
-    mes_comp_b = st.selectbox(
-        "Mês B (Mês Atual - Referência Crítica):",
-        months_choices,
-        index=default_idx_b,
-        key="comp_mes_b",
-    )
-
-ca, cs, ct3 = st.columns([1, 1, 1.2])
-
-with ca:
-    df_a = (
-        filtered_df[filtered_df["Mês_Clean"] == mes_comp_a]["Local Interno"]
-        .value_counts()
-        .head(5)
-        .reset_index()
-    )
-    df_a.columns = ["Local", "Chamados"]
-    fig_a = px.bar(
-        df_a,
-        x="Chamados",
-        y="Local",
-        orientation="h",
-        text="Chamados",
-        color_discrete_sequence=["#f59e0b"],
-    )
-    fig_a.update_traces(marker=dict(line=dict(width=0)))
-    fig_a.update_layout(yaxis=dict(autorange="reversed"))
-    fig_a = apply_powerbi_theme(
-        fig_a, title=f"Top 5 Locais — {mes_comp_a}", height=280
-    )
-    st.plotly_chart(fig_a, use_container_width=True)
-
-with cs:
-    df_b = (
-        filtered_df[filtered_df["Mês_Clean"] == mes_comp_b]["Local Interno"]
-        .value_counts()
-        .head(5)
-        .reset_index()
-    )
-    df_b.columns = ["Local", "Chamados"]
-    fig_b = px.bar(
-        df_b,
-        x="Chamados",
-        y="Local",
-        orientation="h",
-        text="Chamados",
-        color_discrete_sequence=["#0284c7"],
-    )
-    fig_b.update_traces(marker=dict(line=dict(width=0)))
-    fig_b.update_layout(yaxis=dict(autorange="reversed"))
-    fig_b = apply_powerbi_theme(
-        fig_b, title=f"Top 5 Locais — {mes_comp_b}", height=280
-    )
-    st.plotly_chart(fig_b, use_container_width=True)
-
-with ct3:
-    top3_mes_b = (
-        filtered_df[filtered_df["Mês_Clean"] == mes_comp_b]["Local Interno"]
-        .value_counts()
-        .head(3)
-        .index.tolist()
-    )
-
-    items_html = ""
-    for idx, loc in enumerate(top3_mes_b, 1):
-        loc_data = filtered_df[
-            (filtered_df["Mês_Clean"] == mes_comp_b) & (filtered_df["Local Interno"] == loc)
-        ]
-        main_prob = (
-            loc_data["Problemas"].value_counts().index[0]
-            if len(loc_data) > 0
-            else "N/A"
-        )
-        main_desc = (
-            loc_data["Descrição"].value_counts().index[0]
-            if len(loc_data) > 0
-            else "N/A"
-        )
-
-        items_html += f"""
-        <div style="background-color: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                <span style="font-weight: 600; color: #f8fafc; font-size: 13px;">{idx}. {loc}</span>
-                <span style="background-color: #0284c7; color: #ffffff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px;">
-                    {len(loc_data)} chamados
-                </span>
+    <!-- Header Superior -->
+    <header class="sticky top-0 z-40 bg-white/95 border-b border-slate-200 backdrop-blur-md px-6 py-3">
+      <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-4">
+          <div class="flex items-center justify-center p-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" style="height: 54px; min-width: 54px;">
+            <img id="headerLogoImg" src="{logo_base64_src}" alt="Logotipo" class="max-h-12 w-auto object-contain" onerror="this.style.display='none'; document.getElementById('headerFallbackIcon').style.display='flex';">
+            <div id="headerFallbackIcon" style="display: {'none' if logo_base64_src else 'flex'};" class="w-10 h-10 bg-amber-700 text-white rounded-lg items-center justify-center font-black text-sm">
+              ☕
             </div>
-            <div style="font-size: 11px; color: #94a3b8; line-height: 1.4;">
-                <div><b style="color: #cbd5e1;">Falha:</b> {main_prob}</div>
-                <div><b style="color: #cbd5e1;">Item:</b> {main_desc}</div>
-            </div>
+          </div>
+          <div>
+            <h1 class="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+              Painel Executivo de Gestão & SAC
+            </h1>
+            <p class="text-xs text-slate-500">Controle Operacional, Atendimento & Análises · {total_chamados_carregados} chamados registrados</p>
+          </div>
         </div>
-        """
-
-    if not items_html:
-        items_html = f"<p style='color:#94a3b8; font-size:12px; margin-top:20px;'>Nenhum registro encontrado para o mês de {mes_comp_b}.</p>"
-
-    st.markdown(
-        f"""
-        <div style="
-            background-color: #1e293b; 
-            border: 1px solid #334155; 
-            border-radius: 8px; 
-            padding: 16px; 
-            height: 280px; 
-            box-sizing: border-box; 
-            overflow-y: auto;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-        ">
-            <div style="font-family: 'Segoe UI', sans-serif; font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
-                <span>📌</span> Top 3 Locais Críticos ({mes_comp_b})
-            </div>
-            {items_html}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-st.markdown("---")
-
-# --- 4. VALORES E CHAMADOS MENSAL (HISTÓRICO COMPLETO) ---
-g1, g2 = st.columns(2)
-
-with g1:
-    ch_mes = (
-        filtered_df.groupby("Mês_Clean")["Problemas"]
-        .count()
-        .reindex(months_choices)
-        .fillna(0)
-        .reset_index()
-    )
-    ch_mes.columns = ["Mês_Clean", "Chamado"]
-    fig_ch = px.bar(
-        ch_mes,
-        x="Mês_Clean",
-        y="Chamado",
-        text="Chamado",
-        color_discrete_sequence=["#00b4d8"],
-    )
-    fig_ch.update_traces(marker=dict(line=dict(width=0)))
-    fig_ch = apply_powerbi_theme(
-        fig_ch, title="Chamados por Mês", height=320
-    )
-    fig_ch.update_xaxes(title_text="")
-    fig_ch.update_yaxes(title_text="Chamados")
-    st.plotly_chart(fig_ch, use_container_width=True)
-
-with g2:
-    val_mes = (
-        filtered_df.groupby("Mês_Clean")["Valor"]
-        .sum()
-        .reindex(months_choices)
-        .fillna(0)
-        .reset_index()
-    )
-    fig_val = px.bar(
-        val_mes,
-        x="Mês_Clean",
-        y="Valor",
-        text_auto=".2f",
-        color_discrete_sequence=["#10b981"],
-    )
-    fig_val.update_traces(marker=dict(line=dict(width=0)))
-    fig_val = apply_powerbi_theme(
-        fig_val, title="Valores Devolvidos por Mês em R$", height=320
-    )
-    fig_val.update_xaxes(title_text="")
-    fig_val.update_yaxes(title_text="Reembolso (R$)")
-    st.plotly_chart(fig_val, use_container_width=True)
-
-
-
-# --- 5. RANKINGS ANUAIS ---
-st.markdown("---")
-r1, r2 = st.columns(2)
-
-with r1:
-    t10_cli = filtered_df["Cliente"].value_counts().head(10).reset_index()
-    t10_cli.columns = ["Cliente", "Chamados"]
-    fig_cli = px.bar(
-        t10_cli,
-        x="Chamados",
-        y="Cliente",
-        orientation="h",
-        text="Chamados",
-        color_discrete_sequence=["#6366f1"],
-    )
-    fig_cli.update_traces(marker=dict(line=dict(width=0)))
-    fig_cli.update_layout(yaxis=dict(autorange="reversed"))
-    fig_cli = apply_powerbi_theme(
-        fig_cli, title="Top 10 Clientes do Período", height=350
-    )
-    st.plotly_chart(fig_cli, use_container_width=True)
-
-with r2:
-    t10_loc = filtered_df["Local Interno"].value_counts().head(10).reset_index()
-    t10_loc.columns = ["Local Interno", "Chamados"]
-    fig_loc = px.bar(
-        t10_loc,
-        x="Chamados",
-        y="Local Interno",
-        orientation="h",
-        text="Chamados",
-        color_discrete_sequence=["#14b8a6"],
-    )
-    fig_loc.update_traces(marker=dict(line=dict(width=0)))
-    fig_loc.update_layout(yaxis=dict(autorange="reversed"))
-    fig_loc = apply_powerbi_theme(
-        fig_loc, title="Top 10 Locais Internos do Período", height=350
-    )
-    st.plotly_chart(fig_loc, use_container_width=True)
-
-
-# --- 6. GRÁFICOS DIÁRIOS (CHAMADOS E VALORES POR DIA COM ORDENAÇÃO CRONOLÓGICA PERFEITA) ---
-st.markdown("---")
-
-# Filtro Dinâmico de Mês para os Gráficos Diários com o Mês Atual pré-selecionado
-c_filtro_m1, _ = st.columns([1.2, 2.8])
-with c_filtro_m1:
-    mes_graf_diario = st.selectbox(
-        "📅 Filtrar Mês dos Gráficos Diários:",
-        months_order,
-        index=idx_mes_atual,
-        key="filtro_mes_graficos_diarios"
-    )
-
-# Filtra a base temporal conforme o mês selecionado
-df_datas_validas = filtered_df[filtered_df["Data_Date"].notna()].copy()
-if mes_graf_diario != "Todos":
-    df_datas_validas = df_datas_validas[df_datas_validas["Mês_Clean"] == mes_graf_diario]
-
-col_dia_graf1, col_dia_graf2 = st.columns(2)
-
-with col_dia_graf1:
-    if not df_datas_validas.empty:
-        # Agrupamento rigorosamente ordenado pela data real
-        ch_por_dia = (
-            df_datas_validas.groupby("Data_Date")
-            .size()
-            .reset_index(name="Quantidade de Chamados")
-            .sort_values(by="Data_Date", ascending=True)
-        )
-        ch_por_dia["Data_Formatada"] = ch_por_dia["Data_Date"].apply(lambda d: d.strftime("%d/%m/%Y"))
-        ordem_cronologica_dias = ch_por_dia["Data_Formatada"].tolist()
-
-        titulo_ch_dia = f"Quantidade de Chamados por Dia ({mes_graf_diario})" if mes_graf_diario != "Todos" else "Quantidade de Chamados por Dia (Período Completo)"
-
-        fig_dia_ch = px.bar(
-            ch_por_dia,
-            x="Data_Formatada",
-            y="Quantidade de Chamados",
-            text="Quantidade de Chamados",
-            color_discrete_sequence=["#38bdf8"],
-            category_orders={"Data_Formatada": ordem_cronologica_dias},
-        )
-        fig_dia_ch.update_traces(marker=dict(line=dict(width=0)))
-        fig_dia_ch = apply_powerbi_theme(
-            fig_dia_ch, title=titulo_ch_dia, height=340
-        )
-        # Fixa a ordem das categorias como lista ordenada exata
-        fig_dia_ch.update_xaxes(
-            title_text="Data",
-            tickangle=-45,
-            type="category",
-            categoryorder="array",
-            categoryarray=ordem_cronologica_dias
-        )
-        fig_dia_ch.update_yaxes(title_text="Qtd Chamados")
-        st.plotly_chart(fig_dia_ch, use_container_width=True)
-    else:
-        st.info(f"Sem dados de chamados registrados para o mês de {mes_graf_diario}.")
-
-with col_dia_graf2:
-    if not df_datas_validas.empty:
-        # Agrupamento rigorosamente ordenado pela data real
-        val_por_dia = (
-            df_datas_validas.groupby("Data_Date")["Valor"]
-            .sum()
-            .reset_index(name="Valor Devolvido")
-            .sort_values(by="Data_Date", ascending=True)
-        )
-        val_por_dia["Data_Formatada"] = val_por_dia["Data_Date"].apply(lambda d: d.strftime("%d/%m/%Y"))
-        ordem_cronologica_dias_val = val_por_dia["Data_Formatada"].tolist()
-
-        titulo_val_dia = f"Valores Devolvidos por Dia em R$ ({mes_graf_diario})" if mes_graf_diario != "Todos" else "Valores Devolvidos por Dia em R$ (Período Completo)"
-
-        fig_dia_val = px.bar(
-            val_por_dia,
-            x="Data_Formatada",
-            y="Valor Devolvido",
-            text_auto=".2f",
-            color_discrete_sequence=["#10b981"],
-            category_orders={"Data_Formatada": ordem_cronologica_dias_val},
-        )
-        fig_dia_val.update_traces(marker=dict(line=dict(width=0)))
-        fig_dia_val = apply_powerbi_theme(
-            fig_dia_val, title=titulo_val_dia, height=340
-        )
-        # Fixa a ordem das categorias como lista ordenada exata
-        fig_dia_val.update_xaxes(
-            title_text="Data",
-            tickangle=-45,
-            type="category",
-            categoryorder="array",
-            categoryarray=ordem_cronologica_dias_val
-        )
-        fig_dia_val.update_yaxes(title_text="Total Reembolsado (R$)")
-        st.plotly_chart(fig_dia_val, use_container_width=True)
-    else:
-        st.info(f"Sem valores devolvidos registrados para o mês de {mes_graf_diario}.")
-
-# --- 7. FILTROS DINÂMICOS LOCAIS ---
-st.markdown("---")
-
-dev_col1, dev_col2 = st.columns(2)
-
-with dev_col1:
-    st.markdown("**Top Devoluções (R$) - Filtro de Mês Dinâmico**")
-    dev_month_selected = st.selectbox(
-        "Mudar Mês (Top Devoluções R$)",
-        months_order,
-        index=idx_mes_atual,
-        key="dev_month_filter",
-    )
-
-    dev_df_m = filtered_df.copy()
-    if dev_month_selected != "Todos":
-        dev_df_m = dev_df_m[dev_df_m["Mês_Clean"] == dev_month_selected]
-
-    dev_loc_m = (
-        dev_df_m.groupby("Local Interno")["Valor"]
-        .sum()
-        .sort_values(ascending=False)
-        .head(10)
-        .reset_index()
-    )
-    fig_dev_m = px.bar(
-        dev_loc_m,
-        x="Valor",
-        y="Local Interno",
-        orientation="h",
-        text_auto=".2f",
-        color_discrete_sequence=["#10b981"],
-    )
-    fig_dev_m.update_traces(marker=dict(line=dict(width=0)))
-    fig_dev_m.update_layout(yaxis=dict(autorange="reversed"))
-    fig_dev_m = apply_powerbi_theme(
-        fig_dev_m,
-        title=f"Top Devoluções (R$) — {dev_month_selected}",
-        height=320,
-    )
-    st.plotly_chart(fig_dev_m, use_container_width=True)
-
-with dev_col2:
-    st.markdown("**Top Devoluções (R$) - Filtro de Dia Dinâmico**")
-    day_dev_selected = st.date_input(
-        "Mudar Dia (Top Devoluções R$):",
-        value=hoje,
-        min_value=min_data_calendario,
-        max_value=max_data_calendario,
-        format="DD/MM/YYYY",
-        key="day_dev_calendar",
-    )
-
-    dev_df_d = filtered_df.copy()
-    day_dev_str = day_dev_selected.strftime("%d/%m/%Y")
-    dev_df_d = dev_df_d[
-        (dev_df_d["Data_Date"] == day_dev_selected)
-        | (dev_df_d["Data_Str"] == day_dev_str)
-    ]
-
-    dev_loc_d = (
-        dev_df_d.groupby("Local Interno")["Valor"]
-        .sum()
-        .sort_values(ascending=False)
-        .head(10)
-        .reset_index()
-    )
-    fig_dev_d = px.bar(
-        dev_loc_d,
-        x="Valor",
-        y="Local Interno",
-        orientation="h",
-        text_auto=".2f",
-        color_discrete_sequence=["#10b981"],
-    )
-    fig_dev_d.update_traces(marker=dict(line=dict(width=0)))
-    fig_dev_d.update_layout(yaxis=dict(autorange="reversed"))
-    fig_dev_d = apply_powerbi_theme(
-        fig_dev_d,
-        title=f"Top Devoluções (R$) — {day_dev_str}",
-        height=320,
-    )
-    st.plotly_chart(fig_dev_d, use_container_width=True)
-
-loc_col1, loc_col2 = st.columns(2)
-
-with loc_col1:
-    st.markdown("**Top 10 Locais Internos - Filtro de Mês (Chamados)**")
-    ch_month_selected = st.selectbox(
-        "Mudar Mês (Top Locais Chamados)",
-        months_order,
-        index=idx_mes_atual,
-        key="ch_loc_month_filter",
-    )
-
-    ch_df_m = filtered_df.copy()
-    if ch_month_selected != "Todos":
-        ch_df_m = ch_df_m[ch_df_m["Mês_Clean"] == ch_month_selected]
-
-    dia_loc_m = ch_df_m["Local Interno"].value_counts().head(10).reset_index()
-    dia_loc_m.columns = ["Local Interno", "Chamados"]
-
-    fig_loc_m = px.bar(
-        dia_loc_m,
-        x="Chamados",
-        y="Local Interno",
-        orientation="h",
-        text="Chamados",
-        color_discrete_sequence=["#38bdf8"],
-    )
-    fig_loc_m.update_traces(marker=dict(line=dict(width=0)))
-    fig_loc_m.update_layout(yaxis=dict(autorange="reversed"))
-    fig_loc_m = apply_powerbi_theme(
-        fig_loc_m,
-        title=f"Top 10 Locais no Mês — {ch_month_selected}",
-        height=320,
-    )
-    st.plotly_chart(fig_loc_m, use_container_width=True)
-
-with loc_col2:
-    st.markdown("**Top 10 Locais Internos - Filtro de Dia (Calendário)**")
-    day_selected_loc = st.date_input(
-        "Mudar Dia (Top Locais Chamados):",
-        value=hoje,
-        min_value=min_data_calendario,
-        max_value=max_data_calendario,
-        format="DD/MM/YYYY",
-        key="day_loc_calendar",
-    )
-
-    day_df = filtered_df.copy()
-    day_str_target = day_selected_loc.strftime("%d/%m/%Y")
-    day_df = day_df[
-        (day_df["Data_Date"] == day_selected_loc)
-        | (day_df["Data_Str"] == day_str_target)
-    ]
-
-    dia_loc = day_df["Local Interno"].value_counts().head(10).reset_index()
-    dia_loc.columns = ["Local Interno", "Chamados"]
-
-    fig_dia = px.bar(
-        dia_loc,
-        x="Chamados",
-        y="Local Interno",
-        orientation="h",
-        text="Chamados",
-        color_discrete_sequence=["#f59e0b"],
-    )
-    fig_dia.update_traces(marker=dict(line=dict(width=0)))
-    fig_dia.update_layout(yaxis=dict(autorange="reversed"))
-    fig_dia = apply_powerbi_theme(
-        fig_dia,
-        title=f"Top 10 Locais no Dia — {day_str_target}",
-        height=320,
-    )
-    st.plotly_chart(fig_dia, use_container_width=True)
-
-# --- 8. TABELAS DETALHADAS OPERACIONAIS ---
-st.markdown("---")
-st.markdown("### 📅 Detalhamento Operacional de Registros")
-
-lista_clientes_dinamica = ["Todos"] + sorted(
-    [
-        str(c).strip()
-        for c in filtered_df["Cliente"].dropna().unique()
-        if str(c).strip() not in ["Não informado", "nan", "None", ""]
-    ]
-)
-
-tab_chamados_dia, tab_mes_cli, tab_dia_cli, tab_mes_top3, tab_dia_top3 = st.tabs(
-    [
-        "📋 Chamados por Dia (Completa)",
-        "Por Mês e Cliente", 
-        "Por Data e Cliente", 
-        "Por Mês (Top 3 Locais)", 
-        "Por Dia (Top 3 Locais)"
-    ]
-)
-
-# --- ABA: TABELA DE CHAMADOS POR DIA (COM LOCAIS, DESCRIÇÃO, PROBLEMA E QUANTIDADE) ---
-with tab_chamados_dia:
-    st.markdown("#### Chamados por Dia — Detalhamento por Local Interno, Descrição e Problema")
-    
-    col_d_sel1, col_d_sel2 = st.columns([1, 2])
-    with col_d_sel1:
-        data_analitica_sel = st.date_input(
-            "📆 Escolha o Dia para Detalhar:",
-            value=hoje,
-            min_value=min_data_calendario,
-            max_value=max_data_calendario,
-            format="DD/MM/YYYY",
-            key="tb_dia_detalhado_calendar"
-        )
-    with col_d_sel2:
-        filtro_opc_loc = st.selectbox(
-            "Filtrar Local Interno (Opcional):",
-            ["Todos"] + sorted(filtered_df["Local Interno"].dropna().unique().tolist()),
-            key="tb_dia_detalhado_loc_filtro"
-        )
-
-    df_analitico_dia = filtered_df.copy()
-    data_analitica_str = data_analitica_sel.strftime("%d/%m/%Y")
-    
-    df_analitico_dia = df_analitico_dia[
-        (df_analitico_dia["Data_Date"] == data_analitica_sel) |
-        (df_analitico_dia["Data_Str"] == data_analitica_str)
-    ]
-    
-    if filtro_opc_loc != "Todos":
-        df_analitico_dia = df_analitico_dia[df_analitico_dia["Local Interno"] == filtro_opc_loc]
-
-    if not df_analitico_dia.empty:
-        tabela_detalhada = (
-            df_analitico_dia.groupby(["Local Interno", "Descrição", "Problemas"])
-            .agg(
-                Quantidade=("Valor", "count"),
-                Total_Reembolso=("Valor", "sum")
-            )
-            .reset_index()
-            .sort_values(by="Quantidade", ascending=False)
-            .rename(columns={"Problemas": "Problema", "Quantidade": "Quantidade de Chamados"})
-        )
         
-        tabela_detalhada.insert(0, "Data", data_analitica_str)
+        <!-- Navegação Entre Páginas e Informações do Atendente -->
+        <div class="flex items-center gap-3 flex-wrap">
+          <div class="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 flex-wrap">
+            <button id="navDashboardSAC" type="button" class="nav-btn active flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('dashboardSAC')">
+              <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+              Dashboard SAC
+            </button>
+            <button id="navSAC" type="button" class="nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('sac')">
+              <i data-lucide="headphones" class="w-4 h-4"></i>
+              Lançamento SAC
+            </button>
+            
+            <!-- BOTÃO COM LIBERAÇÃO POR PERMISSÃO: SÓ APARECE PARA ACESSO GERAL -->
+            <button id="navCadastroClientes" type="button" class="hidden nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('cadastroClientes')">
+              <i data-lucide="user-plus" class="w-4 h-4"></i>
+              Cadastro de Clientes
+            </button>
 
-        st.markdown(
-            f"**Exibindo registros da data:** `{data_analitica_str}` | "
-            f"**Total de chamados no dia:** `{tabela_detalhada['Quantidade de Chamados'].sum()}` | "
-            f"**Total reembolsado:** `R$ {tabela_detalhada['Total_Reembolso'].sum():,.2f}`".replace(",", "v").replace(".", ",").replace("v", ".")
-        )
+            <button type="button" onclick="executarRefresh()" title="Clique para recarregar da planilha" class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 cursor-pointer transition">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span> Sincronizar 🔄
+            </button>
+          </div>
 
-        st.dataframe(
-            tabela_detalhada[["Data", "Local Interno", "Descrição", "Problema", "Quantidade de Chamados"]],
-            use_container_width=True,
-            hide_index=True,
-        )
-    else:
-        st.warning(f"Nenhum chamado encontrado para a data '{data_analitica_str}'.")
+          <div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="text-right">
+              <span id="labelHeaderAtendente" class="text-xs font-bold text-slate-800 block">Atendente</span>
+              <span id="badgeHeaderNivelAcesso" class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block">Geral</span>
+            </div>
+            <button type="button" onclick="realizarLogoutGlobal()" title="Sair do Sistema" class="p-2 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition cursor-pointer">
+              <i data-lucide="log-out" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
 
-# --- ABA 1: POR MÊS E CLIENTE ---
-with tab_mes_cli:
-    c_m1, c_m2 = st.columns([1, 1.5])
-    with c_m1:
-        sel_tb_mes = st.selectbox(
-            "📅 Selecionar Mês:",
-            months_order,
-            index=idx_mes_atual,
-            key="tb_cli_mes_filter",
-        )
-    with c_m2:
-        sel_tb_cli_m = st.selectbox(
-            "👤 Selecionar Cliente:",
-            lista_clientes_dinamica,
-            index=0,
-            key="tb_cli_mes_client_filter",
-        )
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
-    df_tab_mes = filtered_df.copy()
-    if sel_tb_mes != "Todos":
-        df_tab_mes = df_tab_mes[df_tab_mes["Mês_Clean"] == sel_tb_mes]
-    if sel_tb_cli_m != "Todos":
-        df_tab_mes = df_tab_mes[df_tab_mes["Cliente"] == sel_tb_cli_m]
+      <!-- PÁGINA 1: DASHBOARD SAC -->
+      <div id="pageDashboardSAC" class="space-y-6">
+        <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <i data-lucide="sliders" class="w-4 h-4 text-sky-500"></i>
+              <span>Filtros do Painel SAC</span>
+            </div>
+            <span id="badgeFiltroSAC" class="text-xs font-medium text-slate-500">Filtrando: Todos os chamados</span>
+          </div>
 
-    if not df_tab_mes.empty:
-        tabela_mes_agrupada = (
-            df_tab_mes.groupby(["Problemas", "Descrição"])
-            .size()
-            .reset_index(name="Quantidade de Chamados")
-            .sort_values(by="Quantidade de Chamados", ascending=False)
-            .rename(columns={"Problemas": "Problema"})
-        )
-        st.markdown(
-            f"**Exibindo chamados para:** Mês `'{sel_tb_mes}'` | Cliente `'{sel_tb_cli_m}'` "
-            f"*(Total: {tabela_mes_agrupada['Quantidade de Chamados'].sum()} ocorrências)*"
-        )
-        st.dataframe(
-            tabela_mes_agrupada[["Problema", "Descrição", "Quantidade de Chamados"]],
-            use_container_width=True,
-            hide_index=True,
-        )
-    else:
-        st.warning(f"Nenhum registro encontrado para o mês '{sel_tb_mes}' e cliente '{sel_tb_cli_m}'.")
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Cliente</label>
+              <select id="filterSACCliente" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-slate-800">
+                <option value="ALL">Todos os Clientes</option>
+              </select>
+            </div>
 
-# --- ABA 2: POR DATA (CALENDÁRIO) E CLIENTE ---
-with tab_dia_cli:
-    c_d1, c_d2 = st.columns([1, 1.5])
-    with c_d1:
-        sel_tb_data = st.date_input(
-            "📆 Selecionar Data no Calendário:",
-            value=hoje,
-            min_value=min_data_calendario,
-            max_value=max_data_calendario,
-            format="DD/MM/YYYY",
-            key="tb_cli_dia_calendar",
-        )
-    with c_d2:
-        sel_tb_cli_d = st.selectbox(
-            "👤 Selecionar Cliente:",
-            lista_clientes_dinamica,
-            index=0,
-            key="tb_cli_dia_client_filter",
-        )
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Produto</label>
+              <select id="filterSACProduto" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-slate-800">
+                <option value="ALL">Todos os Produtos</option>
+                <option value="Café">Café</option>
+                <option value="Snaky">Snaky</option>
+              </select>
+            </div>
 
-    df_tab_dia = filtered_df.copy()
-    data_alvo_str = sel_tb_data.strftime("%d/%m/%Y")
-    df_tab_dia = df_tab_dia[
-        (df_tab_dia["Data_Date"] == sel_tb_data)
-        | (df_tab_dia["Data_Str"] == data_alvo_str)
-    ]
-    if sel_tb_cli_d != "Todos":
-        df_tab_dia = df_tab_dia[df_tab_dia["Cliente"] == sel_tb_cli_d]
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Atendente</label>
+              <select id="filterSACAtendente" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-slate-800">
+                <option value="ALL">Todos os Atendentes</option>
+              </select>
+            </div>
 
-    if not df_tab_dia.empty:
-        tabela_dia_agrupada = (
-            df_tab_dia.groupby(["Problemas", "Descrição"])
-            .size()
-            .reset_index(name="Quantidade de Chamados")
-            .sort_values(by="Quantidade de Chamados", ascending=False)
-            .rename(columns={"Problemas": "Problema"})
-        )
-        st.markdown(
-            f"**Exibindo chamados para:** Data `'{data_alvo_str}'` | Cliente `'{sel_tb_cli_d}'` "
-            f"*(Total: {tabela_dia_agrupada['Quantidade de Chamados'].sum()} ocorrências)*"
-        )
-        st.dataframe(
-            tabela_dia_agrupada[["Problema", "Descrição", "Quantidade de Chamados"]],
-            use_container_width=True,
-            hide_index=True,
-        )
-    else:
-        st.warning(f"Nenhum registro encontrado para a data '{data_alvo_str}' e cliente '{sel_tb_cli_d}'.")
+            <div class="flex items-end">
+              <button id="btnLimparFiltrosSAC" class="w-full py-2 px-4 rounded-xl border border-slate-300 bg-slate-100 text-xs font-semibold text-slate-600 hover:bg-slate-200 transition flex items-center justify-center gap-1.5 cursor-pointer">
+                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                Limpar Filtros
+              </button>
+            </div>
+          </div>
+        </section>
 
-# --- ABA 3: POR MÊS (TOP 3 LOCAIS) ---
-with tab_mes_top3:
-    c_m3_1, c_m3_2 = st.columns([1, 2])
-    with c_m3_1:
-        month_for_top3 = st.selectbox(
-            "📅 Selecionar Mês:",
-            months_order,
-            index=idx_mes_atual,
-            key="tb_top3_month_filter",
-        )
+        <!-- CARDS KPIS DO SAC -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total de Chamados</span>
+              <span class="p-1.5 rounded-lg bg-sky-50 text-sky-600"><i data-lucide="headphones" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3">
+              <span id="kpiSACTotal" class="text-xl font-bold tracking-tight text-slate-800">0</span>
+              <p id="kpiSACTotalSub" class="text-[11px] text-slate-400 mt-0.5">Ocorrências registradas</p>
+            </div>
+          </div>
 
-    month_df_top3 = filtered_df.copy()
-    if month_for_top3 != "Todos":
-        month_df_top3 = month_df_top3[month_df_top3["Mês_Clean"] == month_for_top3]
+          <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between border-emerald-200">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider">Valor Ressarcido</span>
+              <span class="p-1.5 rounded-lg bg-emerald-50 text-emerald-600"><i data-lucide="badge-dollar-sign" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3">
+              <span id="kpiSACValorTotal" class="text-xl font-bold tracking-tight text-emerald-600">R$ 0,00</span>
+              <p class="text-[11px] text-slate-400 mt-0.5">Soma total de reembolsos</p>
+            </div>
+          </div>
 
-    top_3_month_locals = (
-        month_df_top3["Local Interno"].value_counts().head(3).index.tolist()
-    )
+          <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between border-amber-200">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-amber-600 uppercase tracking-wider">Chamados Café</span>
+              <span class="p-1.5 rounded-lg bg-amber-50 text-amber-600"><i data-lucide="coffee" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3 flex items-baseline justify-between">
+              <div>
+                <span id="kpiSACCafé" class="text-xl font-bold tracking-tight text-amber-700">0</span>
+                <p class="text-[11px] text-slate-400 mt-0.5">Linha de Bebidas</p>
+              </div>
+              <span id="kpiSACCaféPct" class="text-xs font-semibold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800">0%</span>
+            </div>
+          </div>
 
-    if top_3_month_locals:
-        with c_m3_2:
-            selected_top_local_m = st.selectbox(
-                "🎯 Filtrar Local Interno (Mês):",
-                ["Exibir em Abas Separadas (Top 3)"] + top_3_month_locals,
-                key="top_3_local_m_filter",
-            )
+          <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between border-indigo-200">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-indigo-600 uppercase tracking-wider">Chamados Snaky</span>
+              <span class="p-1.5 rounded-lg bg-indigo-50 text-indigo-600"><i data-lucide="cookie" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3 flex items-baseline justify-between">
+              <div>
+                <span id="kpiSACSnaky" class="text-xl font-bold tracking-tight text-indigo-600">0</span>
+                <p class="text-[11px] text-slate-400 mt-0.5">Máquinas de Snacks</p>
+              </div>
+              <span id="kpiSACSnakyPct" class="text-xs font-semibold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800">0%</span>
+            </div>
+          </div>
 
-        def get_month_local_table(local_name):
-            c_df = month_df_top3[month_df_top3["Local Interno"] == local_name]
-            tb = (
-                c_df.groupby(["Problemas", "Descrição"])
-                .size()
-                .reset_index(name="Quantidade de Chamados")
-                .sort_values(by="Quantidade de Chamados", ascending=False)
-                .rename(columns={"Problemas": "Problema"})
-            )
-            return tb
+          <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Clientes Únicos</span>
+              <span class="p-1.5 rounded-lg bg-blue-50 text-blue-600"><i data-lucide="building" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3">
+              <span id="kpiSACClientes" class="text-xl font-bold tracking-tight text-slate-800">0</span>
+              <p class="text-[11px] text-slate-400 mt-0.5">Pontos atendidos</p>
+            </div>
+          </div>
 
-        if selected_top_local_m == "Exibir em Abas Separadas (Top 3)":
-            tabs_m = st.tabs([f"🥇 {loc}" for loc in top_3_month_locals])
-            for idx, tab in enumerate(tabs_m):
-                with tab:
-                    local_item = top_3_month_locals[idx]
-                    tb_local = get_month_local_table(local_item)
-                    st.markdown(f"**Registros do Local no Mês ({month_for_top3}):** `{local_item}`")
-                    st.dataframe(
-                        tb_local[["Problema", "Descrição", "Quantidade de Chamados"]],
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-        else:
-            tb_single_m = get_month_local_table(selected_top_local_m)
-            st.markdown(f"**Registros do Local no Mês ({month_for_top3}):** `{selected_top_local_m}`")
-            st.dataframe(
-                tb_single_m[["Problema", "Descrição", "Quantidade de Chamados"]],
-                use_container_width=True,
-                hide_index=True,
-            )
-    else:
-        st.warning(f"Nenhum registro encontrado para o mês de {month_for_top3}.")
+          <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Ticket Médio</span>
+              <span class="p-1.5 rounded-lg bg-cyan-50 text-cyan-600"><i data-lucide="calculator" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3">
+              <span id="kpiSACTicketMedio" class="text-xl font-bold tracking-tight text-slate-800">R$ 0,00</span>
+              <p class="text-[11px] text-slate-400 mt-0.5">Média por chamado</p>
+            </div>
+          </div>
+        </section>
 
-# --- ABA 4: POR DIA (TOP 3 LOCAIS) ---
-with tab_dia_top3:
-    c_d3_1, c_d3_2 = st.columns([1.2, 1.8])
-    with c_d3_1:
-        chosen_date_top3 = st.date_input(
-            "📆 Selecionar Data no Calendário:",
-            value=hoje,
-            min_value=min_data_calendario,
-            max_value=max_data_calendario,
-            format="DD/MM/YYYY",
-            key="tb_top3_day_calendar",
-        )
+        <!-- GRÁFICOS DO DASHBOARD SAC -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                  <i data-lucide="bar-chart-2" class="w-4 h-4 text-sky-600"></i>
+                  Top 10 Problemas Mais Frequentes
+                </h3>
+                <p class="text-xs text-slate-400">Classificação de ocorrências recorrentes no SAC</p>
+              </div>
+              <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200">Ocorrências</span>
+            </div>
+            <div class="relative h-80"><canvas id="chartTopProblemasSAC"></canvas></div>
+          </div>
 
-    day_df_top3 = filtered_df.copy()
-    day_str_op_top3 = chosen_date_top3.strftime("%d/%m/%Y")
-    day_df_top3 = day_df_top3[
-        (day_df_top3["Data_Date"] == chosen_date_top3)
-        | (day_df_top3["Data_Str"] == day_str_op_top3)
-    ]
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                  <i data-lucide="users" class="w-4 h-4 text-emerald-600"></i>
+                  Chamados por Atendente
+                </h3>
+                <p class="text-xs text-slate-400">Volume de atendimentos realizados por operador</p>
+              </div>
+              <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Volume</span>
+            </div>
+            <div class="relative h-80"><canvas id="chartAtendentesSAC"></canvas></div>
+          </div>
+        </section>
+      </div>
 
-    top_3_day_locals = (
-        day_df_top3["Local Interno"].value_counts().head(3).index.tolist()
-    )
+      <!-- PÁGINA 2: LANÇAMENTO SAC -->
+      <div id="pageSAC" class="hidden space-y-6">
 
-    if top_3_day_locals:
-        with c_d3_2:
-            selected_top_local_d = st.selectbox(
-                "🎯 Filtrar Local Interno (Dia):",
-                ["Exibir em Abas Separadas (Top 3)"] + top_3_day_locals,
-                key="top_3_local_d_filter",
-            )
+        <!-- PAINEL DO FORMULÁRIO DO SAC -->
+        <div id="sacMainPanel" class="space-y-6">
 
-        def get_day_local_table(local_name):
-            c_df = day_df_top3[day_df_top3["Local Interno"] == local_name]
-            tb = (
-                c_df.groupby(["Problemas", "Descrição"])
-                .size()
-                .reset_index(name="Quantidade de Chamados")
-                .sort_values(by="Quantidade de Chamados", ascending=False)
-                .rename(columns={"Problemas": "Problema"})
-            )
-            return tb
+          <!-- ALERTA DE EDIÇÃO DE CHAMADO -->
+          <div id="alertSACEditMode" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex justify-between items-center shadow-sm">
+            <div class="flex items-center gap-3">
+              <div class="p-2 bg-amber-500 text-white rounded-xl"><i data-lucide="edit-3" class="w-5 h-5"></i></div>
+              <div>
+                <p class="text-sm font-bold">Modo de Edição de Chamado: <span id="labelSACEditChamado" class="font-mono text-amber-800">SAC-0000-0000</span></p>
+                <p class="text-xs text-amber-700">Você está alterando este chamado do SAC. Ao salvar, os dados serão atualizados na planilha.</p>
+              </div>
+            </div>
+            <button type="button" onclick="cancelarEdicaoSAC()" class="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 rounded-xl text-xs font-bold text-amber-900 transition cursor-pointer">
+              Cancelar Edição ✕
+            </button>
+          </div>
 
-        if selected_top_local_d == "Exibir em Abas Separadas (Top 3)":
-            tabs_d = st.tabs([f"🥇 {loc}" for loc in top_3_day_locals])
-            for idx, tab in enumerate(tabs_d):
-                with tab:
-                    local_item = top_3_day_locals[idx]
-                    tb_local_d = get_day_local_table(local_item)
-                    st.markdown(f"**Registros do Local na Data ({day_str_op_top3}):** `{local_item}`")
-                    st.dataframe(
-                        tb_local_d[["Problema", "Descrição", "Quantidade de Chamados"]],
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-        else:
-            tb_single_d = get_day_local_table(selected_top_local_d)
-            st.markdown(f"**Registros do Local na Data ({day_str_op_top3}):** `{selected_top_local_d}`")
-            st.dataframe(
-                tb_single_d[["Problema", "Descrição", "Quantidade de Chamados"]],
-                use_container_width=True,
-                hide_index=True,
-            )
-    else:
-        st.warning(f"Nenhum registro encontrado para a data {day_str_op_top3}.")
+          <!-- MENSAGEM NO TOPO DINÂMICA (SUCESSO / EDIÇÃO / EXCLUSÃO) -->
+          <div id="alertSACSuccess" class="hidden p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition">
+            <div class="flex items-center gap-3">
+              <div id="alertSACIconBadge" class="p-2 bg-emerald-600 text-white rounded-xl">
+                <i id="alertSACLucideIcon" data-lucide="check-circle" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <p id="alertSACSuccessTitle" class="text-sm font-bold">Ação realizada com sucesso!</p>
+                <p id="alertSACSuccessSub" class="text-xs text-emerald-700">A planilha oficial foi atualizada em tempo real.</p>
+              </div>
+            </div>
+            <button type="button" onclick="document.getElementById('alertSACSuccess').classList.add('hidden')" class="px-3 py-2 rounded-xl hover:bg-emerald-100 text-xs font-semibold text-emerald-800 transition cursor-pointer">
+              Fechar
+            </button>
+          </div>
+
+          <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-6 border-b border-slate-100 gap-4">
+              <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-sky-600 text-white rounded-xl shadow-lg shadow-sky-500/25">
+                  <i data-lucide="headphones" class="w-6 h-6"></i>
+                </div>
+                <div>
+                  <h2 id="sacFormTitleText" class="text-base font-bold text-slate-900">Lançamento de Ocorrências do SAC</h2>
+                  <p class="text-xs text-slate-500">Registro de chamados, ressarcimentos e reembolsos · Aba: Chamados</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="text-right">
+                  <span class="text-[10px] uppercase font-bold text-slate-400 block">Atendente Conectado</span>
+                  <div class="flex items-center gap-1.5 justify-end">
+                    <span id="labelSACAtendenteLogado" class="text-xs font-bold text-sky-800 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200">Operador</span>
+                    <span id="badgeNivelAcesso" class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Geral</span>
+                  </div>
+                </div>
+                <button type="button" onclick="realizarLogoutGlobal()" title="Sair do Sistema" class="p-2 rounded-xl border border-slate-200 hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition cursor-pointer">
+                  <i data-lucide="log-out" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <form id="sacForm" onsubmit="handleSACSubmit(event)" class="space-y-6">
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-5 rounded-2xl bg-slate-50/90 border border-slate-200">
+                
+                <!-- Chamado com Trava Atômica e Prévia de Numeração -->
+                <div>
+                  <label class="block text-xs font-bold text-sky-900 mb-1">Chamado (Automático) *</label>
+                  <input type="text" id="sacChamado" readonly class="w-full text-sm font-mono font-black rounded-xl border border-sky-300 bg-white px-3.5 py-2 text-sky-700 cursor-not-allowed shadow-inner" placeholder="[Automático do Servidor]">
+                  <span class="text-[10px] text-slate-400 mt-0.5 block">🔒 Número atômico gerado no envio</span>
+                </div>
+
+                <!-- Data do Chamado -->
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Data *</label>
+                  <input type="date" id="sacData" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Cliente -->
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Cliente *</label>
+                  <input list="listaSACClientes" id="sacCliente" placeholder="Selecione o cliente..." required onchange="validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente', true)" onblur="validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente', true)" class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                  <datalist id="listaSACClientes"></datalist>
+                </div>
+
+                <!-- Local Interno -->
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Local Interno *</label>
+                  <select id="sacLocalInterno" required onchange="aoMudarLocalInternoSAC()" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    <option value="">Selecione primeiro o Cliente...</option>
+                  </select>
+                </div>
+
+                <!-- Filial Responsável -->
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Filial Responsável *</label>
+                  <input list="listaSACCidades" id="sacCidade" placeholder="Filial de atendimento..." required onchange="validarInputComLista('sacCidade', 'listaSACCidades', 'Filial Responsável')" onblur="validarInputComLista('sacCidade', 'listaSACCidades', 'Filial Responsável')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                  <datalist id="listaSACCidades"></datalist>
+                </div>
+
+                <!-- Descrição -->
+                <div class="md:col-span-2 lg:col-span-3">
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Descrição *</label>
+                  <input list="listaSACDescricoes" id="sacDescricao" placeholder="Selecione a descrição do ocorrido..." required onchange="validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição')" onblur="validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                  <datalist id="listaSACDescricoes"></datalist>
+                </div>
+
+                <!-- Produto -->
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Produto *</label>
+                  <select id="sacProduto" required class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    <option value="" selected disabled>Selecione o Produto...</option>
+                    <option value="Café">Café</option>
+                    <option value="Snaky">Snaky</option>
+                  </select>
+                </div>
+
+                <!-- Data da Transação -->
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Data da Transação *</label>
+                  <input type="date" id="sacDataTransacao" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Hora da Transação -->
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Hora da Transação *</label>
+                  <input type="time" id="sacHoraTransacao" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Valor (R$) -->
+                <div>
+                  <label class="block text-xs font-semibold text-emerald-800 mb-1">Valor (R$) *</label>
+                  <input type="number" step="0.01" min="0" id="sacValor" placeholder="0,00" required class="w-full text-sm font-bold rounded-xl border border-emerald-300 bg-white px-3 py-2 text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+
+                <!-- Nome / Sobrenome -->
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Nome / Sobrenome *</label>
+                  <input type="text" id="sacNome" placeholder="Ex: João Da Silva" required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Celular -->
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Celular *</label>
+                  <input type="text" id="sacCelular" placeholder="(00) 00000-0000" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Problemas -->
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Problemas *</label>
+                  <input list="listaSACProblemas" id="sacProblema" placeholder="Selecione o problema..." required onchange="validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas')" onblur="validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                  <datalist id="listaSACProblemas"></datalist>
+                </div>
+
+                <!-- Forma de Pagamento -->
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Forma de Pagamento *</label>
+                  <input list="listaSACFormasPgto" id="sacFormaPgto" placeholder="Selecione a forma de pagamento..." required onchange="validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento')" onblur="validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                  <datalist id="listaSACFormasPgto"></datalist>
+                </div>
+
+                <!-- Reembolso -->
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-bold text-sky-900 mb-1">Reembolso</label>
+                  <input type="text" id="sacReembolso" placeholder="Como foi feito o reembolso (Ex: Pix, Crédito Máquina, Dinheiro)..." onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-sky-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Pix - Reembolso -->
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Pix - Reembolso</label>
+                  <input type="text" id="sacPix" placeholder="Chave Pix (CPF, Celular, E-mail ou Aleatória)..." class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Atendente (Coluna A) -->
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Atendente *</label>
+                  <input type="text" id="sacAtendente" readonly class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-slate-700 cursor-not-allowed">
+                </div>
+
+                <!-- Data/Hora Lançamento -->
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Data/Hora Lançamento</label>
+                  <input type="text" id="sacDataHoraAuto" readonly value="Automático no Envio" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-slate-500 cursor-not-allowed">
+                </div>
+
+              </div>
+
+              <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button type="button" onclick="limparFormSAC()" class="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">
+                  Limpar Campos
+                </button>
+                <button type="submit" id="btnSalvarSAC" class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-sky-600 text-white text-xs font-bold shadow-lg shadow-sky-500/25 hover:bg-sky-700 transition cursor-pointer">
+                  <i data-lucide="send" class="w-4 h-4"></i>
+                  <span id="btnSalvarSACText">Lançar Ocorrência SAC</span>
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <!-- LISTA DE TODOS OS CHAMADOS REALIZADOS -->
+          <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+              <div>
+                <h2 class="text-base font-bold flex items-center gap-2 text-slate-800">
+                  <i data-lucide="list-checks" class="w-4 h-4 text-sky-600"></i>
+                  Chamados Realizados no SAC
+                </h2>
+                <p class="text-xs text-slate-500">Histórico completo de ocorrências registradas na aba Chamados</p>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="relative">
+                  <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                  <input type="text" id="searchSACChamados" placeholder="Buscar chamado, cliente, cliente/nome..." oninput="filtrarChamadosSAC()" class="text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 w-64">
+                </div>
+                <span id="badgeContadorSAC" class="text-xs px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 font-bold border border-sky-200">
+                  0 chamado(s)
+                </span>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-50 uppercase font-semibold text-slate-500">
+                  <tr>
+                    <th class="py-2.5 px-3 rounded-l-lg">Ações</th>
+                    <th class="py-2.5 px-3 font-mono">Chamado</th>
+                    <th class="py-2.5 px-3">Data</th>
+                    <th class="py-2.5 px-3">Cliente</th>
+                    <th class="py-2.5 px-3">Local</th>
+                    <th class="py-2.5 px-3">Filial</th>
+                    <th class="py-2.5 px-3">Produto</th>
+                    <th class="py-2.5 px-3 text-right">Valor</th>
+                    <th class="py-2.5 px-3">Nome Cliente</th>
+                    <th class="py-2.5 px-3">Reembolso</th>
+                    <th class="py-2.5 px-3">Atendente</th>
+                    <th class="py-2.5 px-3 rounded-r-lg">Data Lançamento</th>
+                  </tr>
+                </thead>
+                <tbody id="tableSACChamadosBody" class="divide-y divide-slate-100">
+                  <tr>
+                    <td colspan="12" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado registrado ainda.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+        </div>
+      </div>
+
+      <!-- PÁGINA 3: CADASTRO DE CLIENTES (ACESSO EXCLUSIVO: GERAL) -->
+      <div id="pageCadastroClientes" class="hidden space-y-6">
+
+        <!-- BLOQUEIO DE SEGURANÇA PARA ATENDENTE SEM PERMISSÃO -->
+        <div id="bloqueioAcessoClientes" class="hidden max-w-lg mx-auto my-12 bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+          <div class="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+            <i data-lucide="shield-alert" class="w-8 h-8"></i>
+          </div>
+          <h2 class="text-lg font-black text-slate-800">Acesso Restrito ao Cadastro</h2>
+          <p class="text-xs text-slate-500 leading-relaxed">
+            Seu perfil de login está categorizado como <span class="font-bold text-rose-600">Atendente</span> na coluna D da planilha. O gerenciamento e cadastro de clientes é exclusivo para perfis com permissão de acesso <span class="font-bold text-emerald-700">Geral</span>.
+          </p>
+          <button type="button" onclick="switchPage('sac')" class="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-md transition cursor-pointer">
+            Voltar para Lançamento SAC
+          </button>
+        </div>
+
+        <div id="containerAcessoClientes" class="space-y-6">
+          <!-- ALERTA DE EDIÇÃO DE CLIENTE -->
+          <div id="alertCliEditMode" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex justify-between items-center shadow-sm">
+            <div class="flex items-center gap-3">
+              <div class="p-2 bg-amber-500 text-white rounded-xl"><i data-lucide="edit-3" class="w-5 h-5"></i></div>
+              <div>
+                <p class="text-sm font-bold">Modo de Edição de Cliente: <span id="labelCliEditNome" class="font-bold text-amber-800">Cliente</span></p>
+                <p class="text-xs text-amber-700">Você está alterando os dados cadastrais deste ponto. Ao salvar, os dados serão atualizados na aba Clientes.</p>
+              </div>
+            </div>
+            <button type="button" onclick="cancelarEdicaoCliente()" class="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 rounded-xl text-xs font-bold text-amber-900 transition cursor-pointer">
+              Cancelar Edição ✕
+            </button>
+          </div>
+
+          <!-- MENSAGEM NO TOPO DINÂMICA -->
+          <div id="alertCliSuccess" class="hidden p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition">
+            <div class="flex items-center gap-3">
+              <div id="alertCliIconBadge" class="p-2 bg-emerald-600 text-white rounded-xl">
+                <i id="alertCliLucideIcon" data-lucide="check-circle" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <p id="alertCliSuccessTitle" class="text-sm font-bold">Ação realizada com sucesso!</p>
+                <p id="alertCliSuccessSub" class="text-xs text-emerald-700">A aba Clientes foi atualizada com sucesso.</p>
+              </div>
+            </div>
+            <button type="button" onclick="document.getElementById('alertCliSuccess').classList.add('hidden')" class="px-3 py-2 rounded-xl hover:bg-emerald-100 text-xs font-semibold text-emerald-800 transition cursor-pointer">
+              Fechar
+            </button>
+          </div>
+
+          <!-- FORMULÁRIO DE CADASTRO DE CLIENTE -->
+          <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-6 border-b border-slate-100 gap-4">
+              <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-sky-600 text-white rounded-xl shadow-lg shadow-sky-500/25">
+                  <i data-lucide="building-2" class="w-6 h-6"></i>
+                </div>
+                <div>
+                  <h2 id="cliFormTitleText" class="text-base font-bold text-slate-900">Cadastro de Clientes e Pontos de Atendimento</h2>
+                  <p class="text-xs text-slate-500">Gerenciamento de máquinas, locais e filiais responsáveis · Aba: Clientes</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs px-3 py-1 rounded-lg bg-sky-50 text-sky-800 font-semibold border border-sky-200 flex items-center gap-1.5">
+                  <i data-lucide="sheet" class="w-3.5 h-3.5 text-sky-600"></i> Aba "Clientes"
+                </span>
+              </div>
+            </div>
+
+            <form id="clienteForm" onsubmit="handleClienteSubmit(event)" class="space-y-6">
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-5 rounded-2xl bg-slate-50/90 border border-slate-200">
+                
+                <!-- Cliente -->
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Cliente *</label>
+                  <input type="text" id="cadCliCliente" placeholder="Ex: Embraer, Coca Cola..." required onblur="formatarNomeProprio(this)" class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Local -->
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Local *</label>
+                  <input type="text" id="cadCliLocal" placeholder="Ex: Fábrica 1, Administrativo..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Local interno -->
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Local interno *</label>
+                  <input type="text" id="cadCliLocalInterno" placeholder="Ex: Refeitório, Recepção, Bloco B..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Máquina -->
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Máquina *</label>
+                  <input type="text" id="cadCliMaquina" placeholder="Ex: Máquina 01, M05..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Modelo de máquina -->
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Modelo de máquina *</label>
+                  <input type="text" id="cadCliModeloMaquina" placeholder="Ex: Lei Saeco, Krea, Snaky..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Filial Responsavel -->
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Filial Responsavel *</label>
+                  <input list="listaSACCidades" id="cadCliFilial" placeholder="Ex: Ribeirão Preto, São Carlos..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+              </div>
+
+              <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button type="button" onclick="limparFormCliente()" class="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">
+                  Limpar Campos
+                </button>
+                <button type="submit" id="btnSalvarCliente" class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-sky-600 text-white text-xs font-bold shadow-lg shadow-sky-500/25 hover:bg-sky-700 transition cursor-pointer">
+                  <i data-lucide="save" class="w-4 h-4"></i>
+                  <span id="btnSalvarClienteText">Cadastrar Cliente</span>
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <!-- LISTA DE CLIENTES CADASTRADOS -->
+          <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+              <div>
+                <h2 class="text-base font-bold flex items-center gap-2 text-slate-800">
+                  <i data-lucide="users" class="w-4 h-4 text-sky-600"></i>
+                  Clientes Cadastrados
+                </h2>
+                <p class="text-xs text-slate-500">Base oficial de pontos sincronizada com a aba "Clientes"</p>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="relative">
+                  <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                  <input type="text" id="searchClientesCadastrados" placeholder="Buscar cliente, local, máquina, filial..." oninput="filtrarClientesCadastrados()" class="text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 w-64">
+                </div>
+                <span id="badgeContadorClientes" class="text-xs px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 font-bold border border-sky-200">
+                  0 cliente(s)
+                </span>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-50 uppercase font-semibold text-slate-500">
+                  <tr>
+                    <th class="py-2.5 px-3 rounded-l-lg w-24">Ações</th>
+                    <th class="py-2.5 px-3">Cliente</th>
+                    <th class="py-2.5 px-3">Local</th>
+                    <th class="py-2.5 px-3">Local interno</th>
+                    <th class="py-2.5 px-3">Máquina</th>
+                    <th class="py-2.5 px-3">Modelo de máquina</th>
+                    <th class="py-2.5 px-3 rounded-r-lg">Filial Responsavel</th>
+                  </tr>
+                </thead>
+                <tbody id="tableClientesBody" class="divide-y divide-slate-100">
+                  <tr>
+                    <td colspan="7" class="text-center py-6 text-slate-400 font-semibold">Nenhum cliente carregado.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+      </div>
+
+    </main>
+
+  </div>
+
+  <script>
+    lucide.createIcons();
+    Chart.register(ChartDataLabels);
+
+    const APPS_SCRIPT_SAC_URL = "{APPS_SCRIPT_SAC_WEBAPP_URL}";
+    const dadosSAC = {dados_sac_json};
+    let listaChamadosSAC = Array.isArray(dadosSAC.chamados) ? dadosSAC.chamados : [];
+    let listaCadastroClientes = Array.isArray(dadosSAC.cadastro_clientes) ? dadosSAC.cadastro_clientes : [];
+    let chamadoEmEdicao = null;
+    let clienteEmEdicao = null;
+    
+    // VARIÁVEIS GLOBAIS DE SESSÃO
+    let atendenteSACLogado = "";
+    let loginUsuarioConectado = "";
+    let nivelAcessoLogado = "";
+
+    try {{
+      atendenteSACLogado = sessionStorage.getItem('sac_atendente_conectado') || "";
+      loginUsuarioConectado = sessionStorage.getItem('sac_usuario_login') || "";
+      nivelAcessoLogado = sessionStorage.getItem('sac_nivel_acesso') || "";
+    }} catch(e) {{}}
+
+    // =========================================================================
+    // CONTROLE DE SESSÃO GLOBAL DO SISTEMA
+    // =========================================================================
+    function verificarEstadoAutenticacao() {{
+      const loginScreen = document.getElementById('systemLoginScreen');
+      const appContainer = document.getElementById('systemAppContainer');
+
+      if (!atendenteSACLogado) {{
+        loginScreen.classList.remove('hidden');
+        appContainer.classList.add('hidden');
+      }} else {{
+        loginScreen.classList.add('hidden');
+        appContainer.classList.remove('hidden');
+
+        document.getElementById('labelHeaderAtendente').innerText = atendenteSACLogado;
+        document.getElementById('labelSACAtendenteLogado').innerText = atendenteSACLogado;
+        document.getElementById('sacAtendente').value = atendenteSACLogado;
+
+        aplicarRegrasDeAcesso();
+        inicializarFormularioSAC();
+        renderizarTabelaChamadosSAC();
+
+        let abaDesejada = 'dashboardSAC';
+        try {{
+          abaDesejada = sessionStorage.getItem('aba_ativa_atual') || 'dashboardSAC';
+        }} catch(e) {{}}
+
+        if (abaDesejada === 'cadastroClientes' && (nivelAcessoLogado || '').toLowerCase() !== 'geral') {{
+          abaDesejada = 'sac';
+        }}
+
+        switchPage(abaDesejada);
+      }}
+      lucide.createIcons();
+    }}
+
+    function realizarLoginGlobal(e) {{
+      e.preventDefault();
+      const u = (document.getElementById('globalLoginUser').value || '').trim();
+      const p = (document.getElementById('globalLoginPass').value || '').trim();
+      const erroBox = document.getElementById('globalLoginErro');
+
+      // Coluna B: Usuário | Coluna C: Senha
+      const userValido = dadosSAC.usuarios.find(x => 
+        (x.usuario || '').toLowerCase() === u.toLowerCase() && 
+        String(x.senha).trim() === p
+      );
+
+      if (userValido) {{
+        erroBox.classList.add('hidden');
+        // Coluna A: Nome do Atendente
+        atendenteSACLogado = userValido.nome || userValido.usuario;
+        loginUsuarioConectado = userValido.usuario;
+        // Coluna D: Acesso (Geral ou Atendente)
+        nivelAcessoLogado = userValido.acesso || "Atendente";
+
+        try {{
+          sessionStorage.setItem('sac_atendente_conectado', atendenteSACLogado);
+          sessionStorage.setItem('sac_usuario_login', loginUsuarioConectado);
+          sessionStorage.setItem('sac_nivel_acesso', nivelAcessoLogado);
+          sessionStorage.setItem('aba_ativa_atual', 'dashboardSAC');
+        }} catch(e) {{}}
+
+        verificarEstadoAutenticacao();
+      }} else {{
+        erroBox.classList.remove('hidden');
+      }}
+    }}
+
+    function realizarLogoutGlobal() {{
+      atendenteSACLogado = "";
+      loginUsuarioConectado = "";
+      nivelAcessoLogado = "";
+      try {{
+        sessionStorage.removeItem('sac_atendente_conectado');
+        sessionStorage.removeItem('sac_usuario_login');
+        sessionStorage.removeItem('sac_nivel_acesso');
+        sessionStorage.removeItem('aba_ativa_atual');
+      }} catch(e) {{}}
+      document.getElementById('globalLoginForm').reset();
+      verificarEstadoAutenticacao();
+    }}
+
+    // =========================================================================
+    // ATUALIZAÇÃO DA INTERFACE BASEADA NO NÍVEL DE ACESSO
+    // =========================================================================
+    function aplicarRegrasDeAcesso() {{
+      const btnCadastro = document.getElementById('navCadastroClientes');
+      const badgeAcesso = document.getElementById('badgeNivelAcesso');
+      const badgeHeader = document.getElementById('badgeHeaderNivelAcesso');
+      const containerCli = document.getElementById('containerAcessoClientes');
+      const bloqueioCli = document.getElementById('bloqueioAcessoClientes');
+
+      const ehGeral = (nivelAcessoLogado || '').trim().toLowerCase() === 'geral';
+
+      if (ehGeral) {{
+        if (btnCadastro) btnCadastro.classList.remove('hidden');
+        if (containerCli) containerCli.classList.remove('hidden');
+        if (bloqueioCli) bloqueioCli.classList.add('hidden');
+        if (badgeAcesso) {{
+          badgeAcesso.innerText = "Geral";
+          badgeAcesso.className = "text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200";
+        }}
+        if (badgeHeader) {{
+          badgeHeader.innerText = "Geral";
+          badgeHeader.className = "text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block";
+        }}
+      }} else {{
+        // Perfil Atendente: Esconde totalmente o cadastro de clientes
+        if (btnCadastro) btnCadastro.classList.add('hidden');
+        if (containerCli) containerCli.classList.add('hidden');
+        if (bloqueioCli) bloqueioCli.classList.remove('hidden');
+        if (badgeAcesso) {{
+          badgeAcesso.innerText = "Atendente";
+          badgeAcesso.className = "text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200";
+        }}
+        if (badgeHeader) {{
+          badgeHeader.innerText = "Atendente";
+          badgeHeader.className = "text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 inline-block";
+        }}
+      }}
+    }}
+
+    // =========================================================================
+    // FORMATAÇÃO DE TEXTO: PRIMEIRAS MAIÚSCULAS (TITLE CASE INTELIGENTE)
+    // =========================================================================
+    function converterParaPrimeirasMaiusculas(texto) {{
+      if (!texto) return '';
+      const preposicoes = ['de', 'da', 'do', 'das', 'dos', 'e'];
+      return texto
+        .toString()
+        .trim()
+        .toLowerCase()
+        .split(/\\s+/)
+        .map((palavra, index) => {{
+          if (index > 0 && preposicoes.includes(palavra)) {{
+            return palavra;
+          }}
+          return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+        }})
+        .join(' ');
+    }}
+
+    function formatarNomeProprio(input) {{
+      if (!input || !input.value) return;
+      input.value = converterParaPrimeirasMaiusculas(input.value);
+    }}
+
+    // =========================================================================
+    // TRAVAMENTO RÍGIDO DE PRÉ-LISTA
+    // =========================================================================
+    function obterValoresDeDatalist(datalistId) {{
+      const dl = document.getElementById(datalistId);
+      if (!dl) return [];
+      return Array.from(dl.options).map(opt => (opt.value || '').trim());
+    }}
+
+    function validarInputComLista(inputId, datalistId, nomeAmigavel, dispararCascataCliente = false) {{
+      const input = document.getElementById(inputId);
+      if (!input) return false;
+      const valor = (input.value || '').trim();
+      if (!valor) return true;
+
+      const opcoesValidas = obterValoresDeDatalist(datalistId);
+      const achado = opcoesValidas.find(item => item.toLowerCase() === valor.toLowerCase());
+
+      if (!achado) {{
+        alert('⛔ Bloqueio de Segurança:\\nO valor digitado no campo "' + nomeAmigavel + '" não está cadastrado na base de dados.\\nPor favor, selecione exclusivamente um dos itens disponíveis na listagem.');
+        input.value = '';
+        if (dispararCascataCliente) {{
+          document.getElementById('sacLocalInterno').innerHTML = '<option value="">Selecione primeiro o Cliente...</option>';
+          document.getElementById('sacCidade').value = '';
+        }}
+        setTimeout(() => {{ input.focus(); }}, 50);
+        return false;
+      }} else {{
+        input.value = achado;
+        if (dispararCascataCliente) {{
+          aoMudarClienteSAC();
+        }}
+        return true;
+      }}
+    }}
+
+    function abrirModalLoading(titulo, subtitulo, tipoAcao = 'loading') {{
+      const modal = document.getElementById('modalLoadingAcao');
+      if (!modal) return;
+
+      document.getElementById('modalLoadingTitle').innerText = titulo;
+      document.getElementById('modalLoadingSub').innerText = subtitulo;
+
+      const spinner = document.getElementById('modalSpinner');
+      const iconCheck = document.getElementById('modalIconCheck');
+      const iconTrash = document.getElementById('modalIconTrash');
+      const progressBar = document.getElementById('modalProgressBar');
+      const badge = document.getElementById('modalIconContainer');
+
+      spinner.classList.add('hidden');
+      iconCheck.classList.add('hidden');
+      iconTrash.classList.add('hidden');
+      progressBar.classList.remove('hidden');
+
+      if (tipoAcao === 'loading') {{
+        spinner.classList.remove('hidden');
+        badge.className = "w-16 h-16 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shadow-inner";
+      }} else if (tipoAcao === 'sucesso') {{
+        iconCheck.classList.remove('hidden');
+        progressBar.classList.add('hidden');
+        badge.className = "w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner";
+      }} else if (tipoAcao === 'excluir') {{
+        iconTrash.classList.remove('hidden');
+        progressBar.classList.add('hidden');
+        badge.className = "w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shadow-inner";
+      }}
+
+      modal.classList.remove('hidden');
+      lucide.createIcons();
+    }}
+
+    function fecharModalLoading() {{
+      const modal = document.getElementById('modalLoadingAcao');
+      if (modal) modal.classList.add('hidden');
+    }}
+
+    function exibirMensagemTopo(titulo, subtitulo, tipo = 'sucesso') {{
+      const alertBox = document.getElementById('alertSACSuccess');
+      const alertTitle = document.getElementById('alertSACSuccessTitle');
+      const alertSub = document.getElementById('alertSACSuccessSub');
+      const iconBadge = document.getElementById('alertSACIconBadge');
+      const lucideIcon = document.getElementById('alertSACLucideIcon');
+
+      if (!alertBox) return;
+
+      alertTitle.innerText = titulo;
+      alertSub.innerText = subtitulo;
+
+      if (tipo === 'excluir') {{
+        alertBox.className = "p-5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition";
+        iconBadge.className = "p-2 bg-rose-600 text-white rounded-xl";
+        lucideIcon.setAttribute('data-lucide', 'trash-2');
+      }} else if (tipo === 'editar') {{
+        alertBox.className = "p-5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition";
+        iconBadge.className = "p-2 bg-amber-600 text-white rounded-xl";
+        lucideIcon.setAttribute('data-lucide', 'edit-3');
+      }} else {{
+        alertBox.className = "p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition";
+        iconBadge.className = "p-2 bg-emerald-600 text-white rounded-xl";
+        lucideIcon.setAttribute('data-lucide', 'check-circle');
+      }}
+
+      alertBox.classList.remove('hidden');
+      alertBox.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+      lucide.createIcons();
+    }}
+
+    function exibirMensagemTopoCliente(titulo, subtitulo, tipo = 'sucesso') {{
+      const alertBox = document.getElementById('alertCliSuccess');
+      const alertTitle = document.getElementById('alertCliSuccessTitle');
+      const alertSub = document.getElementById('alertCliSuccessSub');
+      const iconBadge = document.getElementById('alertCliIconBadge');
+      const lucideIcon = document.getElementById('alertCliLucideIcon');
+
+      if (!alertBox) return;
+
+      alertTitle.innerText = titulo;
+      alertSub.innerText = subtitulo;
+
+      if (tipo === 'excluir') {{
+        alertBox.className = "p-5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition";
+        iconBadge.className = "p-2 bg-rose-600 text-white rounded-xl";
+        lucideIcon.setAttribute('data-lucide', 'trash-2');
+      }} else if (tipo === 'editar') {{
+        alertBox.className = "p-5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition";
+        iconBadge.className = "p-2 bg-amber-600 text-white rounded-xl";
+        lucideIcon.setAttribute('data-lucide', 'edit-3');
+      }} else {{
+        alertBox.className = "p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition";
+        iconBadge.className = "p-2 bg-emerald-600 text-white rounded-xl";
+        lucideIcon.setAttribute('data-lucide', 'check-circle');
+      }}
+
+      alertBox.classList.remove('hidden');
+      alertBox.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+      lucide.createIcons();
+    }}
+
+    function enviarParaPlanilhaGarantido(payload) {{
+      const endpoint = APPS_SCRIPT_SAC_URL;
+      const strData = JSON.stringify(payload);
+
+      if (navigator.sendBeacon) {{
+        try {{
+          const blob = new Blob([strData], {{ type: 'text/plain;charset=utf-8' }});
+          navigator.sendBeacon(endpoint, blob);
+          return Promise.resolve(true);
+        }} catch (err) {{}}
+      }}
+
+      try {{
+        fetch(endpoint, {{
+          method: "POST",
+          mode: "no-cors",
+          headers: {{ "Content-Type": "text/plain;charset=utf-8" }},
+          body: strData
+        }}).catch(() => {{}});
+      }} catch (err) {{}}
+
+      return Promise.resolve(true);
+    }}
+
+    function executarRefresh() {{
+      window.parent.location.reload();
+    }}
+
+    function formatCurrency(val) {{
+      return (val || 0).toLocaleString('pt-BR', {{ style: 'currency', currency: 'BRL' }});
+    }}
+
+    // =========================================================================
+    // NAVEGAÇÃO ENTRE PÁGINAS
+    // =========================================================================
+    function switchPage(page) {{
+      if (page === 'cadastroClientes' && (nivelAcessoLogado || '').trim().toLowerCase() !== 'geral') {{
+        alert('⛔ Acesso Restrito:\\nSeu perfil não tem permissão para cadastrar ou gerenciar clientes.');
+        switchPage('sac');
+        return;
+      }}
+
+      try {{
+        sessionStorage.setItem('aba_ativa_atual', page);
+      }} catch(e) {{}}
+
+      const pages = {{
+        dashboardSAC: document.getElementById('pageDashboardSAC'),
+        sac: document.getElementById('pageSAC'),
+        cadastroClientes: document.getElementById('pageCadastroClientes')
+      }};
+
+      const buttons = {{
+        dashboardSAC: document.getElementById('navDashboardSAC'),
+        sac: document.getElementById('navSAC'),
+        cadastroClientes: document.getElementById('navCadastroClientes')
+      }};
+
+      Object.keys(pages).forEach(key => {{
+        if (pages[key]) pages[key].classList.add('hidden');
+        if (buttons[key]) {{
+          buttons[key].classList.remove('active');
+          buttons[key].classList.add('inactive');
+        }}
+      }});
+
+      if (pages[page]) {{
+        pages[page].classList.remove('hidden');
+      }}
+      if (buttons[page]) {{
+        buttons[page].classList.add('active');
+        buttons[page].classList.remove('inactive');
+      }}
+
+      if (page === 'dashboardSAC') {{
+        atualizarDashboardSAC();
+      }} else if (page === 'cadastroClientes') {{
+        aplicarRegrasDeAcesso();
+        renderizarTabelaClientes();
+      }}
+
+      lucide.createIcons();
+    }}
+
+    // =========================================================================
+    // ROTINAS SAC
+    // =========================================================================
+    function calcularPreviaProximoChamado(ano) {{
+      let maior = dadosSAC.maior_sac_ano[ano] || 0;
+      listaChamadosSAC.forEach(c => {{
+        if (c.chamado) {{
+          const m = c.chamado.match(new RegExp('SAC-' + ano + '-(\\\\d+)', 'i'));
+          if (m) {{
+            const seq = parseInt(m[1], 10);
+            if (seq > maior) maior = seq;
+          }}
+        }}
+      }});
+      const proximo = String(maior + 1).padStart(4, '0');
+      return 'SAC-' + ano + '-' + proximo;
+    }}
+
+    function inicializarFormularioSAC() {{
+      if (chamadoEmEdicao) return;
+
+      const anoAtual = new Date().getFullYear();
+      document.getElementById('sacChamado').value = calcularPreviaProximoChamado(anoAtual);
+      document.getElementById('sacData').value = new Date().toISOString().split('T')[0];
+      
+      document.getElementById('sacProduto').value = "";
+      document.getElementById('sacDataTransacao').value = "";
+      document.getElementById('sacHoraTransacao').value = "";
+      document.getElementById('sacReembolso').value = "";
+      document.getElementById('sacPix').value = "";
+      document.getElementById('sacValor').value = "";
+      document.getElementById('sacNome').value = "";
+      document.getElementById('sacCelular').value = "";
+      document.getElementById('sacProblema').value = "";
+      document.getElementById('sacDescricao').value = "";
+      document.getElementById('sacFormaPgto').value = "";
+      document.getElementById('sacCliente').value = "";
+      document.getElementById('sacCidade').value = "";
+      
+      const selectLocal = document.getElementById('sacLocalInterno');
+      selectLocal.innerHTML = '<option value="">Selecione primeiro o Cliente...</option>';
+
+      const dlCli = document.getElementById('listaSACClientes');
+      dlCli.innerHTML = '';
+      const clientesUnicos = [...new Set(dadosSAC.clientes.map(c => c.cliente).filter(Boolean))].sort();
+      clientesUnicos.forEach(cli => {{
+        const opt = document.createElement('option');
+        opt.value = cli;
+        dlCli.appendChild(opt);
+      }});
+
+      const dlCid = document.getElementById('listaSACCidades');
+      dlCid.innerHTML = '';
+      const cidadesGerais = dadosSAC.cidades && dadosSAC.cidades.length > 0 
+        ? dadosSAC.cidades 
+        : [...new Set(dadosSAC.clientes.map(c => c.cidade).filter(Boolean))].sort();
+      cidadesGerais.forEach(cid => {{
+        const opt = document.createElement('option');
+        opt.value = cid;
+        dlCid.appendChild(opt);
+      }});
+
+      const dlDesc = document.getElementById('listaSACDescricoes');
+      dlDesc.innerHTML = '';
+      dadosSAC.descricoes.forEach(d => {{
+        const opt = document.createElement('option');
+        opt.value = d;
+        dlDesc.appendChild(opt);
+      }});
+
+      const dlProb = document.getElementById('listaSACProblemas');
+      dlProb.innerHTML = '';
+      dadosSAC.problemas.forEach(p => {{
+        const opt = document.createElement('option');
+        opt.value = p;
+        dlProb.appendChild(opt);
+      }});
+
+      const dlPgto = document.getElementById('listaSACFormasPgto');
+      dlPgto.innerHTML = '';
+      dadosSAC.formas_pagamento.forEach(f => {{
+        const opt = document.createElement('option');
+        opt.value = f;
+        dlPgto.appendChild(opt);
+      }});
+    }}
+
+    function aoMudarClienteSAC() {{
+      const cli = (document.getElementById('sacCliente').value || '').trim();
+      const selectLocal = document.getElementById('sacLocalInterno');
+      selectLocal.innerHTML = '<option value="">Selecione o Local Interno...</option>';
+
+      if (!cli) return;
+
+      const locaisDoCliente = dadosSAC.clientes.filter(c => c.cliente.toLowerCase() === cli.toLowerCase());
+      if (locaisDoCliente.length === 0) return;
+
+      const locaisUnicos = [...new Set(locaisDoCliente.map(l => l.local).filter(Boolean))].sort();
+      locaisUnicos.forEach(loc => {{
+        const opt = document.createElement('option');
+        opt.value = loc;
+        opt.textContent = loc;
+        selectLocal.appendChild(opt);
+      }});
+
+      if (locaisUnicos.length === 1) {{
+        selectLocal.value = locaisUnicos[0];
+        aoMudarLocalInternoSAC();
+      }}
+    }}
+
+    function aoMudarLocalInternoSAC() {{
+      const cli = (document.getElementById('sacCliente').value || '').trim();
+      const loc = document.getElementById('sacLocalInterno').value;
+      if (!cli || !loc) return;
+
+      const achado = dadosSAC.clientes.find(c => c.cliente.toLowerCase() === cli.toLowerCase() && c.local === loc);
+      if (achado && achado.cidade) {{
+        document.getElementById('sacCidade').value = achado.cidade;
+      }}
+    }}
+
+    function limparFormSAC() {{
+      chamadoEmEdicao = null;
+      document.getElementById('sacForm').reset();
+      
+      document.getElementById('sacProduto').value = "";
+      document.getElementById('sacLocalInterno').innerHTML = '<option value="">Selecione primeiro o Cliente...</option>';
+      document.getElementById('sacCidade').value = "";
+      document.getElementById('sacDataTransacao').value = "";
+      document.getElementById('sacHoraTransacao').value = "";
+      document.getElementById('sacReembolso').value = "";
+      document.getElementById('sacPix').value = "";
+      document.getElementById('sacValor').value = "";
+      document.getElementById('sacNome').value = "";
+      document.getElementById('sacCelular').value = "";
+      document.getElementById('sacProblema').value = "";
+      document.getElementById('sacDescricao').value = "";
+      document.getElementById('sacFormaPgto').value = "";
+      document.getElementById('sacCliente').value = "";
+
+      document.getElementById('alertSACEditMode').classList.add('hidden');
+      document.getElementById('sacFormTitleText').innerText = "Lançamento de Ocorrências do SAC";
+      document.getElementById('btnSalvarSACText').innerText = "Lançar Ocorrência SAC";
+      
+      const anoAtual = new Date().getFullYear();
+      document.getElementById('sacChamado').value = calcularPreviaProximoChamado(anoAtual);
+      document.getElementById('sacData').value = new Date().toISOString().split('T')[0];
+      document.getElementById('sacAtendente').value = atendenteSACLogado;
+
+      lucide.createIcons();
+    }}
+
+    function editarChamadoSAC(numeroChamado) {{
+      const item = listaChamadosSAC.find(c => c.chamado === numeroChamado);
+      if (!item) return;
+
+      chamadoEmEdicao = item;
+      document.getElementById('sacChamado').value = item.chamado;
+      document.getElementById('sacData').value = item.data;
+      document.getElementById('sacCliente').value = item.cliente;
+      aoMudarClienteSAC();
+      document.getElementById('sacLocalInterno').value = item.localInterno;
+      document.getElementById('sacCidade').value = item.cidade;
+      document.getElementById('sacDescricao').value = item.descricao;
+      document.getElementById('sacProduto').value = item.produto || '';
+      document.getElementById('sacDataTransacao').value = item.dataTransacao || '';
+      document.getElementById('sacHoraTransacao').value = item.horaTransacao || '';
+      
+      const vLimpo = parseFloat(String(item.valor).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')) || 0;
+      document.getElementById('sacValor').value = vLimpo || '';
+      document.getElementById('sacNome').value = item.nomeSobrenome;
+      document.getElementById('sacCelular').value = item.celular;
+      document.getElementById('sacProblema').value = item.problemas;
+      document.getElementById('sacFormaPgto').value = item.formaPgto;
+      document.getElementById('sacReembolso').value = item.reembolso || '';
+      document.getElementById('sacPix').value = item.pix || '';
+      document.getElementById('sacAtendente').value = item.atendente || atendenteSACLogado;
+
+      document.getElementById('alertSACEditMode').classList.remove('hidden');
+      document.getElementById('labelSACEditChamado').innerText = item.chamado;
+      document.getElementById('sacFormTitleText').innerText = 'Edição da Ocorrência: ' + item.chamado;
+      document.getElementById('btnSalvarSACText').innerText = 'Salvar Alterações';
+
+      document.getElementById('sacForm').scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+      lucide.createIcons();
+    }}
+
+    function cancelarEdicaoSAC() {{
+      limparFormSAC();
+    }}
+
+    function excluirChamadoSAC(numeroChamado) {{
+      if (!confirm('Deseja realmente excluir o chamado ' + numeroChamado + '? Esta ação solicitará a remoção na planilha.')) {{
+        return;
+      }}
+
+      abrirModalLoading(
+        'Excluindo Ocorrência...',
+        'Removendo a ocorrência ' + numeroChamado + ' da planilha oficial Chamados.',
+        'loading'
+      );
+
+      const item = listaChamadosSAC.find(c => c.chamado === numeroChamado);
+
+      const payloadExcluir = {{
+        "action": "excluir",
+        "acao": "excluir",
+        "tipo": "excluir_sac",
+        "Chamado": numeroChamado,
+        "chamado": numeroChamado,
+        "linha": item && item.linha ? item.linha : ""
+      }};
+
+      enviarParaPlanilhaGarantido(payloadExcluir);
+
+      listaChamadosSAC = listaChamadosSAC.filter(c => c.chamado !== numeroChamado);
+      renderizarTabelaChamadosSAC();
+
+      if (chamadoEmEdicao && chamadoEmEdicao.chamado === numeroChamado) {{
+        limparFormSAC();
+      }}
+
+      setTimeout(() => {{
+        abrirModalLoading(
+          'Chamado Excluído!',
+          'A ocorrência ' + numeroChamado + ' foi removida da base com sucesso.',
+          'excluir'
+        );
+
+        exibirMensagemTopo(
+          '🗑️ Chamado ' + numeroChamado + ' excluído!',
+          'A ocorrência foi removida do sistema e da planilha oficial.',
+          'excluir'
+        );
+
+        setTimeout(fecharModalLoading, 1000);
+      }}, 500);
+    }}
+
+    function filtrarChamadosSAC() {{
+      const termo = (document.getElementById('searchSACChamados')?.value || '').trim().toLowerCase();
+      if (!termo) {{
+        renderizarTabelaChamadosSAC(listaChamadosSAC);
+        return;
+      }}
+      const filtrados = listaChamadosSAC.filter(c => 
+        (c.chamado && c.chamado.toLowerCase().includes(termo)) ||
+        (c.cliente && c.cliente.toLowerCase().includes(termo)) ||
+        (c.nomeSobrenome && c.nomeSobrenome.toLowerCase().includes(termo)) ||
+        (c.localInterno && c.localInterno.toLowerCase().includes(termo)) ||
+        (c.cidade && c.cidade.toLowerCase().includes(termo)) ||
+        (c.problemas && c.problemas.toLowerCase().includes(termo))
+      );
+      renderizarTabelaChamadosSAC(filtrados);
+    }}
+
+    function renderizarTabelaChamadosSAC(lista = listaChamadosSAC) {{
+      const tbody = document.getElementById('tableSACChamadosBody');
+      const badge = document.getElementById('badgeContadorSAC');
+      if (badge) badge.innerText = lista.length + ' chamado(s)';
+
+      if (!lista || lista.length === 0) {{
+        tbody.innerHTML = '<tr><td colspan="12" class="text-center py-6 text-slate-400 font-semibold">Nenhuma ocorrência encontrada.</td></tr>';
+        return;
+      }}
+
+      tbody.innerHTML = lista.map(c => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-2 px-3 whitespace-nowrap">
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="editarChamadoSAC('${{c.chamado}}')" title="Editar chamado ${{c.chamado}}" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
+                <i data-lucide="edit-2" class="w-3 h-3"></i>
+                Editar
+              </button>
+              <button type="button" onclick="excluirChamadoSAC('${{c.chamado}}')" title="Excluir chamado ${{c.chamado}}" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition cursor-pointer">
+                <i data-lucide="trash-2" class="w-3 h-3"></i>
+                Excluir
+              </button>
+            </div>
+          </td>
+          <td class="py-2.5 px-3 font-mono font-bold text-sky-700">${{c.chamado}}</td>
+          <td class="py-2.5 px-3">${{c.data || '-'}}</td>
+          <td class="py-2.5 px-3 font-semibold text-slate-800">${{c.cliente || '-'}}</td>
+          <td class="py-2.5 px-3 text-slate-600">${{c.localInterno || '-'}}</td>
+          <td class="py-2.5 px-3 text-slate-600">${{c.cidade || '-'}}</td>
+          <td class="py-2.5 px-3 font-medium text-slate-700">${{c.produto || '-'}}</td>
+          <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
+          <td class="py-2.5 px-3 font-medium text-slate-800">${{c.nomeSobrenome || '-'}}</td>
+          <td class="py-2.5 px-3 text-sky-900 font-semibold">${{c.reembolso || '-'}}</td>
+          <td class="py-2.5 px-3 font-medium text-slate-600">${{c.atendente || '-'}}</td>
+          <td class="py-2.5 px-3 text-slate-400 text-[11px]">${{c.dataHoraLancamento || '-'}}</td>
+        </tr>
+      `).join('');
+
+      lucide.createIcons();
+    }}
+
+    function handleSACSubmit(e) {{
+      e.preventDefault();
+
+      const cliValido = validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente');
+      if (!cliValido) return;
+
+      const selectLocal = document.getElementById('sacLocalInterno');
+      if (!selectLocal.value) {{
+        alert('⛔ Bloqueio de Segurança:\\nPor favor, selecione um Local Interno vinculado ao cliente.');
+        selectLocal.focus();
+        return;
+      }}
+
+      const cidValida = validarInputComLista('sacCidade', 'listaSACCidades', 'Filial Responsável');
+      if (!cidValida) return;
+
+      const descValida = validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição');
+      if (!descValida) return;
+
+      const probValido = validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas');
+      if (!probValido) return;
+
+      const pgtoValido = validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento');
+      if (!pgtoValido) return;
+
+      const selectProduto = document.getElementById('sacProduto');
+      if (!selectProduto.value) {{
+        alert('⛔ Bloqueio de Segurança:\\nPor favor, selecione o Produto (Café ou Snaky).');
+        selectProduto.focus();
+        return;
+      }}
+
+      const ehEdicao = (chamadoEmEdicao !== null);
+      let chamado = document.getElementById('sacChamado').value.trim();
+      const anoAtual = new Date().getFullYear();
+
+      if (!ehEdicao) {{
+        chamado = calcularPreviaProximoChamado(anoAtual);
+      }}
+
+      const chamadoExiste = listaChamadosSAC.some(c => c.chamado.toUpperCase() === chamado.toUpperCase());
+      if (!ehEdicao && chamadoExiste) {{
+        alert('⛔ Chamado Duplicado! O número "' + chamado + '" já existe.');
+        document.getElementById('sacChamado').value = calcularPreviaProximoChamado(anoAtual);
+        return;
+      }}
+
+      abrirModalLoading(
+        ehEdicao ? 'Atualizando Ocorrência...' : 'Lançando no Sistema...',
+        ehEdicao ? 'Gravando alterações do chamado ' + chamado + ' na planilha Chamados.' : 'Registrando a ocorrência ' + chamado + ' na planilha oficial.',
+        'loading'
+      );
+
+      const data = document.getElementById('sacData').value;
+      const cliente = document.getElementById('sacCliente').value.trim();
+      const localInterno = document.getElementById('sacLocalInterno').value;
+      const cidade = document.getElementById('sacCidade').value.trim();
+      const descricao = document.getElementById('sacDescricao').value.trim();
+      const produto = document.getElementById('sacProduto').value;
+      const dataTransacao = document.getElementById('sacDataTransacao').value;
+      const horaTransacao = document.getElementById('sacHoraTransacao').value;
+      const valor = parseFloat(document.getElementById('sacValor').value) || 0;
+      const nomeSobrenome = converterParaPrimeirasMaiusculas(document.getElementById('sacNome').value.trim());
+      const celular = document.getElementById('sacCelular').value.trim();
+      const problemas = document.getElementById('sacProblema').value.trim();
+      const formaPgto = document.getElementById('sacFormaPgto').value.trim();
+      const reembolso = converterParaPrimeirasMaiusculas(document.getElementById('sacReembolso').value.trim());
+      const pix = document.getElementById('sacPix').value.trim();
+      const atendente = atendenteSACLogado || document.getElementById('sacAtendente').value;
+      
+      const agora = new Date();
+      const dataHoraLancamento = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR');
+
+      const payloadSAC = {{
+        "acao": ehEdicao ? "editar" : "inserir",
+        "action": ehEdicao ? "editar" : "inserir",
+        "linha": ehEdicao && chamadoEmEdicao.linha ? chamadoEmEdicao.linha : "",
+        "Chamado": chamado,
+        "Data": data,
+        "Cliente": cliente,
+        "Local Interno": localInterno,
+        "Cidade": cidade,
+        "Descrição": descricao,
+        "Produto": produto,
+        "Data da Transação": dataTransacao,
+        "Hora da Transação": horaTransacao,
+        "Valor": valor,
+        "Nome/Sobrenome": nomeSobrenome,
+        "Celular": celular,
+        "Problemas": problemas,
+        "Forma de Pagamento": formaPgto,
+        "Reembolso": reembolso,
+        "Pix - Reembolso": pix,
+        "Atendente": atendente,
+        "Data/Hora do lançamento": dataHoraLancamento
+      }};
+
+      enviarParaPlanilhaGarantido(payloadSAC);
+
+      const novoItem = {{
+        linha: ehEdicao && chamadoEmEdicao.linha ? chamadoEmEdicao.linha : listaChamadosSAC.length + 2,
+        chamado,
+        data,
+        cliente,
+        localInterno,
+        cidade,
+        descricao,
+        produto,
+        dataTransacao,
+        horaTransacao,
+        valor: formatCurrency(valor),
+        nomeSobrenome,
+        celular,
+        problemas,
+        formaPgto,
+        reembolso,
+        pix,
+        atendente,
+        dataHoraLancamento
+      }};
+
+      if (ehEdicao) {{
+        listaChamadosSAC = listaChamadosSAC.map(c => c.chamado === chamado ? novoItem : c);
+      }} else {{
+        listaChamadosSAC.unshift(novoItem);
+      }}
+
+      const m = chamado.match(/SAC-(\d{{4}})-(\d+)/i);
+      if (m) {{
+        const ano = m[1];
+        const seq = parseInt(m[2], 10);
+        dadosSAC.maior_sac_ano[ano] = Math.max(dadosSAC.maior_sac_ano[ano] || 0, seq);
+      }}
+
+      limparFormSAC();
+      renderizarTabelaChamadosSAC();
+
+      setTimeout(() => {{
+        abrirModalLoading(
+          ehEdicao ? 'Ocorrência Atualizada!' : 'Lançamento Concluído!',
+          ehEdicao ? 'As alterações do chamado ' + chamado + ' foram salvas com sucesso.' : 'O chamado ' + chamado + ' foi registrado na planilha oficial com sucesso.',
+          'sucesso'
+        );
+
+        exibirMensagemTopo(
+          ehEdicao ? '✅ Ocorrência ' + chamado + ' atualizada com sucesso!' : '✅ Ocorrência ' + chamado + ' lançada com sucesso!',
+          'Cliente: ' + cliente + ' (' + localInterno + ') · Filial: ' + cidade + ' · Atendente: ' + atendente + ' · Valor: ' + formatCurrency(valor),
+          ehEdicao ? 'editar' : 'sucesso'
+        );
+
+        setTimeout(fecharModalLoading, 1000);
+      }}, 500);
+    }}
+
+    // =========================================================================
+    // ROTINAS DA PÁGINA: CADASTRO DE CLIENTES
+    // =========================================================================
+    function limparFormCliente() {{
+      clienteEmEdicao = null;
+      document.getElementById('clienteForm').reset();
+      document.getElementById('alertCliEditMode').classList.add('hidden');
+      document.getElementById('cliFormTitleText').innerText = "Cadastro de Clientes e Pontos de Atendimento";
+      document.getElementById('btnSalvarClienteText').innerText = "Cadastrar Cliente";
+      lucide.createIcons();
+    }}
+
+    function cancelarEdicaoCliente() {{
+      limparFormCliente();
+    }}
+
+    function editarCliente(index) {{
+      if ((nivelAcessoLogado || '').trim().toLowerCase() !== 'geral') {{
+        alert('⛔ Operação não permitida: Apenas usuários com perfil Geral podem editar clientes.');
+        return;
+      }}
+
+      const item = listaCadastroClientes[index];
+      if (!item) return;
+
+      clienteEmEdicao = {{ ...item, indexOriginal: index }};
+
+      document.getElementById('cadCliCliente').value = converterParaPrimeirasMaiusculas(item.cliente || '');
+      document.getElementById('cadCliLocal').value = converterParaPrimeirasMaiusculas(item.local || '');
+      document.getElementById('cadCliLocalInterno').value = converterParaPrimeirasMaiusculas(item.localInterno || item.local || '');
+      document.getElementById('cadCliMaquina').value = converterParaPrimeirasMaiusculas(item.maquina || '');
+      document.getElementById('cadCliModeloMaquina').value = converterParaPrimeirasMaiusculas(item.modeloMaquina || '');
+      document.getElementById('cadCliFilial').value = converterParaPrimeirasMaiusculas(item.filialResponsavel || '');
+
+      document.getElementById('alertCliEditMode').classList.remove('hidden');
+      document.getElementById('labelCliEditNome').innerText = item.cliente + ' (' + (item.localInterno || item.local || '') + ')';
+      document.getElementById('cliFormTitleText').innerText = 'Edição de Ponto: ' + item.cliente;
+      document.getElementById('btnSalvarClienteText').innerText = 'Salvar Alterações';
+
+      document.getElementById('clienteForm').scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+      lucide.createIcons();
+    }}
+
+    function excluirCliente(index) {{
+      if ((nivelAcessoLogado || '').trim().toLowerCase() !== 'geral') {{
+        alert('⛔ Operação não permitida: Apenas usuários com perfil Geral podem excluir clientes.');
+        return;
+      }}
+
+      const item = listaCadastroClientes[index];
+      if (!item) return;
+
+      const descr = item.cliente + ' - ' + (item.localInterno || item.local || '');
+      if (!confirm('Deseja realmente excluir o cadastro de "' + descr + '"?')) {{
+        return;
+      }}
+
+      abrirModalLoading(
+        'Excluindo Cliente...',
+        'Removendo o ponto "' + descr + '" da aba Clientes.',
+        'loading'
+      );
+
+      const payloadExcluir = {{
+        "action": "excluir_cliente",
+        "acao": "excluir_cliente",
+        "tipo": "excluir_cliente",
+        "aba": "Clientes",
+        "sheet": "Clientes",
+        "linha": item.linha || "",
+        "Cliente": item.cliente,
+        "Local": item.local,
+        "Local interno": item.localInterno,
+        "Máquina": item.maquina,
+        "Modelo de máquina": item.modeloMaquina,
+        "Filial Responsavel": item.filialResponsavel
+      }};
+
+      enviarParaPlanilhaGarantido(payloadExcluir);
+
+      listaCadastroClientes.splice(index, 1);
+      renderizarTabelaClientes();
+
+      if (clienteEmEdicao && clienteEmEdicao.indexOriginal === index) {{
+        limparFormCliente();
+      }}
+
+      setTimeout(() => {{
+        abrirModalLoading(
+          'Cliente Excluído!',
+          'O cadastro foi removido da aba Clientes com sucesso.',
+          'excluir'
+        );
+
+        exibirMensagemTopoCliente(
+          '🗑️ Ponto "' + descr + '" excluído!',
+          'O registro foi removido com sucesso da aba Clientes.',
+          'excluir'
+        );
+
+        setTimeout(fecharModalLoading, 1000);
+      }}, 500);
+    }}
+
+    function filtrarClientesCadastrados() {{
+      const termo = (document.getElementById('searchClientesCadastrados')?.value || '').trim().toLowerCase();
+      if (!termo) {{
+        renderizarTabelaClientes(listaCadastroClientes);
+        return;
+      }}
+      const filtrados = listaCadastroClientes.filter(c => 
+        (c.cliente && c.cliente.toLowerCase().includes(termo)) ||
+        (c.local && c.local.toLowerCase().includes(termo)) ||
+        (c.localInterno && c.localInterno.toLowerCase().includes(termo)) ||
+        (c.maquina && c.maquina.toLowerCase().includes(termo)) ||
+        (c.modeloMaquina && c.modeloMaquina.toLowerCase().includes(termo)) ||
+        (c.filialResponsavel && c.filialResponsavel.toLowerCase().includes(termo))
+      );
+      renderizarTabelaClientes(filtrados);
+    }}
+
+    function renderizarTabelaClientes(lista = listaCadastroClientes) {{
+      const tbody = document.getElementById('tableClientesBody');
+      const badge = document.getElementById('badgeContadorClientes');
+      if (badge) badge.innerText = lista.length + ' cliente(s)';
+
+      if (!lista || lista.length === 0) {{
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-slate-400 font-semibold">Nenhum cliente encontrado.</td></tr>';
+        return;
+      }}
+
+      tbody.innerHTML = lista.map((c, idx) => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-2.5 px-3 whitespace-nowrap">
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="editarCliente(${{idx}})" title="Editar cadastro" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
+                <i data-lucide="edit-2" class="w-3 h-3"></i>
+                Editar
+              </button>
+              <button type="button" onclick="excluirCliente(${{idx}})" title="Excluir cadastro" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition cursor-pointer">
+                <i data-lucide="trash-2" class="w-3 h-3"></i>
+                Excluir
+              </button>
+            </div>
+          </td>
+          <td class="py-2.5 px-3 font-bold text-slate-800">${{c.cliente || '-'}}</td>
+          <td class="py-2.5 px-3 text-slate-600">${{c.local || '-'}}</td>
+          <td class="py-2.5 px-3 text-slate-700 font-medium">${{c.localInterno || '-'}}</td>
+          <td class="py-2.5 px-3 text-slate-600 font-mono">${{c.maquina || '-'}}</td>
+          <td class="py-2.5 px-3 text-slate-600">${{c.modeloMaquina || '-'}}</td>
+          <td class="py-2.5 px-3 font-semibold text-sky-800">${{c.filialResponsavel || '-'}}</td>
+        </tr>
+      `).join('');
+
+      lucide.createIcons();
+    }}
+
+    function handleClienteSubmit(e) {{
+      e.preventDefault();
+
+      if ((nivelAcessoLogado || '').trim().toLowerCase() !== 'geral') {{
+        alert('⛔ Operação não permitida: Apenas usuários com perfil Geral podem cadastrar clientes.');
+        return;
+      }}
+
+      const cliente = converterParaPrimeirasMaiusculas(document.getElementById('cadCliCliente').value.trim());
+      const local = converterParaPrimeirasMaiusculas(document.getElementById('cadCliLocal').value.trim());
+      const localInterno = converterParaPrimeirasMaiusculas(document.getElementById('cadCliLocalInterno').value.trim());
+      const maquina = converterParaPrimeirasMaiusculas(document.getElementById('cadCliMaquina').value.trim());
+      const modeloMaquina = converterParaPrimeirasMaiusculas(document.getElementById('cadCliModeloMaquina').value.trim());
+      const filialResponsavel = converterParaPrimeirasMaiusculas(document.getElementById('cadCliFilial').value.trim());
+
+      if (!cliente || !local || !localInterno || !maquina || !modeloMaquina || !filialResponsavel) {{
+        alert('Por favor, preencha todos os campos obrigatórios do formulário.');
+        return;
+      }}
+
+      const ehEdicao = (clienteEmEdicao !== null);
+
+      abrirModalLoading(
+        ehEdicao ? 'Atualizando Cliente...' : 'Cadastrando Cliente...',
+        ehEdicao ? 'Salvando alterações na aba Clientes...' : 'Enviando registro para a aba Clientes...',
+        'loading'
+      );
+
+      const payloadCliente = {{
+        "acao": ehEdicao ? "editar_cliente" : "inserir_cliente",
+        "action": ehEdicao ? "editar_cliente" : "inserir_cliente",
+        "tipo": "cadastro_cliente",
+        "aba": "Clientes",
+        "sheet": "Clientes",
+        "linha": ehEdicao && clienteEmEdicao.linha ? clienteEmEdicao.linha : "",
+        "Cliente": cliente,
+        "Local": local,
+        "Local interno": localInterno,
+        "Máquina": maquina,
+        "Modelo de máquina": modeloMaquina,
+        "Filial Responsavel": filialResponsavel
+      }};
+
+      enviarParaPlanilhaGarantido(payloadCliente);
+
+      const novoItem = {{
+        linha: ehEdicao && clienteEmEdicao.linha ? clienteEmEdicao.linha : listaCadastroClientes.length + 2,
+        cliente,
+        local,
+        localInterno,
+        maquina,
+        modeloMaquina,
+        filialResponsavel
+      }};
+
+      if (ehEdicao) {{
+        listaCadastroClientes[clienteEmEdicao.indexOriginal] = novoItem;
+      }} else {{
+        listaCadastroClientes.unshift(novoItem);
+      }}
+
+      dadosSAC.clientes.push({{
+        cliente: cliente,
+        local: localInterno,
+        cidade: filialResponsavel
+      }});
+
+      limparFormCliente();
+      renderizarTabelaClientes();
+
+      setTimeout(() => {{
+        abrirModalLoading(
+          ehEdicao ? 'Cliente Atualizado!' : 'Cadastro Concluído!',
+          'Os dados de ' + cliente + ' foram registrados na aba Clientes com sucesso.',
+          'sucesso'
+        );
+
+        exibirMensagemTopoCliente(
+          ehEdicao ? '✅ Cadastro de ' + cliente + ' atualizado!' : '✅ Cliente ' + cliente + ' cadastrado com sucesso!',
+          'Local: ' + localInterno + ' · Máquina: ' + maquina + ' · Filial: ' + filialResponsavel,
+          ehEdicao ? 'editar' : 'sucesso'
+        );
+
+        setTimeout(fecharModalLoading, 1000);
+      }}, 500);
+    }}
+
+    // =========================================================================
+    // DASHBOARD SAC
+    // =========================================================================
+    const filterSACCliente = document.getElementById('filterSACCliente');
+    const filterSACProduto = document.getElementById('filterSACProduto');
+    const filterSACAtendente = document.getElementById('filterSACAtendente');
+
+    function getHorizontalSACBarOptions() {{
+      const textColor = '#475569';
+      const gridColor = 'rgba(226, 232, 240, 0.7)';
+      return {{
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {{ padding: {{ right: 40, left: 10, top: 10, bottom: 10 }} }},
+        plugins: {{
+          legend: {{ display: false }},
+          tooltip: {{
+            backgroundColor: '#ffffff',
+            titleColor: '#0f172a',
+            bodyColor: '#334155',
+            borderColor: '#e2e8f0',
+            borderWidth: 1,
+            padding: 10,
+            callbacks: {{
+              label: (context) => 'Ocorrências: ' + context.raw.toLocaleString('pt-BR')
+            }}
+          }},
+          datalabels: {{
+            anchor: 'end',
+            align: 'right',
+            offset: 4,
+            color: '#0f172a',
+            font: {{ family: 'Inter', weight: 'bold', size: 10 }},
+            formatter: (v) => v ? v.toLocaleString('pt-BR') : ''
+          }}
+        }},
+        scales: {{
+          x: {{
+            grid: {{ color: gridColor }},
+            ticks: {{ color: textColor, font: {{ size: 10 }} }},
+            beginAtZero: true
+          }},
+          y: {{
+            grid: {{ display: false }},
+            ticks: {{ color: textColor, font: {{ size: 10, weight: '600' }} }}
+          }}
+        }}
+      }};
+    }}
+
+    const chartTopProblemasSAC = new Chart(document.getElementById('chartTopProblemasSAC').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(2, 132, 199, 0.85)', borderRadius: 6 }}] }},
+      options: getHorizontalSACBarOptions()
+    }});
+
+    const chartAtendentesSAC = new Chart(document.getElementById('chartAtendentesSAC').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(16, 185, 129, 0.85)', borderRadius: 6 }}] }},
+      options: getHorizontalSACBarOptions()
+    }});
+
+    function inicializarFiltrosDashboardSAC() {{
+      const clientesUnicos = [...new Set(listaChamadosSAC.map(c => c.cliente).filter(Boolean))].sort();
+      filterSACCliente.innerHTML = '<option value="ALL">Todos os Clientes</option>';
+      clientesUnicos.forEach(cli => {{
+        const opt = document.createElement('option');
+        opt.value = cli;
+        opt.textContent = cli;
+        filterSACCliente.appendChild(opt);
+      }});
+
+      const atendentesUnicos = [...new Set(listaChamadosSAC.map(c => c.atendente).filter(Boolean))].sort();
+      filterSACAtendente.innerHTML = '<option value="ALL">Todos os Atendentes</option>';
+      atendentesUnicos.forEach(a => {{
+        const opt = document.createElement('option');
+        opt.value = a;
+        opt.textContent = a;
+        filterSACAtendente.appendChild(opt);
+      }});
+    }}
+    inicializarFiltrosDashboardSAC();
+
+    function parseValorNumerico(v) {{
+      if (!v) return 0;
+      const s = String(v).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.');
+      const n = parseFloat(s);
+      return isNaN(n) ? 0 : n;
+    }}
+
+    function atualizarDashboardSAC() {{
+      const cliVal = filterSACCliente.value;
+      const prodVal = filterSACProduto.value;
+      const atendVal = filterSACAtendente.value;
+
+      const filtrados = listaChamadosSAC.filter(item => {{
+        const matchCli = (cliVal === 'ALL' || (item.cliente && item.cliente.toLowerCase() === cliVal.toLowerCase()));
+        const matchProd = (prodVal === 'ALL' || (item.produto && item.produto.toLowerCase() === prodVal.toLowerCase()));
+        const matchAtend = (atendVal === 'ALL' || (item.atendente && item.atendente.toLowerCase() === atendVal.toLowerCase()));
+        return matchCli && matchProd && matchAtend;
+      }});
+
+      document.getElementById('badgeFiltroSAC').innerText = 'Filtrando: Cliente [' + cliVal + '] · Produto [' + prodVal + '] · Atendente [' + atendVal + ']';
+
+      const totalChamados = filtrados.length;
+      let somaValor = 0;
+      let chamadosCafe = 0;
+      let chamadosSnaky = 0;
+
+      filtrados.forEach(c => {{
+        somaValor += parseValorNumerico(c.valor);
+        const pLower = (c.produto || '').toLowerCase();
+        if (pLower.includes('café') || pLower.includes('cafe')) chamadosCafe++;
+        else if (pLower.includes('snaky') || pLower.includes('snack')) chamadosSnaky++;
+      }});
+
+      const pctCafe = totalChamados > 0 ? Math.round((chamadosCafe / totalChamados) * 100) : 0;
+      const pctSnaky = totalChamados > 0 ? Math.round((chamadosSnaky / totalChamados) * 100) : 0;
+      const ticketMedio = totalChamados > 0 ? (somaValor / totalChamados) : 0;
+
+      document.getElementById('kpiSACTotal').innerText = totalChamados.toLocaleString('pt-BR');
+      document.getElementById('kpiSACTotalSub').innerText = totalChamados + ' ocorrências registradas';
+
+      document.getElementById('kpiSACValorTotal').innerText = formatCurrency(somaValor);
+      document.getElementById('kpiSACCafé').innerText = chamadosCafe.toLocaleString('pt-BR');
+      document.getElementById('kpiSACCaféPct').innerText = pctCafe + '%';
+      document.getElementById('kpiSACSnaky').innerText = chamadosSnaky.toLocaleString('pt-BR');
+      document.getElementById('kpiSACSnakyPct').innerText = pctSnaky + '%';
+      document.getElementById('kpiSACClientes').innerText = new Set(filtrados.map(c => c.cliente)).size;
+      document.getElementById('kpiSACTicketMedio').innerText = formatCurrency(ticketMedio);
+
+      // Gráfico de Problemas
+      const probContagem = {{}};
+      filtrados.forEach(c => {{
+        const p = (c.problemas || 'Outros').trim();
+        probContagem[p] = (probContagem[p] || 0) + 1;
+      }});
+      const truncar = (t, max = 28) => t.length > max ? t.substring(0, max) + '...' : t;
+      const top10Problemas = Object.entries(probContagem).map(([nome, qt]) => ({{ nome, qt }})).sort((a,b) => b.qt - a.qt).slice(0, 10);
+      chartTopProblemasSAC.data.labels = top10Problemas.map(p => truncar(p.nome));
+      chartTopProblemasSAC.data.datasets[0].data = top10Problemas.map(p => p.qt);
+      chartTopProblemasSAC.update();
+
+      // Gráfico de Atendentes
+      const atendContagem = {{}};
+      filtrados.forEach(c => {{
+        const a = (c.atendente || 'Não Informado').trim();
+        atendContagem[a] = (atendContagem[a] || 0) + 1;
+      }});
+      const topAtendentes = Object.entries(atendContagem).map(([nome, qt]) => ({{ nome, qt }})).sort((a,b) => b.qt - a.qt).slice(0, 10);
+      chartAtendentesSAC.data.labels = topAtendentes.map(a => truncar(a.nome));
+      chartAtendentesSAC.data.datasets[0].data = topAtendentes.map(a => a.qt);
+      chartAtendentesSAC.update();
+    }}
+
+    [filterSACCliente, filterSACProduto, filterSACAtendente].forEach(el => el.addEventListener('change', atualizarDashboardSAC));
+    document.getElementById('btnLimparFiltrosSAC').addEventListener('click', () => {{
+      filterSACCliente.value = 'ALL';
+      filterSACProduto.value = 'ALL';
+      filterSACAtendente.value = 'ALL';
+      atualizarDashboardSAC();
+    }});
+
+    // =========================================================================
+    // DISPARO INICIAL
+    // =========================================================================
+    verificarEstadoAutenticacao();
+  </script>
+</body>
+</html>
+"""
+
+components.html(html_code, height=2700, scrolling=True)
