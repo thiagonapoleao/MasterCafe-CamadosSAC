@@ -266,17 +266,19 @@ html_code = f"""
   <!-- MODAL DE PROCESSAMENTO / AÇÃO EM ANDAMENTO -->
   <div id="modalLoadingAcao" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl border border-slate-100 flex flex-col items-center text-center space-y-4 animate-in fade-in zoom-in duration-200">
-      <div class="w-16 h-16 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shadow-inner">
-        <svg class="animate-spin h-8 w-8 text-sky-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <div id="modalIconContainer" class="w-16 h-16 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shadow-inner">
+        <svg id="modalSpinner" class="animate-spin h-8 w-8 text-sky-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
         </svg>
+        <i id="modalIconCheck" data-lucide="check" class="hidden w-8 h-8 text-emerald-600"></i>
+        <i id="modalIconTrash" data-lucide="trash-2" class="hidden w-8 h-8 text-rose-600"></i>
       </div>
       <div>
-        <h3 id="modalLoadingTitle" class="text-base font-bold text-slate-900">Lançando no Sistema...</h3>
+        <h3 id="modalLoadingTitle" class="text-base font-bold text-slate-900">Processando Ação...</h3>
         <p id="modalLoadingSub" class="text-xs text-slate-500 mt-1">Sua solicitação está sendo transmitida e registrada na planilha Chamados.</p>
       </div>
-      <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+      <div id="modalProgressBar" class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
         <div class="bg-sky-500 h-full w-2/3 animate-pulse"></div>
       </div>
     </div>
@@ -438,7 +440,7 @@ html_code = f"""
         </div>
       </section>
 
-      <!-- GRÁFICOS DO DASHBOARD SAC -->
+      <!-- GRÁFICOS DO DASHBOARD SAC (SEM A TABELA ABAIXO) -->
       <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
           <div class="flex items-center justify-between mb-3">
@@ -466,43 +468,6 @@ html_code = f"""
             <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Volume</span>
           </div>
           <div class="relative h-80"><canvas id="chartAtendentesSAC"></canvas></div>
-        </div>
-      </section>
-
-      <!-- TABELA RESUMO EXECUTIVA DO SAC -->
-      <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
-          <div>
-            <h2 class="text-base font-bold flex items-center gap-2 text-slate-800">
-              <i data-lucide="list" class="w-4 h-4 text-sky-600"></i>
-              Resumo Geral de Ocorrências do SAC
-            </h2>
-            <p class="text-xs text-slate-500">Histórico detalhado sincronizado com a aba Chamados</p>
-          </div>
-          <div class="relative">
-            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
-            <input type="text" id="searchSACGeral" placeholder="Buscar cliente, chamado, atendente..." oninput="atualizarDashboardSAC()" class="text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 w-64">
-          </div>
-        </div>
-
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs text-slate-600">
-            <thead class="bg-slate-50 uppercase font-semibold text-slate-500">
-              <tr>
-                <th class="py-2.5 px-3 rounded-l-lg font-mono">Chamado</th>
-                <th class="py-2.5 px-3">Data</th>
-                <th class="py-2.5 px-3">Cliente</th>
-                <th class="py-2.5 px-3">Local</th>
-                <th class="py-2.5 px-3">Cidade</th>
-                <th class="py-2.5 px-3">Produto</th>
-                <th class="py-2.5 px-3 text-right">Valor</th>
-                <th class="py-2.5 px-3">Problema</th>
-                <th class="py-2.5 px-3">Reembolso</th>
-                <th class="py-2.5 px-3 rounded-r-lg">Atendente</th>
-              </tr>
-            </thead>
-            <tbody id="tableSACGeralBody" class="divide-y divide-slate-100"></tbody>
-          </table>
         </div>
       </section>
     </div>
@@ -557,14 +522,15 @@ html_code = f"""
           </button>
         </div>
 
+        <!-- MENSAGEM NO TOPO DINÂMICA (SUCESSO / EDIÇÃO / EXCLUSÃO) -->
         <div id="alertSACSuccess" class="hidden p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition">
           <div class="flex items-center gap-3">
-            <div class="p-2 bg-emerald-600 text-white rounded-xl">
-              <i data-lucide="check-circle" class="w-5 h-5"></i>
+            <div id="alertSACIconBadge" class="p-2 bg-emerald-600 text-white rounded-xl">
+              <i id="alertSACLucideIcon" data-lucide="check-circle" class="w-5 h-5"></i>
             </div>
             <div>
-              <p id="alertSACSuccessTitle" class="text-sm font-bold">Ocorrência SAC lançada com sucesso!</p>
-              <p id="alertSACSuccessSub" class="text-xs text-emerald-700">Gravado na aba Chamados da planilha oficial.</p>
+              <p id="alertSACSuccessTitle" class="text-sm font-bold">Ação realizada com sucesso!</p>
+              <p id="alertSACSuccessSub" class="text-xs text-emerald-700">A planilha oficial foi atualizada em tempo real.</p>
             </div>
           </div>
           <button type="button" onclick="document.getElementById('alertSACSuccess').classList.add('hidden')" class="px-3 py-2 rounded-xl hover:bg-emerald-100 text-xs font-semibold text-emerald-800 transition cursor-pointer">
@@ -798,14 +764,40 @@ html_code = f"""
       atendenteSACLogado = sessionStorage.getItem('sac_atendente_conectado') || "";
     }} catch(e) {{}}
 
-    // MODAL DE AÇÃO EM ANDAMENTO (OVERLAY VISUAL)
-    function abrirModalLoading(titulo, subtitulo) {{
+    // CONTROLE DINÂMICO DE MODAL DE PROCESSAMENTO
+    function abrirModalLoading(titulo, subtitulo, tipoAcao = 'loading') {{
       const modal = document.getElementById('modalLoadingAcao');
-      if (modal) {{
-        document.getElementById('modalLoadingTitle').innerText = titulo;
-        document.getElementById('modalLoadingSub').innerText = subtitulo;
-        modal.classList.remove('hidden');
+      if (!modal) return;
+
+      document.getElementById('modalLoadingTitle').innerText = titulo;
+      document.getElementById('modalLoadingSub').innerText = subtitulo;
+
+      const spinner = document.getElementById('modalSpinner');
+      const iconCheck = document.getElementById('modalIconCheck');
+      const iconTrash = document.getElementById('modalIconTrash');
+      const progressBar = document.getElementById('modalProgressBar');
+      const badge = document.getElementById('modalIconContainer');
+
+      spinner.classList.add('hidden');
+      iconCheck.classList.add('hidden');
+      iconTrash.classList.add('hidden');
+      progressBar.classList.remove('hidden');
+
+      if (tipoAcao === 'loading') {{
+        spinner.classList.remove('hidden');
+        badge.className = "w-16 h-16 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shadow-inner";
+      }} else if (tipoAcao === 'sucesso') {{
+        iconCheck.classList.remove('hidden');
+        progressBar.classList.add('hidden');
+        badge.className = "w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner";
+      }} else if (tipoAcao === 'excluir') {{
+        iconTrash.classList.remove('hidden');
+        progressBar.classList.add('hidden');
+        badge.className = "w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shadow-inner";
       }}
+
+      modal.classList.remove('hidden');
+      lucide.createIcons();
     }}
 
     function fecharModalLoading() {{
@@ -813,12 +805,43 @@ html_code = f"""
       if (modal) modal.classList.add('hidden');
     }}
 
+    // EXIBE MENSAGEM NO BANNER DO TOPO COM ATUALIZAÇÃO DE TIPO (LANÇAMENTO, EDIÇÃO OU EXCLUSÃO)
+    function exibirMensagemTopo(titulo, subtitulo, tipo = 'sucesso') {{
+      const alertBox = document.getElementById('alertSACSuccess');
+      const alertTitle = document.getElementById('alertSACSuccessTitle');
+      const alertSub = document.getElementById('alertSACSuccessSub');
+      const iconBadge = document.getElementById('alertSACIconBadge');
+      const lucideIcon = document.getElementById('alertSACLucideIcon');
+
+      if (!alertBox) return;
+
+      alertTitle.innerText = titulo;
+      alertSub.innerText = subtitulo;
+
+      if (tipo === 'excluir') {{
+        alertBox.className = "p-5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition";
+        iconBadge.className = "p-2 bg-rose-600 text-white rounded-xl";
+        lucideIcon.setAttribute('data-lucide', 'trash-2');
+      }} else if (tipo === 'editar') {{
+        alertBox.className = "p-5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition";
+        iconBadge.className = "p-2 bg-amber-600 text-white rounded-xl";
+        lucideIcon.setAttribute('data-lucide', 'edit-3');
+      }} else {{
+        alertBox.className = "p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition";
+        iconBadge.className = "p-2 bg-emerald-600 text-white rounded-xl";
+        lucideIcon.setAttribute('data-lucide', 'check-circle');
+      }}
+
+      alertBox.classList.remove('hidden');
+      alertBox.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+      lucide.createIcons();
+    }}
+
     // ENVIO DESACOPLADO E INSTANTÂNEO
     function enviarParaPlanilhaGarantido(payload) {{
       const endpoint = APPS_SCRIPT_SAC_URL;
       const strData = JSON.stringify(payload);
 
-      // 1. Tenta envio por Beacon nativo
       if (navigator.sendBeacon) {{
         try {{
           const blob = new Blob([strData], {{ type: 'text/plain;charset=utf-8' }});
@@ -827,7 +850,6 @@ html_code = f"""
         }} catch (err) {{}}
       }}
 
-      // 2. Disparo assíncrono via fetch desacoplado
       try {{
         fetch(endpoint, {{
           method: "POST",
@@ -849,7 +871,7 @@ html_code = f"""
     }}
 
     // =========================================================================
-    // NAVEGAÇÃO ENTRE PÁGINAS CORRIGIDA (Dashboard SAC x Lançamento SAC)
+    // NAVEGAÇÃO ENTRE PÁGINAS (Dashboard SAC x Lançamento SAC)
     // =========================================================================
     function switchPage(page) {{
       try {{
@@ -1151,7 +1173,12 @@ html_code = f"""
         return;
       }}
 
-      abrirModalLoading('Excluindo Chamado...', 'Removendo a ocorrência ' + numeroChamado + ' da planilha Chamados.');
+      // ATUALIZA MODAL INFORMANDO A EXCLUSÃO
+      abrirModalLoading(
+        'Excluindo Ocorrência...',
+        'Removendo a ocorrência ' + numeroChamado + ' da planilha oficial Chamados.',
+        'loading'
+      );
 
       const item = listaChamadosSAC.find(c => c.chamado === numeroChamado);
 
@@ -1173,7 +1200,22 @@ html_code = f"""
         limparFormSAC();
       }}
 
-      setTimeout(fecharModalLoading, 800);
+      // ATUALIZA MODAL E MENSAGEM DO TOPO COM STATUS DE EXCLUSÃO
+      setTimeout(() => {{
+        abrirModalLoading(
+          'Chamado Excluído!',
+          'A ocorrência ' + numeroChamado + ' foi removida da base com sucesso.',
+          'excluir'
+        );
+
+        exibirMensagemTopo(
+          '🗑️ Chamado ' + numeroChamado + ' excluído!',
+          'A ocorrência foi removida do sistema e da planilha oficial.',
+          'excluir'
+        );
+
+        setTimeout(fecharModalLoading, 1000);
+      }}, 500);
     }}
 
     function filtrarChamadosSAC() {{
@@ -1251,10 +1293,11 @@ html_code = f"""
         return;
       }}
 
-      // ABRE O MODAL NA TELA INFORMANDO QUE A AÇÃO ESTÁ SENDO REALIZADA
+      // ATUALIZAÇÃO DO MODAL PARA O INÍCIO DA TRANSMISSÃO
       abrirModalLoading(
         ehEdicao ? 'Atualizando Ocorrência...' : 'Lançando no Sistema...',
-        ehEdicao ? 'Gravando alterações do chamado ' + chamado + ' na planilha Chamados.' : 'Registrando a ocorrência ' + chamado + ' na planilha oficial.'
+        ehEdicao ? 'Gravando alterações do chamado ' + chamado + ' na planilha Chamados.' : 'Registrando a ocorrência ' + chamado + ' na planilha oficial.',
+        'loading'
       );
 
       const data = document.getElementById('sacData').value;
@@ -1344,21 +1387,26 @@ html_code = f"""
       limparFormSAC();
       renderizarTabelaChamadosSAC();
 
-      // 4. Fecha modal de loading após confirmação visual
+      // 4. ATUALIZAÇÃO DO MODAL E DA MENSAGEM NO TOPO APÓS A CONCLUSÃO
       setTimeout(() => {{
-        fecharModalLoading();
-        const alertBox = document.getElementById('alertSACSuccess');
-        document.getElementById('alertSACSuccessTitle').innerText = ehEdicao ?
-          '✅ Ocorrência ' + chamado + ' atualizada com sucesso!' :
-          '✅ Ocorrência ' + chamado + ' lançada com sucesso!';
-        document.getElementById('alertSACSuccessSub').innerText = 'Cliente: ' + cliente + ' (' + localInterno + ') · Atendente: ' + atendente + ' · Valor: ' + formatCurrency(valor);
-        alertBox.classList.remove('hidden');
-        alertBox.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
-      }}, 600);
+        abrirModalLoading(
+          ehEdicao ? 'Ocorrência Atualizada!' : 'Lançamento Concluído!',
+          ehEdicao ? 'As alterações do chamado ' + chamado + ' foram salvas com sucesso.' : 'O chamado ' + chamado + ' foi registrado na planilha oficial com sucesso.',
+          'sucesso'
+        );
+
+        exibirMensagemTopo(
+          ehEdicao ? '✅ Ocorrência ' + chamado + ' atualizada com sucesso!' : '✅ Ocorrência ' + chamado + ' lançada com sucesso!',
+          'Cliente: ' + cliente + ' (' + localInterno + ') · Atendente: ' + atendente + ' · Valor: ' + formatCurrency(valor),
+          ehEdicao ? 'editar' : 'sucesso'
+        );
+
+        setTimeout(fecharModalLoading, 1000);
+      }}, 500);
     }}
 
     // =========================================================================
-    // DASHBOARD SAC
+    // DASHBOARD SAC (SOMENTE GRÁFICOS E KPIS - LISTA REMOVIDA)
     // =========================================================================
     const filterSACCliente = document.getElementById('filterSACCliente');
     const filterSACProduto = document.getElementById('filterSACProduto');
@@ -1452,21 +1500,12 @@ html_code = f"""
       const cliVal = filterSACCliente.value;
       const prodVal = filterSACProduto.value;
       const atendVal = filterSACAtendente.value;
-      const searchVal = (document.getElementById('searchSACGeral')?.value || '').trim().toLowerCase();
 
       const filtrados = listaChamadosSAC.filter(item => {{
         const matchCli = (cliVal === 'ALL' || (item.cliente && item.cliente.toLowerCase() === cliVal.toLowerCase()));
         const matchProd = (prodVal === 'ALL' || (item.produto && item.produto.toLowerCase() === prodVal.toLowerCase()));
         const matchAtend = (atendVal === 'ALL' || (item.atendente && item.atendente.toLowerCase() === atendVal.toLowerCase()));
-        const matchSearch = !searchVal || (
-          (item.chamado && item.chamado.toLowerCase().includes(searchVal)) ||
-          (item.cliente && item.cliente.toLowerCase().includes(searchVal)) ||
-          (item.localInterno && item.localInterno.toLowerCase().includes(searchVal)) ||
-          (item.nomeSobrenome && item.nomeSobrenome.toLowerCase().includes(searchVal)) ||
-          (item.atendente && item.atendente.toLowerCase().includes(searchVal)) ||
-          (item.problemas && item.problemas.toLowerCase().includes(searchVal))
-        );
-        return matchCli && matchProd && matchAtend && matchSearch;
+        return matchCli && matchProd && matchAtend;
       }});
 
       document.getElementById('badgeFiltroSAC').innerText = 'Filtrando: Cliente [' + cliVal + '] · Produto [' + prodVal + '] · Atendente [' + atendVal + ']';
@@ -1520,28 +1559,6 @@ html_code = f"""
       chartAtendentesSAC.data.labels = topAtendentes.map(a => truncar(a.nome));
       chartAtendentesSAC.data.datasets[0].data = topAtendentes.map(a => a.qt);
       chartAtendentesSAC.update();
-
-      // Tabela Resumo Geral do SAC
-      const tbGeral = document.getElementById('tableSACGeralBody');
-      if (filtrados.length === 0) {{
-        tbGeral.innerHTML = '<tr><td colspan="10" class="text-center py-6 text-slate-400 font-semibold">Nenhuma ocorrência encontrada.</td></tr>';
-      }} else {{
-        tbGeral.innerHTML = filtrados.map(item => `
-          <tr class="hover:bg-slate-50 transition">
-            <td class="py-2.5 px-3 font-mono font-bold text-sky-700">${{item.chamado}}</td>
-            <td class="py-2.5 px-3">${{item.data || '-'}}</td>
-            <td class="py-2.5 px-3 font-semibold text-slate-800">${{item.cliente || '-'}}</td>
-            <td class="py-2.5 px-3 text-slate-600">${{item.localInterno || '-'}}</td>
-            <td class="py-2.5 px-3 text-slate-600">${{item.cidade || '-'}}</td>
-            <td class="py-2.5 px-3 font-medium text-slate-700">${{item.produto || '-'}}</td>
-            <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${{item.valor ? (String(item.valor).includes('R$') ? item.valor : 'R$ ' + item.valor) : 'R$ 0,00'}}</td>
-            <td class="py-2.5 px-3 text-slate-700">${{item.problemas || '-'}}</td>
-            <td class="py-2.5 px-3 text-sky-900 font-semibold">${{item.reembolso || '-'}}</td>
-            <td class="py-2.5 px-3 font-medium text-slate-600">${{item.atendente || '-'}}</td>
-          </tr>
-        `).join('');
-      }}
-      lucide.createIcons();
     }}
 
     [filterSACCliente, filterSACProduto, filterSACAtendente].forEach(el => el.addEventListener('change', atualizarDashboardSAC));
@@ -1549,7 +1566,6 @@ html_code = f"""
       filterSACCliente.value = 'ALL';
       filterSACProduto.value = 'ALL';
       filterSACAtendente.value = 'ALL';
-      document.getElementById('searchSACGeral').value = '';
       atualizarDashboardSAC();
     }});
 
