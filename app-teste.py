@@ -76,24 +76,54 @@ URL_CSV_SAC_USUARIOS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC
 def carregar_dados_sac():
     clientes_dados = []
     cidades_clientes = []
+    lista_clientes_completa = []
     try:
         df_cli = pd.read_csv(URL_CSV_SAC_CLIENTES, dtype=str)
         if df_cli is not None and not df_cli.empty:
-            col_a = df_cli.columns[0]
-            col_b = df_cli.columns[1] if len(df_cli.columns) > 1 else col_a
-            col_f = df_cli.columns[5] if len(df_cli.columns) > 5 else df_cli.columns[-1]
-            for _, r in df_cli.iterrows():
-                cli = str(r[col_a]).strip() if pd.notna(r[col_a]) else ""
-                loc = str(r[col_b]).strip() if pd.notna(r[col_b]) else ""
-                cid = str(r[col_f]).strip() if pd.notna(r[col_f]) else ""
+            cols = [c.strip() for c in df_cli.columns]
+
+            def find_cli_col(candidates, default_idx):
+                for cand in candidates:
+                    for c in cols:
+                        if c.lower() == cand.lower():
+                            return c
+                return cols[default_idx] if len(cols) > default_idx else ""
+
+            col_c_cliente = find_cli_col(["Cliente", "cliente"], 0)
+            col_c_local = find_cli_col(["Local", "local"], 1)
+            col_c_local_int = find_cli_col(["Local interno", "Local Interno", "local interno"], 2)
+            col_c_maquina = find_cli_col(["Máquina", "Maquina", "maquina"], 3)
+            col_c_modelo = find_cli_col(["Modelo de máquina", "Modelo de Máquina", "Modelo Maquina", "modelo de maquina"], 4)
+            col_c_filial = find_cli_col(["Filial Responsavel", "Filial Responsável", "Filial", "filial responsavel", "Cidade", "cidade"], 5)
+
+            for idx, r in df_cli.iterrows():
+                def val_de(col):
+                    return str(r[col]).strip() if col and col in r and pd.notna(r[col]) else ""
+
+                cli = val_de(col_c_cliente)
+                loc = val_de(col_c_local)
+                loc_int = val_de(col_c_local_int) or loc
+                maq = val_de(col_c_maquina)
+                mod = val_de(col_c_modelo)
+                filial = val_de(col_c_filial)
+
                 if cli and cli.lower() not in ["nan", "cliente"]:
                     clientes_dados.append({
                         "cliente": cli,
-                        "local": loc,
-                        "cidade": cid
+                        "local": loc_int,
+                        "cidade": filial
                     })
-                    if cid and cid.lower() not in ["nan", "cidade", "filial", "filial responsável"]:
-                        cidades_clientes.append(cid)
+                    lista_clientes_completa.append({
+                        "linha": idx + 2,
+                        "cliente": cli,
+                        "local": loc,
+                        "localInterno": loc_int,
+                        "maquina": maq,
+                        "modeloMaquina": mod,
+                        "filialResponsavel": filial
+                    })
+                    if filial and filial.lower() not in ["nan", "cidade", "filial", "filial responsável", "filial responsavel"]:
+                        cidades_clientes.append(filial)
     except Exception:
         pass
 
@@ -204,6 +234,7 @@ def carregar_dados_sac():
 
     return {
         "clientes": clientes_dados,
+        "cadastro_clientes": lista_clientes_completa,
         "formas_pagamento": sorted(formas_pagamento),
         "cidades": sorted(list(set(cidades_clientes))),
         "problemas": sorted(problemas),
@@ -310,6 +341,10 @@ html_code = f"""
         <button id="navSAC" type="button" class="nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('sac')">
           <i data-lucide="headphones" class="w-4 h-4"></i>
           Lançamento SAC
+        </button>
+        <button id="navCadastroClientes" type="button" class="nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('cadastroClientes')">
+          <i data-lucide="user-plus" class="w-4 h-4"></i>
+          Cadastro de Clientes
         </button>
         <button type="button" onclick="executarRefresh()" title="Clique para recarregar da planilha" class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 cursor-pointer transition">
           <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span> Sincronizar 🔄
@@ -747,6 +782,156 @@ html_code = f"""
       </div>
     </div>
 
+    <!-- PÁGINA 3: CADASTRO DE CLIENTES (ABA "CLIENTES") -->
+    <div id="pageCadastroClientes" class="hidden space-y-6">
+
+      <!-- ALERTA DE EDIÇÃO DE CLIENTE -->
+      <div id="alertCliEditMode" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex justify-between items-center shadow-sm">
+        <div class="flex items-center gap-3">
+          <div class="p-2 bg-amber-500 text-white rounded-xl"><i data-lucide="edit-3" class="w-5 h-5"></i></div>
+          <div>
+            <p class="text-sm font-bold">Modo de Edição de Cliente: <span id="labelCliEditNome" class="font-bold text-amber-800">Cliente</span></p>
+            <p class="text-xs text-amber-700">Você está alterando os dados cadastrais deste ponto. Ao salvar, os dados serão atualizados na aba Clientes.</p>
+          </div>
+        </div>
+        <button type="button" onclick="cancelarEdicaoCliente()" class="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 rounded-xl text-xs font-bold text-amber-900 transition cursor-pointer">
+          Cancelar Edição ✕
+        </button>
+      </div>
+
+      <!-- MENSAGEM NO TOPO DINÂMICA (SUCESSO / EDIÇÃO / EXCLUSÃO DE CLIENTE) -->
+      <div id="alertCliSuccess" class="hidden p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition">
+        <div class="flex items-center gap-3">
+          <div id="alertCliIconBadge" class="p-2 bg-emerald-600 text-white rounded-xl">
+            <i id="alertCliLucideIcon" data-lucide="check-circle" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <p id="alertCliSuccessTitle" class="text-sm font-bold">Ação realizada com sucesso!</p>
+            <p id="alertCliSuccessSub" class="text-xs text-emerald-700">A aba Clientes foi atualizada com sucesso.</p>
+          </div>
+        </div>
+        <button type="button" onclick="document.getElementById('alertCliSuccess').classList.add('hidden')" class="px-3 py-2 rounded-xl hover:bg-emerald-100 text-xs font-semibold text-emerald-800 transition cursor-pointer">
+          Fechar
+        </button>
+      </div>
+
+      <!-- FORMULÁRIO DE CADASTRO DE CLIENTE -->
+      <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-6 border-b border-slate-100 gap-4">
+          <div class="flex items-center gap-3">
+            <div class="p-2.5 bg-sky-600 text-white rounded-xl shadow-lg shadow-sky-500/25">
+              <i data-lucide="building-2" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <h2 id="cliFormTitleText" class="text-base font-bold text-slate-900">Cadastro de Clientes e Pontos de Atendimento</h2>
+              <p class="text-xs text-slate-500">Gerenciamento de máquinas, locais e filiais responsáveis · Aba: Clientes</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs px-3 py-1 rounded-lg bg-sky-50 text-sky-800 font-semibold border border-sky-200 flex items-center gap-1.5">
+              <i data-lucide="sheet" class="w-3.5 h-3.5 text-sky-600"></i> Aba "Clientes"
+            </span>
+          </div>
+        </div>
+
+        <form id="clienteForm" onsubmit="handleClienteSubmit(event)" class="space-y-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-5 rounded-2xl bg-slate-50/90 border border-slate-200">
+            
+            <!-- Cliente -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Cliente *</label>
+              <input type="text" id="cadCliCliente" placeholder="Ex: Embraer, Coca Cola..." required class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            </div>
+
+            <!-- Local -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Local *</label>
+              <input type="text" id="cadCliLocal" placeholder="Ex: Fábrica 1, Administrativo..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            </div>
+
+            <!-- Local interno -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Local interno *</label>
+              <input type="text" id="cadCliLocalInterno" placeholder="Ex: Refeitório, Recepção, Bloco B..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            </div>
+
+            <!-- Máquina -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Máquina *</label>
+              <input type="text" id="cadCliMaquina" placeholder="Ex: Máquina 01, M05..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            </div>
+
+            <!-- Modelo de máquina -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Modelo de máquina *</label>
+              <input type="text" id="cadCliModeloMaquina" placeholder="Ex: Lei Saeco, Krea, Snaky..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            </div>
+
+            <!-- Filial Responsavel -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Filial Responsavel *</label>
+              <input list="listaSACCidades" id="cadCliFilial" placeholder="Ex: Ribeirão Preto, São Carlos..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            </div>
+
+          </div>
+
+          <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+            <button type="button" onclick="limparFormCliente()" class="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">
+              Limpar Campos
+            </button>
+            <button type="submit" id="btnSalvarCliente" class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-sky-600 text-white text-xs font-bold shadow-lg shadow-sky-500/25 hover:bg-sky-700 transition cursor-pointer">
+              <i data-lucide="save" class="w-4 h-4"></i>
+              <span id="btnSalvarClienteText">Cadastrar Cliente</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- LISTA DE CLIENTES CADASTRADOS -->
+      <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+          <div>
+            <h2 class="text-base font-bold flex items-center gap-2 text-slate-800">
+              <i data-lucide="users" class="w-4 h-4 text-sky-600"></i>
+              Clientes Cadastrados
+            </h2>
+            <p class="text-xs text-slate-500">Base oficial de pontos sincronizada com a aba "Clientes"</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="relative">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+              <input type="text" id="searchClientesCadastrados" placeholder="Buscar cliente, local, máquina, filial..." oninput="filtrarClientesCadastrados()" class="text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 w-64">
+            </div>
+            <span id="badgeContadorClientes" class="text-xs px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 font-bold border border-sky-200">
+              0 cliente(s)
+            </span>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-600">
+            <thead class="bg-slate-50 uppercase font-semibold text-slate-500">
+              <tr>
+                <th class="py-2.5 px-3 rounded-l-lg w-24">Ações</th>
+                <th class="py-2.5 px-3">Cliente</th>
+                <th class="py-2.5 px-3">Local</th>
+                <th class="py-2.5 px-3">Local interno</th>
+                <th class="py-2.5 px-3">Máquina</th>
+                <th class="py-2.5 px-3">Modelo de máquina</th>
+                <th class="py-2.5 px-3 rounded-r-lg">Filial Responsavel</th>
+              </tr>
+            </thead>
+            <tbody id="tableClientesBody" class="divide-y divide-slate-100">
+              <tr>
+                <td colspan="7" class="text-center py-6 text-slate-400 font-semibold">Nenhum cliente carregado.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+
   </main>
 
   <script>
@@ -756,7 +941,9 @@ html_code = f"""
     const APPS_SCRIPT_SAC_URL = "{APPS_SCRIPT_SAC_WEBAPP_URL}";
     const dadosSAC = {dados_sac_json};
     let listaChamadosSAC = Array.isArray(dadosSAC.chamados) ? dadosSAC.chamados : [];
+    let listaCadastroClientes = Array.isArray(dadosSAC.cadastro_clientes) ? dadosSAC.cadastro_clientes : [];
     let chamadoEmEdicao = null;
+    let clienteEmEdicao = null;
     
     // Tratamento seguro de Storage
     let atendenteSACLogado = "";
@@ -873,6 +1060,38 @@ html_code = f"""
       lucide.createIcons();
     }}
 
+    // EXIBE MENSAGEM NO BANNER DE CLIENTES
+    function exibirMensagemTopoCliente(titulo, subtitulo, tipo = 'sucesso') {{
+      const alertBox = document.getElementById('alertCliSuccess');
+      const alertTitle = document.getElementById('alertCliSuccessTitle');
+      const alertSub = document.getElementById('alertCliSuccessSub');
+      const iconBadge = document.getElementById('alertCliIconBadge');
+      const lucideIcon = document.getElementById('alertCliLucideIcon');
+
+      if (!alertBox) return;
+
+      alertTitle.innerText = titulo;
+      alertSub.innerText = subtitulo;
+
+      if (tipo === 'excluir') {{
+        alertBox.className = "p-5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition";
+        iconBadge.className = "p-2 bg-rose-600 text-white rounded-xl";
+        lucideIcon.setAttribute('data-lucide', 'trash-2');
+      }} else if (tipo === 'editar') {{
+        alertBox.className = "p-5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition";
+        iconBadge.className = "p-2 bg-amber-600 text-white rounded-xl";
+        lucideIcon.setAttribute('data-lucide', 'edit-3');
+      }} else {{
+        alertBox.className = "p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition";
+        iconBadge.className = "p-2 bg-emerald-600 text-white rounded-xl";
+        lucideIcon.setAttribute('data-lucide', 'check-circle');
+      }}
+
+      alertBox.classList.remove('hidden');
+      alertBox.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+      lucide.createIcons();
+    }}
+
     // ENVIO DESACOPLADO E INSTANTÂNEO
     function enviarParaPlanilhaGarantido(payload) {{
       const endpoint = APPS_SCRIPT_SAC_URL;
@@ -907,7 +1126,7 @@ html_code = f"""
     }}
 
     // =========================================================================
-    // NAVEGAÇÃO ENTRE PÁGINAS (Dashboard SAC x Lançamento SAC)
+    // NAVEGAÇÃO ENTRE PÁGINAS (Dashboard SAC x Lançamento SAC x Cadastro Clientes)
     // =========================================================================
     function switchPage(page) {{
       try {{
@@ -916,12 +1135,14 @@ html_code = f"""
 
       const pages = {{
         dashboardSAC: document.getElementById('pageDashboardSAC'),
-        sac: document.getElementById('pageSAC')
+        sac: document.getElementById('pageSAC'),
+        cadastroClientes: document.getElementById('pageCadastroClientes')
       }};
 
       const buttons = {{
         dashboardSAC: document.getElementById('navDashboardSAC'),
-        sac: document.getElementById('navSAC')
+        sac: document.getElementById('navSAC'),
+        cadastroClientes: document.getElementById('navCadastroClientes')
       }};
 
       Object.keys(pages).forEach(key => {{
@@ -944,6 +1165,8 @@ html_code = f"""
         atualizarDashboardSAC();
       }} else if (page === 'sac') {{
         verificarSessaoSAC();
+      }} else if (page === 'cadastroClientes') {{
+        renderizarTabelaClientes();
       }}
 
       lucide.createIcons();
@@ -1209,7 +1432,6 @@ html_code = f"""
         return;
       }}
 
-      // ATUALIZA MODAL INFORMANDO A EXCLUSÃO
       abrirModalLoading(
         'Excluindo Ocorrência...',
         'Removendo a ocorrência ' + numeroChamado + ' da planilha oficial Chamados.',
@@ -1236,7 +1458,6 @@ html_code = f"""
         limparFormSAC();
       }}
 
-      // ATUALIZA MODAL E MENSAGEM DO TOPO COM STATUS DE EXCLUSÃO
       setTimeout(() => {{
         abrirModalLoading(
           'Chamado Excluído!',
@@ -1315,7 +1536,6 @@ html_code = f"""
     function handleSACSubmit(e) {{
       e.preventDefault();
 
-      // VALIDAÇÕES RÍGIDAS DE PRÉ-LISTA ANTES DO SUBMIT
       const cliValido = validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente');
       if (!cliValido) return;
 
@@ -1353,7 +1573,6 @@ html_code = f"""
         chamado = calcularPreviaProximoChamado(anoAtual);
       }}
 
-      // Validação de duplicidade
       const chamadoExiste = listaChamadosSAC.some(c => c.chamado.toUpperCase() === chamado.toUpperCase());
       if (!ehEdicao && chamadoExiste) {{
         alert('⛔ Chamado Duplicado! O número "' + chamado + '" já existe.');
@@ -1361,7 +1580,6 @@ html_code = f"""
         return;
       }}
 
-      // ATUALIZAÇÃO DO MODAL PARA O INÍCIO DA TRANSMISSÃO
       abrirModalLoading(
         ehEdicao ? 'Atualizando Ocorrência...' : 'Lançando no Sistema...',
         ehEdicao ? 'Gravando alterações do chamado ' + chamado + ' na planilha Chamados.' : 'Registrando a ocorrência ' + chamado + ' na planilha oficial.',
@@ -1412,10 +1630,8 @@ html_code = f"""
         "Data/Hora do lançamento": dataHoraLancamento
       }};
 
-      // 1. Envia em segundo plano
       enviarParaPlanilhaGarantido(payloadSAC);
 
-      // 2. Atualiza a lista visual imediatamente
       const novoItem = {{
         linha: ehEdicao && chamadoEmEdicao.linha ? chamadoEmEdicao.linha : listaChamadosSAC.length + 2,
         chamado,
@@ -1451,11 +1667,9 @@ html_code = f"""
         dadosSAC.maior_sac_ano[ano] = Math.max(dadosSAC.maior_sac_ano[ano] || 0, seq);
       }}
 
-      // 3. Limpeza total do formulário
       limparFormSAC();
       renderizarTabelaChamadosSAC();
 
-      // 4. ATUALIZAÇÃO DO MODAL E DA MENSAGEM NO TOPO APÓS A CONCLUSÃO
       setTimeout(() => {{
         abrirModalLoading(
           ehEdicao ? 'Ocorrência Atualizada!' : 'Lançamento Concluído!',
@@ -1466,6 +1680,236 @@ html_code = f"""
         exibirMensagemTopo(
           ehEdicao ? '✅ Ocorrência ' + chamado + ' atualizada com sucesso!' : '✅ Ocorrência ' + chamado + ' lançada com sucesso!',
           'Cliente: ' + cliente + ' (' + localInterno + ') · Filial: ' + cidade + ' · Atendente: ' + atendente + ' · Valor: ' + formatCurrency(valor),
+          ehEdicao ? 'editar' : 'sucesso'
+        );
+
+        setTimeout(fecharModalLoading, 1000);
+      }}, 500);
+    }}
+
+    // =========================================================================
+    // ROTINAS DA PÁGINA: CADASTRO DE CLIENTES (ABA "CLIENTES")
+    // =========================================================================
+    function limparFormCliente() {{
+      clienteEmEdicao = null;
+      document.getElementById('clienteForm').reset();
+      document.getElementById('alertCliEditMode').classList.add('hidden');
+      document.getElementById('cliFormTitleText').innerText = "Cadastro de Clientes e Pontos de Atendimento";
+      document.getElementById('btnSalvarClienteText').innerText = "Cadastrar Cliente";
+      lucide.createIcons();
+    }}
+
+    function cancelarEdicaoCliente() {{
+      limparFormCliente();
+    }}
+
+    function editarCliente(index) {{
+      const item = listaCadastroClientes[index];
+      if (!item) return;
+
+      clienteEmEdicao = {{ ...item, indexOriginal: index }};
+
+      document.getElementById('cadCliCliente').value = item.cliente || '';
+      document.getElementById('cadCliLocal').value = item.local || '';
+      document.getElementById('cadCliLocalInterno').value = item.localInterno || item.local || '';
+      document.getElementById('cadCliMaquina').value = item.maquina || '';
+      document.getElementById('cadCliModeloMaquina').value = item.modeloMaquina || '';
+      document.getElementById('cadCliFilial').value = item.filialResponsavel || '';
+
+      document.getElementById('alertCliEditMode').classList.remove('hidden');
+      document.getElementById('labelCliEditNome').innerText = item.cliente + ' (' + (item.localInterno || item.local || '') + ')';
+      document.getElementById('cliFormTitleText').innerText = 'Edição de Ponto: ' + item.cliente;
+      document.getElementById('btnSalvarClienteText').innerText = 'Salvar Alterações';
+
+      document.getElementById('clienteForm').scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+      lucide.createIcons();
+    }}
+
+    function excluirCliente(index) {{
+      const item = listaCadastroClientes[index];
+      if (!item) return;
+
+      const descr = item.cliente + ' - ' + (item.localInterno || item.local || '');
+      if (!confirm('Deseja realmente excluir o cadastro de "' + descr + '"?')) {{
+        return;
+      }}
+
+      abrirModalLoading(
+        'Excluindo Cliente...',
+        'Removendo o ponto "' + descr + '" da aba Clientes.',
+        'loading'
+      );
+
+      const payloadExcluir = {{
+        "action": "excluir_cliente",
+        "acao": "excluir_cliente",
+        "tipo": "excluir_cliente",
+        "aba": "Clientes",
+        "sheet": "Clientes",
+        "linha": item.linha || "",
+        "Cliente": item.cliente,
+        "Local": item.local,
+        "Local interno": item.localInterno,
+        "Máquina": item.maquina,
+        "Modelo de máquina": item.modeloMaquina,
+        "Filial Responsavel": item.filialResponsavel
+      }};
+
+      enviarParaPlanilhaGarantido(payloadExcluir);
+
+      listaCadastroClientes.splice(index, 1);
+      renderizarTabelaClientes();
+
+      if (clienteEmEdicao && clienteEmEdicao.indexOriginal === index) {{
+        limparFormCliente();
+      }}
+
+      setTimeout(() => {{
+        abrirModalLoading(
+          'Cliente Excluído!',
+          'O cadastro foi removido da aba Clientes com sucesso.',
+          'excluir'
+        );
+
+        exibirMensagemTopoCliente(
+          '🗑️ Ponto "' + descr + '" excluído!',
+          'O registro foi removido com sucesso da aba Clientes.',
+          'excluir'
+        );
+
+        setTimeout(fecharModalLoading, 1000);
+      }}, 500);
+    }}
+
+    function filtrarClientesCadastrados() {{
+      const termo = (document.getElementById('searchClientesCadastrados')?.value || '').trim().toLowerCase();
+      if (!termo) {{
+        renderizarTabelaClientes(listaCadastroClientes);
+        return;
+      }}
+      const filtrados = listaCadastroClientes.filter(c => 
+        (c.cliente && c.cliente.toLowerCase().includes(termo)) ||
+        (c.local && c.local.toLowerCase().includes(termo)) ||
+        (c.localInterno && c.localInterno.toLowerCase().includes(termo)) ||
+        (c.maquina && c.maquina.toLowerCase().includes(termo)) ||
+        (c.modeloMaquina && c.modeloMaquina.toLowerCase().includes(termo)) ||
+        (c.filialResponsavel && c.filialResponsavel.toLowerCase().includes(termo))
+      );
+      renderizarTabelaClientes(filtrados);
+    }}
+
+    function renderizarTabelaClientes(lista = listaCadastroClientes) {{
+      const tbody = document.getElementById('tableClientesBody');
+      const badge = document.getElementById('badgeContadorClientes');
+      if (badge) badge.innerText = lista.length + ' cliente(s)';
+
+      if (!lista || lista.length === 0) {{
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-slate-400 font-semibold">Nenhum cliente encontrado.</td></tr>';
+        return;
+      }}
+
+      tbody.innerHTML = lista.map((c, idx) => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-2.5 px-3 whitespace-nowrap">
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="editarCliente(${{idx}})" title="Editar cadastro" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
+                <i data-lucide="edit-2" class="w-3 h-3"></i>
+                Editar
+              </button>
+              <button type="button" onclick="excluirCliente(${{idx}})" title="Excluir cadastro" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition cursor-pointer">
+                <i data-lucide="trash-2" class="w-3 h-3"></i>
+                Excluir
+              </button>
+            </div>
+          </td>
+          <td class="py-2.5 px-3 font-bold text-slate-800">${{c.cliente || '-'}}</td>
+          <td class="py-2.5 px-3 text-slate-600">${{c.local || '-'}}</td>
+          <td class="py-2.5 px-3 text-slate-700 font-medium">${{c.localInterno || '-'}}</td>
+          <td class="py-2.5 px-3 text-slate-600 font-mono">${{c.maquina || '-'}}</td>
+          <td class="py-2.5 px-3 text-slate-600">${{c.modeloMaquina || '-'}}</td>
+          <td class="py-2.5 px-3 font-semibold text-sky-800">${{c.filialResponsavel || '-'}}</td>
+        </tr>
+      `).join('');
+
+      lucide.createIcons();
+    }}
+
+    function handleClienteSubmit(e) {{
+      e.preventDefault();
+
+      const cliente = document.getElementById('cadCliCliente').value.trim();
+      const local = document.getElementById('cadCliLocal').value.trim();
+      const localInterno = document.getElementById('cadCliLocalInterno').value.trim();
+      const maquina = document.getElementById('cadCliMaquina').value.trim();
+      const modeloMaquina = document.getElementById('cadCliModeloMaquina').value.trim();
+      const filialResponsavel = document.getElementById('cadCliFilial').value.trim();
+
+      if (!cliente || !local || !localInterno || !maquina || !modeloMaquina || !filialResponsavel) {{
+        alert('Por favor, preencha todos os campos obrigatórios do formulário.');
+        return;
+      }}
+
+      const ehEdicao = (clienteEmEdicao !== null);
+
+      abrirModalLoading(
+        ehEdicao ? 'Atualizando Cliente...' : 'Cadastrando Cliente...',
+        ehEdicao ? 'Salvando alterações na aba Clientes...' : 'Enviando registro para a aba Clientes...',
+        'loading'
+      );
+
+      const payloadCliente = {{
+        "acao": ehEdicao ? "editar_cliente" : "inserir_cliente",
+        "action": ehEdicao ? "editar_cliente" : "inserir_cliente",
+        "tipo": "cadastro_cliente",
+        "aba": "Clientes",
+        "sheet": "Clientes",
+        "linha": ehEdicao && clienteEmEdicao.linha ? clienteEmEdicao.linha : "",
+        "Cliente": cliente,
+        "Local": local,
+        "Local interno": localInterno,
+        "Máquina": maquina,
+        "Modelo de máquina": modeloMaquina,
+        "Filial Responsavel": filialResponsavel
+      }};
+
+      enviarParaPlanilhaGarantido(payloadCliente);
+
+      const novoItem = {{
+        linha: ehEdicao && clienteEmEdicao.linha ? clienteEmEdicao.linha : listaCadastroClientes.length + 2,
+        cliente,
+        local,
+        localInterno,
+        maquina,
+        modeloMaquina,
+        filialResponsavel
+      }};
+
+      if (ehEdicao) {{
+        listaCadastroClientes[clienteEmEdicao.indexOriginal] = novoItem;
+      }} else {{
+        listaCadastroClientes.unshift(novoItem);
+      }}
+
+      // Atualiza também a lista em memória usada nos selects do formulário SAC
+      dadosSAC.clientes.push({{
+        cliente: cliente,
+        local: localInterno,
+        cidade: filialResponsavel
+      }});
+
+      limparFormCliente();
+      renderizarTabelaClientes();
+
+      setTimeout(() => {{
+        abrirModalLoading(
+          ehEdicao ? 'Cliente Atualizado!' : 'Cadastro Concluído!',
+          'Os dados de ' + cliente + ' foram registrados na aba Clientes com sucesso.',
+          'sucesso'
+        );
+
+        exibirMensagemTopoCliente(
+          ehEdicao ? '✅ Cadastro de ' + cliente + ' atualizado!' : '✅ Cliente ' + cliente + ' cadastrado com sucesso!',
+          'Local: ' + localInterno + ' · Máquina: ' + maquina + ' · Filial: ' + filialResponsavel,
           ehEdicao ? 'editar' : 'sucesso'
         );
 
@@ -1643,7 +2087,7 @@ html_code = f"""
     let abaInicial = 'dashboardSAC';
     try {{
       abaInicial = sessionStorage.getItem('aba_ativa_atual') || 'dashboardSAC';
-      if (abaInicial !== 'dashboardSAC' && abaInicial !== 'sac') {{
+      if (abaInicial !== 'dashboardSAC' && abaInicial !== 'sac' && abaInicial !== 'cadastroClientes') {{
         abaInicial = 'dashboardSAC';
       }}
     }} catch(e) {{}}
