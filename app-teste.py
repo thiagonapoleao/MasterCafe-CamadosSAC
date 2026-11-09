@@ -61,20 +61,21 @@ logo_base64_src = obter_logo_base64()
 # IDs e GIDs de Planilhas
 SPREADSHEET_SAC_ID = "1YUS9AwQti0Gl79X-TGCIqZSkOfF0bE0BX5gyDClo3rc"
 GID_SAC_CHAMADOS = "0"
+GID_SAC_CLIENTES = "1332839106"
 
 SPREADSHEET_SAC_CONFIG_ID = "1vOa6QpGPZ6rZ1doT2RRU1SAXWR5usPzv"
-GID_SAC_CLIENTES = "400904478"
 GID_SAC_CONFIGS = "1833376686"
 GID_SAC_USUARIOS = "772646879"
 
 URL_CSV_SAC_CHAMADOS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_CHAMADOS}"
-URL_CSV_SAC_CLIENTES = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_CONFIG_ID}/export?format=csv&gid={GID_SAC_CLIENTES}"
+URL_CSV_SAC_CLIENTES = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_CLIENTES}"
 URL_CSV_SAC_CONFIGS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_CONFIG_ID}/export?format=csv&gid={GID_SAC_CONFIGS}"
 URL_CSV_SAC_USUARIOS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_CONFIG_ID}/export?format=csv&gid={GID_SAC_USUARIOS}"
 
 @st.cache_data(ttl=5)
 def carregar_dados_sac():
     clientes_dados = []
+    cidades_clientes = []
     try:
         df_cli = pd.read_csv(URL_CSV_SAC_CLIENTES, dtype=str)
         if df_cli is not None and not df_cli.empty:
@@ -91,11 +92,12 @@ def carregar_dados_sac():
                         "local": loc,
                         "cidade": cid
                     })
+                    if cid and cid.lower() not in ["nan", "cidade", "filial", "filial responsável"]:
+                        cidades_clientes.append(cid)
     except Exception:
         pass
 
     formas_pagamento = []
-    cidades_lista = []
     problemas = []
     descricoes = []
     try:
@@ -104,9 +106,6 @@ def carregar_dados_sac():
             if len(df_cfg.columns) > 0:
                 col_a = df_cfg.columns[0]
                 formas_pagamento = [str(x).strip() for x in df_cfg[col_a].dropna().unique() if str(x).strip() and str(x).lower() not in ["nan", "forma de pagamento", "forma"]]
-            if len(df_cfg.columns) > 4:
-                col_e = df_cfg.columns[4]
-                cidades_lista = [str(x).strip() for x in df_cfg[col_e].dropna().unique() if str(x).strip() and str(x).lower() not in ["nan", "cidade", "cidades"]]
             if len(df_cfg.columns) > 11:
                 col_l = df_cfg.columns[11]
                 problemas = [str(x).strip() for x in df_cfg[col_l].dropna().unique() if str(x).strip() and str(x).lower() not in ["nan", "problemas", "problema"]]
@@ -148,7 +147,7 @@ def carregar_dados_sac():
             col_data = get_col(["Data", "data"]) or (cols[1] if len(cols) > 1 else "")
             col_cli = get_col(["Cliente", "cliente"]) or (cols[2] if len(cols) > 2 else "")
             col_loc = get_col(["Local Interno", "local interno", "localInterno"]) or (cols[3] if len(cols) > 3 else "")
-            col_cid = get_col(["Cidade", "cidade"]) or (cols[4] if len(cols) > 4 else "")
+            col_cid = get_col(["Filial Responsável", "Filial Responsavel", "Cidade", "cidade"]) or (cols[4] if len(cols) > 4 else "")
             col_desc = get_col(["Descrição", "Descricao", "descricao"]) or (cols[5] if len(cols) > 5 else "")
             col_prod = get_col(["Produto", "produto"]) or (cols[6] if len(cols) > 6 else "")
             col_dt_trans = get_col(["Data da Transação", "Data da Transacao", "dataTransacao"]) or (cols[7] if len(cols) > 7 else "")
@@ -206,7 +205,7 @@ def carregar_dados_sac():
     return {
         "clientes": clientes_dados,
         "formas_pagamento": sorted(formas_pagamento),
-        "cidades": sorted(cidades_lista),
+        "cidades": sorted(list(set(cidades_clientes))),
         "problemas": sorted(problemas),
         "descricoes": sorted(descricoes),
         "usuarios": usuarios_validos,
@@ -576,14 +575,14 @@ html_code = f"""
                 <input type="date" id="sacData" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
               </div>
 
-              <!-- Cliente (Travado na pré-lista) -->
+              <!-- Cliente (Travado na pré-lista da aba Clientes coluna A) -->
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Cliente *</label>
                 <input list="listaSACClientes" id="sacCliente" placeholder="Selecione o cliente..." required onchange="validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente', true)" onblur="validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente', true)" class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 <datalist id="listaSACClientes"></datalist>
               </div>
 
-              <!-- Local Interno (Filtro rígido do cliente) -->
+              <!-- Local Interno (Travado nos locais do cliente selecionado da aba Clientes coluna B) -->
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Local Interno *</label>
                 <select id="sacLocalInterno" required onchange="aoMudarLocalInternoSAC()" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
@@ -591,14 +590,14 @@ html_code = f"""
                 </select>
               </div>
 
-              <!-- Cidade (Travada na pré-lista da aba Dados coluna E) -->
+              <!-- Filial Responsável (Antiga Cidade, vinculada ao Cliente/Local da aba Clientes coluna F com datalist) -->
               <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Cidade *</label>
-                <input list="listaSACCidades" id="sacCidade" placeholder="Cidade do atendimento..." required onchange="validarInputComLista('sacCidade', 'listaSACCidades', 'Cidade')" onblur="validarInputComLista('sacCidade', 'listaSACCidades', 'Cidade')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Filial Responsável *</label>
+                <input list="listaSACCidades" id="sacCidade" placeholder="Filial de atendimento..." required onchange="validarInputComLista('sacCidade', 'listaSACCidades', 'Filial Responsável')" onblur="validarInputComLista('sacCidade', 'listaSACCidades', 'Filial Responsável')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 <datalist id="listaSACCidades"></datalist>
               </div>
 
-              <!-- Descrição (Travada na pré-lista) -->
+              <!-- Descrição (Travada na pré-lista da coluna N) -->
               <div class="md:col-span-2 lg:col-span-3">
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Descrição *</label>
                 <input list="listaSACDescricoes" id="sacDescricao" placeholder="Selecione a descrição do ocorrido..." required onchange="validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição')" onblur="validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
@@ -645,14 +644,14 @@ html_code = f"""
                 <input type="text" id="sacCelular" placeholder="(00) 00000-0000" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
               </div>
 
-              <!-- Problemas (Travado na pré-lista) -->
+              <!-- Problemas (Travado na pré-lista da coluna L) -->
               <div class="md:col-span-2">
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Problemas *</label>
                 <input list="listaSACProblemas" id="sacProblema" placeholder="Selecione o problema..." required onchange="validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas')" onblur="validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 <datalist id="listaSACProblemas"></datalist>
               </div>
 
-              <!-- Forma de Pagamento (Travada na pré-lista) -->
+              <!-- Forma de Pagamento (Travada na pré-lista da coluna A) -->
               <div class="md:col-span-2">
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Forma de Pagamento *</label>
                 <input list="listaSACFormasPgto" id="sacFormaPgto" placeholder="Selecione a forma de pagamento..." required onchange="validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento')" onblur="validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
@@ -727,6 +726,7 @@ html_code = f"""
                   <th class="py-2.5 px-3">Data</th>
                   <th class="py-2.5 px-3">Cliente</th>
                   <th class="py-2.5 px-3">Local</th>
+                  <th class="py-2.5 px-3">Filial</th>
                   <th class="py-2.5 px-3">Produto</th>
                   <th class="py-2.5 px-3 text-right">Valor</th>
                   <th class="py-2.5 px-3">Nome Cliente</th>
@@ -737,7 +737,7 @@ html_code = f"""
               </thead>
               <tbody id="tableSACChamadosBody" class="divide-y divide-slate-100">
                 <tr>
-                  <td colspan="11" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado registrado ainda.</td>
+                  <td colspan="12" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado registrado ainda.</td>
                 </tr>
               </tbody>
             </table>
@@ -1040,7 +1040,7 @@ html_code = f"""
       const selectLocal = document.getElementById('sacLocalInterno');
       selectLocal.innerHTML = '<option value="">Selecione primeiro o Cliente...</option>';
 
-      // Datalist de Clientes
+      // Datalist de Clientes da aba Clientes coluna A
       const dlCli = document.getElementById('listaSACClientes');
       dlCli.innerHTML = '';
       const clientesUnicos = [...new Set(dadosSAC.clientes.map(c => c.cliente).filter(Boolean))].sort();
@@ -1050,7 +1050,7 @@ html_code = f"""
         dlCli.appendChild(opt);
       }});
 
-      // Datalist de Cidades da coluna E da aba Dados
+      // Datalist de Filiais Responsáveis da aba Clientes coluna F
       const dlCid = document.getElementById('listaSACCidades');
       dlCid.innerHTML = '';
       const cidadesGerais = dadosSAC.cidades && dadosSAC.cidades.length > 0 
@@ -1062,7 +1062,7 @@ html_code = f"""
         dlCid.appendChild(opt);
       }});
 
-      // Datalist de Descrições
+      // Datalist de Descrições da coluna N
       const dlDesc = document.getElementById('listaSACDescricoes');
       dlDesc.innerHTML = '';
       dadosSAC.descricoes.forEach(d => {{
@@ -1071,7 +1071,7 @@ html_code = f"""
         dlDesc.appendChild(opt);
       }});
 
-      // Datalist de Problemas
+      // Datalist de Problemas da coluna L
       const dlProb = document.getElementById('listaSACProblemas');
       dlProb.innerHTML = '';
       dadosSAC.problemas.forEach(p => {{
@@ -1080,7 +1080,7 @@ html_code = f"""
         dlProb.appendChild(opt);
       }});
 
-      // Datalist de Formas de Pagamento
+      // Datalist de Formas de Pagamento da coluna A
       const dlPgto = document.getElementById('listaSACFormasPgto');
       dlPgto.innerHTML = '';
       dadosSAC.formas_pagamento.forEach(f => {{
@@ -1265,6 +1265,7 @@ html_code = f"""
         (c.cliente && c.cliente.toLowerCase().includes(termo)) ||
         (c.nomeSobrenome && c.nomeSobrenome.toLowerCase().includes(termo)) ||
         (c.localInterno && c.localInterno.toLowerCase().includes(termo)) ||
+        (c.cidade && c.cidade.toLowerCase().includes(termo)) ||
         (c.problemas && c.problemas.toLowerCase().includes(termo))
       );
       renderizarTabelaChamadosSAC(filtrados);
@@ -1276,7 +1277,7 @@ html_code = f"""
       if (badge) badge.innerText = lista.length + ' chamado(s)';
 
       if (!lista || lista.length === 0) {{
-        tbody.innerHTML = '<tr><td colspan="11" class="text-center py-6 text-slate-400 font-semibold">Nenhuma ocorrência encontrada.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="text-center py-6 text-slate-400 font-semibold">Nenhuma ocorrência encontrada.</td></tr>';
         return;
       }}
 
@@ -1298,6 +1299,7 @@ html_code = f"""
           <td class="py-2.5 px-3">${{c.data || '-'}}</td>
           <td class="py-2.5 px-3 font-semibold text-slate-800">${{c.cliente || '-'}}</td>
           <td class="py-2.5 px-3 text-slate-600">${{c.localInterno || '-'}}</td>
+          <td class="py-2.5 px-3 text-slate-600">${{c.cidade || '-'}}</td>
           <td class="py-2.5 px-3 font-medium text-slate-700">${{c.produto || '-'}}</td>
           <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
           <td class="py-2.5 px-3 font-medium text-slate-800">${{c.nomeSobrenome || '-'}}</td>
@@ -1324,7 +1326,7 @@ html_code = f"""
         return;
       }}
 
-      const cidValida = validarInputComLista('sacCidade', 'listaSACCidades', 'Cidade');
+      const cidValida = validarInputComLista('sacCidade', 'listaSACCidades', 'Filial Responsável');
       if (!cidValida) return;
 
       const descValida = validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição');
@@ -1463,7 +1465,7 @@ html_code = f"""
 
         exibirMensagemTopo(
           ehEdicao ? '✅ Ocorrência ' + chamado + ' atualizada com sucesso!' : '✅ Ocorrência ' + chamado + ' lançada com sucesso!',
-          'Cliente: ' + cliente + ' (' + localInterno + ') · Atendente: ' + atendente + ' · Valor: ' + formatCurrency(valor),
+          'Cliente: ' + cliente + ' (' + localInterno + ') · Filial: ' + cidade + ' · Atendente: ' + atendente + ' · Valor: ' + formatCurrency(valor),
           ehEdicao ? 'editar' : 'sucesso'
         );
 
