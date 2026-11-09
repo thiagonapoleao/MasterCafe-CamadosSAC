@@ -145,17 +145,31 @@ def carregar_dados_sac():
     except Exception:
         pass
 
+    # ==========================================================================
+    # CARREGAMENTO DOS USUÁRIOS: COLUNA A (NOME), B (USER), C (SENHA), D (ACESSO)
+    # ==========================================================================
     usuarios_validos = []
     try:
         df_usr = pd.read_csv(URL_CSV_SAC_USUARIOS, dtype=str)
         if df_usr is not None and not df_usr.empty:
-            col_u = df_usr.columns[0]
-            col_s = df_usr.columns[1] if len(df_usr.columns) > 1 else col_u
+            col_nome = df_usr.columns[0]
+            col_u = df_usr.columns[1] if len(df_usr.columns) > 1 else col_nome
+            col_s = df_usr.columns[2] if len(df_usr.columns) > 2 else col_u
+            col_acesso = df_usr.columns[3] if len(df_usr.columns) > 3 else ""
+
             for _, r in df_usr.iterrows():
+                nome = str(r[col_nome]).strip() if pd.notna(r[col_nome]) else ""
                 u = str(r[col_u]).strip() if pd.notna(r[col_u]) else ""
                 s = str(r[col_s]).strip() if pd.notna(r[col_s]) else ""
-                if u and u.lower() not in ["nan", "usuario", "usuário"]:
-                    usuarios_validos.append({"usuario": u, "senha": s})
+                acesso = str(r[col_acesso]).strip() if (col_acesso and pd.notna(r[col_acesso])) else "Atendente"
+
+                if u and u.lower() not in ["nan", "usuario", "usuário", "login"]:
+                    usuarios_validos.append({
+                        "nome": nome or u,
+                        "usuario": u,
+                        "senha": s,
+                        "acesso": acesso if acesso else "Atendente"
+                    })
     except Exception:
         pass
 
@@ -183,7 +197,7 @@ def carregar_dados_sac():
             col_dt_trans = get_col(["Data da Transação", "Data da Transacao", "dataTransacao"]) or (cols[7] if len(cols) > 7 else "")
             col_hr_trans = get_col(["Hora da Transação", "Hora da Transacao", "horaTransacao"]) or (cols[8] if len(cols) > 8 else "")
             col_val = get_col(["Valor", "Valor(R$)", "valor"]) or (cols[9] if len(cols) > 9 else "")
-            col_nome = get_col(["Nome/Sobrenome", "Nome", "nomeSobrenome"]) or (cols[10] if len(cols) > 10 else "")
+            col_nome_atend = get_col(["Nome/Sobrenome", "Nome", "nomeSobrenome"]) or (cols[10] if len(cols) > 10 else "")
             col_cel = get_col(["Celular", "celular"]) or (cols[11] if len(cols) > 11 else "")
             col_prob = get_col(["Problemas", "Problema", "problemas"]) or (cols[12] if len(cols) > 12 else "")
             col_pag = get_col(["Forma de Pagamento", "Forma Pagamento", "formaPgto"]) or (cols[13] if len(cols) > 13 else "")
@@ -218,7 +232,7 @@ def carregar_dados_sac():
                     "dataTransacao": get_val(col_dt_trans),
                     "horaTransacao": get_val(col_hr_trans),
                     "valor": get_val(col_val),
-                    "nomeSobrenome": get_val(col_nome),
+                    "nomeSobrenome": get_val(col_nome_atend),
                     "celular": get_val(col_cel),
                     "problemas": get_val(col_prob),
                     "formaPgto": get_val(col_pag),
@@ -342,7 +356,8 @@ html_code = f"""
           <i data-lucide="headphones" class="w-4 h-4"></i>
           Lançamento SAC
         </button>
-        <button id="navCadastroClientes" type="button" class="nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('cadastroClientes')">
+        <!-- BOTÃO COM CONTROLE DE ACESSO: APENAS ACESSO GERAL -->
+        <button id="navCadastroClientes" type="button" class="hidden nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('cadastroClientes')">
           <i data-lucide="user-plus" class="w-4 h-4"></i>
           Cadastro de Clientes
         </button>
@@ -509,20 +524,20 @@ html_code = f"""
     <!-- PÁGINA 2: LANÇAMENTO SAC -->
     <div id="pageSAC" class="hidden space-y-6">
 
-      <!-- TELA DE LOGIN / AUTENTICAÇÃO -->
+      <!-- TELA DE LOGIN / AUTENTICAÇÃO (COLUNAS A, B, C E D) -->
       <div id="sacAuthScreen" class="max-w-md mx-auto my-8 bg-white p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6">
         <div class="text-center space-y-2">
           <div class="w-14 h-14 bg-sky-100 text-sky-700 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
-            <i data-lucide="lock" class="w-7 h-7"></i>
+            <i data-lucide="shield-check" class="w-7 h-7"></i>
           </div>
-          <h2 class="text-xl font-black text-slate-900">Acesso Restrito ao SAC</h2>
-          <p class="text-xs text-slate-500">Validação oficial na aba "Usuarios" (Colunas A e B)</p>
+          <h2 class="text-xl font-black text-slate-900">Autenticação do Sistema</h2>
+          <p class="text-xs text-slate-500">Validação oficial na aba "Usuarios" (Colunas A, B, C e D)</p>
         </div>
 
         <form id="sacLoginForm" onsubmit="realizarLoginSAC(event)" class="space-y-4">
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Usuário *</label>
-            <input type="text" id="sacLoginUser" placeholder="Digite seu usuário..." required class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium">
+            <label class="block text-xs font-bold text-slate-700 mb-1">Usuário para Login *</label>
+            <input type="text" id="sacLoginUser" placeholder="Digite seu usuário (Coluna B)..." required class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium">
           </div>
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-1">Senha *</label>
@@ -534,7 +549,7 @@ html_code = f"""
           </div>
           <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-md shadow-sky-600/25 transition flex items-center justify-center gap-2 cursor-pointer">
             <i data-lucide="log-in" class="w-4 h-4"></i>
-            Acessar Formulário do SAC
+            Entrar no Sistema
           </button>
         </form>
       </div>
@@ -586,9 +601,12 @@ html_code = f"""
             <div class="flex items-center gap-3">
               <div class="text-right">
                 <span class="text-[10px] uppercase font-bold text-slate-400 block">Atendente Conectado</span>
-                <span id="labelSACAtendenteLogado" class="text-xs font-bold text-sky-800 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200">Operador</span>
+                <div class="flex items-center gap-1.5 justify-end">
+                  <span id="labelSACAtendenteLogado" class="text-xs font-bold text-sky-800 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200">Operador</span>
+                  <span id="badgeNivelAcesso" class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Geral</span>
+                </div>
               </div>
-              <button type="button" onclick="realizarLogoutSAC()" title="Sair do SAC" class="p-2 rounded-xl border border-slate-200 hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition cursor-pointer">
+              <button type="button" onclick="realizarLogoutSAC()" title="Sair da Sessão" class="p-2 rounded-xl border border-slate-200 hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition cursor-pointer">
                 <i data-lucide="log-out" class="w-4 h-4"></i>
               </button>
             </div>
@@ -610,14 +628,14 @@ html_code = f"""
                 <input type="date" id="sacData" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
               </div>
 
-              <!-- Cliente (Travado na pré-lista da aba Clientes coluna A) -->
+              <!-- Cliente -->
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Cliente *</label>
                 <input list="listaSACClientes" id="sacCliente" placeholder="Selecione o cliente..." required onchange="validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente', true)" onblur="validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente', true)" class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 <datalist id="listaSACClientes"></datalist>
               </div>
 
-              <!-- Local Interno (Travado nos locais do cliente selecionado da aba Clientes coluna B) -->
+              <!-- Local Interno -->
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Local Interno *</label>
                 <select id="sacLocalInterno" required onchange="aoMudarLocalInternoSAC()" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
@@ -705,7 +723,7 @@ html_code = f"""
                 <input type="text" id="sacPix" placeholder="Chave Pix (CPF, Celular, E-mail ou Aleatória)..." class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
               </div>
 
-              <!-- Atendente -->
+              <!-- Atendente (Nome vindo da Coluna A) -->
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Atendente *</label>
                 <input type="text" id="sacAtendente" readonly class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-slate-700 cursor-not-allowed">
@@ -782,153 +800,169 @@ html_code = f"""
       </div>
     </div>
 
-    <!-- PÁGINA 3: CADASTRO DE CLIENTES (ABA "CLIENTES") -->
+    <!-- PÁGINA 3: CADASTRO DE CLIENTES (ACESSO EXCLUSIVO: GERAL) -->
     <div id="pageCadastroClientes" class="hidden space-y-6">
 
-      <!-- ALERTA DE EDIÇÃO DE CLIENTE -->
-      <div id="alertCliEditMode" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex justify-between items-center shadow-sm">
-        <div class="flex items-center gap-3">
-          <div class="p-2 bg-amber-500 text-white rounded-xl"><i data-lucide="edit-3" class="w-5 h-5"></i></div>
-          <div>
-            <p class="text-sm font-bold">Modo de Edição de Cliente: <span id="labelCliEditNome" class="font-bold text-amber-800">Cliente</span></p>
-            <p class="text-xs text-amber-700">Você está alterando os dados cadastrais deste ponto. Ao salvar, os dados serão atualizados na aba Clientes.</p>
-          </div>
+      <!-- BLOQUEIO DE SEGURANÇA PARA ATENDENTE SEM PERMISSÃO -->
+      <div id="bloqueioAcessoClientes" class="hidden max-w-lg mx-auto my-12 bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+        <div class="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+          <i data-lucide="shield-alert" class="w-8 h-8"></i>
         </div>
-        <button type="button" onclick="cancelarEdicaoCliente()" class="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 rounded-xl text-xs font-bold text-amber-900 transition cursor-pointer">
-          Cancelar Edição ✕
+        <h2 class="text-lg font-black text-slate-800">Acesso Restrito ao Cadastro</h2>
+        <p class="text-xs text-slate-500 leading-relaxed">
+          Seu perfil de login está categorizado como <span class="font-bold text-rose-600">Atendente</span> na coluna D da planilha. O gerenciamento e cadastro de clientes é exclusivo para perfis com acesso <span class="font-bold text-emerald-700">Geral</span>.
+        </p>
+        <button type="button" onclick="switchPage('sac')" class="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-md transition cursor-pointer">
+          Voltar para Lançamento SAC
         </button>
       </div>
 
-      <!-- MENSAGEM NO TOPO DINÂMICA -->
-      <div id="alertCliSuccess" class="hidden p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition">
-        <div class="flex items-center gap-3">
-          <div id="alertCliIconBadge" class="p-2 bg-emerald-600 text-white rounded-xl">
-            <i id="alertCliLucideIcon" data-lucide="check-circle" class="w-5 h-5"></i>
+      <div id="containerAcessoClientes" class="space-y-6">
+        <!-- ALERTA DE EDIÇÃO DE CLIENTE -->
+        <div id="alertCliEditMode" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex justify-between items-center shadow-sm">
+          <div class="flex items-center gap-3">
+            <div class="p-2 bg-amber-500 text-white rounded-xl"><i data-lucide="edit-3" class="w-5 h-5"></i></div>
+            <div>
+              <p class="text-sm font-bold">Modo de Edição de Cliente: <span id="labelCliEditNome" class="font-bold text-amber-800">Cliente</span></p>
+              <p class="text-xs text-amber-700">Você está alterando os dados cadastrais deste ponto. Ao salvar, os dados serão atualizados na aba Clientes.</p>
+            </div>
           </div>
-          <div>
-            <p id="alertCliSuccessTitle" class="text-sm font-bold">Ação realizada com sucesso!</p>
-            <p id="alertCliSuccessSub" class="text-xs text-emerald-700">A aba Clientes foi atualizada com sucesso.</p>
-          </div>
+          <button type="button" onclick="cancelarEdicaoCliente()" class="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 rounded-xl text-xs font-bold text-amber-900 transition cursor-pointer">
+            Cancelar Edição ✕
+          </button>
         </div>
-        <button type="button" onclick="document.getElementById('alertCliSuccess').classList.add('hidden')" class="px-3 py-2 rounded-xl hover:bg-emerald-100 text-xs font-semibold text-emerald-800 transition cursor-pointer">
-          Fechar
-        </button>
+
+        <!-- MENSAGEM NO TOPO DINÂMICA -->
+        <div id="alertCliSuccess" class="hidden p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition">
+          <div class="flex items-center gap-3">
+            <div id="alertCliIconBadge" class="p-2 bg-emerald-600 text-white rounded-xl">
+              <i id="alertCliLucideIcon" data-lucide="check-circle" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <p id="alertCliSuccessTitle" class="text-sm font-bold">Ação realizada com sucesso!</p>
+              <p id="alertCliSuccessSub" class="text-xs text-emerald-700">A aba Clientes foi atualizada com sucesso.</p>
+            </div>
+          </div>
+          <button type="button" onclick="document.getElementById('alertCliSuccess').classList.add('hidden')" class="px-3 py-2 rounded-xl hover:bg-emerald-100 text-xs font-semibold text-emerald-800 transition cursor-pointer">
+            Fechar
+          </button>
+        </div>
+
+        <!-- FORMULÁRIO DE CADASTRO DE CLIENTE -->
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-6 border-b border-slate-100 gap-4">
+            <div class="flex items-center gap-3">
+              <div class="p-2.5 bg-sky-600 text-white rounded-xl shadow-lg shadow-sky-500/25">
+                <i data-lucide="building-2" class="w-6 h-6"></i>
+              </div>
+              <div>
+                <h2 id="cliFormTitleText" class="text-base font-bold text-slate-900">Cadastro de Clientes e Pontos de Atendimento</h2>
+                <p class="text-xs text-slate-500">Gerenciamento de máquinas, locais e filiais responsáveis · Aba: Clientes</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs px-3 py-1 rounded-lg bg-sky-50 text-sky-800 font-semibold border border-sky-200 flex items-center gap-1.5">
+                <i data-lucide="sheet" class="w-3.5 h-3.5 text-sky-600"></i> Aba "Clientes"
+              </span>
+            </div>
+          </div>
+
+          <form id="clienteForm" onsubmit="handleClienteSubmit(event)" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-5 rounded-2xl bg-slate-50/90 border border-slate-200">
+              
+              <!-- Cliente -->
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Cliente *</label>
+                <input type="text" id="cadCliCliente" placeholder="Ex: Embraer, Coca Cola..." required onblur="formatarNomeProprio(this)" class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              </div>
+
+              <!-- Local -->
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Local *</label>
+                <input type="text" id="cadCliLocal" placeholder="Ex: Fábrica 1, Administrativo..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              </div>
+
+              <!-- Local interno -->
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Local interno *</label>
+                <input type="text" id="cadCliLocalInterno" placeholder="Ex: Refeitório, Recepção, Bloco B..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              </div>
+
+              <!-- Máquina -->
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Máquina *</label>
+                <input type="text" id="cadCliMaquina" placeholder="Ex: Máquina 01, M05..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              </div>
+
+              <!-- Modelo de máquina -->
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Modelo de máquina *</label>
+                <input type="text" id="cadCliModeloMaquina" placeholder="Ex: Lei Saeco, Krea, Snaky..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              </div>
+
+              <!-- Filial Responsavel -->
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Filial Responsavel *</label>
+                <input list="listaSACCidades" id="cadCliFilial" placeholder="Ex: Ribeirão Preto, São Carlos..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              </div>
+
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <button type="button" onclick="limparFormCliente()" class="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">
+                Limpar Campos
+              </button>
+              <button type="submit" id="btnSalvarCliente" class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-sky-600 text-white text-xs font-bold shadow-lg shadow-sky-500/25 hover:bg-sky-700 transition cursor-pointer">
+                <i data-lucide="save" class="w-4 h-4"></i>
+                <span id="btnSalvarClienteText">Cadastrar Cliente</span>
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <!-- LISTA DE CLIENTES CADASTRADOS -->
+        <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+            <div>
+              <h2 class="text-base font-bold flex items-center gap-2 text-slate-800">
+                <i data-lucide="users" class="w-4 h-4 text-sky-600"></i>
+                Clientes Cadastrados
+              </h2>
+              <p class="text-xs text-slate-500">Base oficial de pontos sincronizada com a aba "Clientes"</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="relative">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                <input type="text" id="searchClientesCadastrados" placeholder="Buscar cliente, local, máquina, filial..." oninput="filtrarClientesCadastrados()" class="text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 w-64">
+              </div>
+              <span id="badgeContadorClientes" class="text-xs px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 font-bold border border-sky-200">
+                0 cliente(s)
+              </span>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-600">
+              <thead class="bg-slate-50 uppercase font-semibold text-slate-500">
+                <tr>
+                  <th class="py-2.5 px-3 rounded-l-lg w-24">Ações</th>
+                  <th class="py-2.5 px-3">Cliente</th>
+                  <th class="py-2.5 px-3">Local</th>
+                  <th class="py-2.5 px-3">Local interno</th>
+                  <th class="py-2.5 px-3">Máquina</th>
+                  <th class="py-2.5 px-3">Modelo de máquina</th>
+                  <th class="py-2.5 px-3 rounded-r-lg">Filial Responsavel</th>
+                </tr>
+              </thead>
+              <tbody id="tableClientesBody" class="divide-y divide-slate-100">
+                <tr>
+                  <td colspan="7" class="text-center py-6 text-slate-400 font-semibold">Nenhum cliente carregado.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
-
-      <!-- FORMULÁRIO DE CADASTRO DE CLIENTE -->
-      <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-6 border-b border-slate-100 gap-4">
-          <div class="flex items-center gap-3">
-            <div class="p-2.5 bg-sky-600 text-white rounded-xl shadow-lg shadow-sky-500/25">
-              <i data-lucide="building-2" class="w-6 h-6"></i>
-            </div>
-            <div>
-              <h2 id="cliFormTitleText" class="text-base font-bold text-slate-900">Cadastro de Clientes e Pontos de Atendimento</h2>
-              <p class="text-xs text-slate-500">Gerenciamento de máquinas, locais e filiais responsáveis · Aba: Clientes</p>
-            </div>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="text-xs px-3 py-1 rounded-lg bg-sky-50 text-sky-800 font-semibold border border-sky-200 flex items-center gap-1.5">
-              <i data-lucide="sheet" class="w-3.5 h-3.5 text-sky-600"></i> Aba "Clientes"
-            </span>
-          </div>
-        </div>
-
-        <form id="clienteForm" onsubmit="handleClienteSubmit(event)" class="space-y-6">
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-5 rounded-2xl bg-slate-50/90 border border-slate-200">
-            
-            <!-- Cliente -->
-            <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Cliente *</label>
-              <input type="text" id="cadCliCliente" placeholder="Ex: Embraer, Coca Cola..." required onblur="formatarNomeProprio(this)" class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-            </div>
-
-            <!-- Local -->
-            <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Local *</label>
-              <input type="text" id="cadCliLocal" placeholder="Ex: Fábrica 1, Administrativo..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-            </div>
-
-            <!-- Local interno -->
-            <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Local interno *</label>
-              <input type="text" id="cadCliLocalInterno" placeholder="Ex: Refeitório, Recepção, Bloco B..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-            </div>
-
-            <!-- Máquina -->
-            <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Máquina *</label>
-              <input type="text" id="cadCliMaquina" placeholder="Ex: Máquina 01, M05..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-            </div>
-
-            <!-- Modelo de máquina -->
-            <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Modelo de máquina *</label>
-              <input type="text" id="cadCliModeloMaquina" placeholder="Ex: Lei Saeco, Krea, Snaky..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-            </div>
-
-            <!-- Filial Responsavel -->
-            <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Filial Responsavel *</label>
-              <input list="listaSACCidades" id="cadCliFilial" placeholder="Ex: Ribeirão Preto, São Carlos..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-            </div>
-
-          </div>
-
-          <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-            <button type="button" onclick="limparFormCliente()" class="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">
-              Limpar Campos
-            </button>
-            <button type="submit" id="btnSalvarCliente" class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-sky-600 text-white text-xs font-bold shadow-lg shadow-sky-500/25 hover:bg-sky-700 transition cursor-pointer">
-              <i data-lucide="save" class="w-4 h-4"></i>
-              <span id="btnSalvarClienteText">Cadastrar Cliente</span>
-            </button>
-          </div>
-        </form>
-      </section>
-
-      <!-- LISTA DE CLIENTES CADASTRADOS -->
-      <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
-          <div>
-            <h2 class="text-base font-bold flex items-center gap-2 text-slate-800">
-              <i data-lucide="users" class="w-4 h-4 text-sky-600"></i>
-              Clientes Cadastrados
-            </h2>
-            <p class="text-xs text-slate-500">Base oficial de pontos sincronizada com a aba "Clientes"</p>
-          </div>
-          <div class="flex items-center gap-3">
-            <div class="relative">
-              <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
-              <input type="text" id="searchClientesCadastrados" placeholder="Buscar cliente, local, máquina, filial..." oninput="filtrarClientesCadastrados()" class="text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 w-64">
-            </div>
-            <span id="badgeContadorClientes" class="text-xs px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 font-bold border border-sky-200">
-              0 cliente(s)
-            </span>
-          </div>
-        </div>
-
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs text-slate-600">
-            <thead class="bg-slate-50 uppercase font-semibold text-slate-500">
-              <tr>
-                <th class="py-2.5 px-3 rounded-l-lg w-24">Ações</th>
-                <th class="py-2.5 px-3">Cliente</th>
-                <th class="py-2.5 px-3">Local</th>
-                <th class="py-2.5 px-3">Local interno</th>
-                <th class="py-2.5 px-3">Máquina</th>
-                <th class="py-2.5 px-3">Modelo de máquina</th>
-                <th class="py-2.5 px-3 rounded-r-lg">Filial Responsavel</th>
-              </tr>
-            </thead>
-            <tbody id="tableClientesBody" class="divide-y divide-slate-100">
-              <tr>
-                <td colspan="7" class="text-center py-6 text-slate-400 font-semibold">Nenhum cliente carregado.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
 
     </div>
 
@@ -945,10 +979,47 @@ html_code = f"""
     let chamadoEmEdicao = null;
     let clienteEmEdicao = null;
     
+    // VARIÁVEIS DE SESSÃO E PERMISSÃO
     let atendenteSACLogado = "";
+    let loginUsuarioConectado = "";
+    let nivelAcessoLogado = "";
+
     try {{
       atendenteSACLogado = sessionStorage.getItem('sac_atendente_conectado') || "";
+      loginUsuarioConectado = sessionStorage.getItem('sac_usuario_login') || "";
+      nivelAcessoLogado = sessionStorage.getItem('sac_nivel_acesso') || "";
     }} catch(e) {{}}
+
+    // =========================================================================
+    // ATUALIZAÇÃO DA INTERFACE BASEADA NO NÍVEL DE ACESSO
+    // =========================================================================
+    function aplicarRegrasDeAcesso() {{
+      const btnCadastro = document.getElementById('navCadastroClientes');
+      const badgeAcesso = document.getElementById('badgeNivelAcesso');
+      const containerCli = document.getElementById('containerAcessoClientes');
+      const bloqueioCli = document.getElementById('bloqueioAcessoClientes');
+
+      const ehGeral = (nivelAcessoLogado || '').trim().toLowerCase() === 'geral';
+
+      if (atendenteSACLogado && ehGeral) {{
+        if (btnCadastro) btnCadastro.classList.remove('hidden');
+        if (containerCli) containerCli.classList.remove('hidden');
+        if (bloqueioCli) bloqueioCli.classList.add('hidden');
+        if (badgeAcesso) {{
+          badgeAcesso.innerText = "Geral";
+          badgeAcesso.className = "text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200";
+        }}
+      }} else {{
+        // Perfil Atendente ou deslogado
+        if (btnCadastro) btnCadastro.classList.add('hidden');
+        if (containerCli) containerCli.classList.add('hidden');
+        if (bloqueioCli) bloqueioCli.classList.remove('hidden');
+        if (badgeAcesso) {{
+          badgeAcesso.innerText = "Atendente";
+          badgeAcesso.className = "text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200";
+        }}
+      }}
+    }}
 
     // =========================================================================
     // FORMATAÇÃO DE TEXTO: PRIMEIRAS MAIÚSCULAS (TITLE CASE INTELIGENTE)
@@ -960,7 +1031,7 @@ html_code = f"""
         .toString()
         .trim()
         .toLowerCase()
-        .split(/\s+/)
+        .split(/\\s+/)
         .map((palavra, index) => {{
           if (index > 0 && preposicoes.includes(palavra)) {{
             return palavra;
@@ -1149,6 +1220,13 @@ html_code = f"""
     // NAVEGAÇÃO ENTRE PÁGINAS
     // =========================================================================
     function switchPage(page) {{
+      // Se não for Geral, bloqueia a ida para o cadastro de clientes
+      if (page === 'cadastroClientes' && (nivelAcessoLogado || '').trim().toLowerCase() !== 'geral') {{
+        alert('⛔ Acesso Restrito:\\nSeu perfil não tem permissão para cadastrar ou gerenciar clientes.');
+        switchPage('sac');
+        return;
+      }}
+
       try {{
         sessionStorage.setItem('aba_ativa_atual', page);
       }} catch(e) {{}}
@@ -1186,6 +1264,7 @@ html_code = f"""
       }} else if (page === 'sac') {{
         verificarSessaoSAC();
       }} else if (page === 'cadastroClientes') {{
+        aplicarRegrasDeAcesso();
         renderizarTabelaClientes();
       }}
 
@@ -1193,7 +1272,7 @@ html_code = f"""
     }}
 
     // =========================================================================
-    // ROTINAS SAC
+    // ROTINAS SAC E AUTENTICAÇÃO COM COLUNAS A, B, C E D
     // =========================================================================
     function verificarSessaoSAC() {{
       const authScreen = document.getElementById('sacAuthScreen');
@@ -1204,11 +1283,13 @@ html_code = f"""
         mainPanel.classList.remove('hidden');
         document.getElementById('labelSACAtendenteLogado').innerText = atendenteSACLogado;
         document.getElementById('sacAtendente').value = atendenteSACLogado;
+        aplicarRegrasDeAcesso();
         inicializarFormularioSAC();
         renderizarTabelaChamadosSAC();
       }} else {{
         authScreen.classList.remove('hidden');
         mainPanel.classList.add('hidden');
+        aplicarRegrasDeAcesso();
       }}
     }}
 
@@ -1218,14 +1299,27 @@ html_code = f"""
       const p = (document.getElementById('sacLoginPass').value || '').trim();
       const erroBox = document.getElementById('sacLoginErro');
 
-      const userValido = dadosSAC.usuarios.find(x => x.usuario.toLowerCase() === u.toLowerCase() && x.senha === p);
+      // Coluna B: Usuario | Coluna C: Senha
+      const userValido = dadosSAC.usuarios.find(x => 
+        (x.usuario || '').toLowerCase() === u.toLowerCase() && 
+        String(x.senha).trim() === p
+      );
 
       if (userValido) {{
         erroBox.classList.add('hidden');
-        atendenteSACLogado = userValido.usuario;
+        // Coluna A: Nome do atendente
+        atendenteSACLogado = userValido.nome || userValido.usuario;
+        loginUsuarioConectado = userValido.usuario;
+        // Coluna D: Nível de Acesso (Geral ou Atendente)
+        nivelAcessoLogado = userValido.acesso || "Atendente";
+
         try {{
           sessionStorage.setItem('sac_atendente_conectado', atendenteSACLogado);
+          sessionStorage.setItem('sac_usuario_login', loginUsuarioConectado);
+          sessionStorage.setItem('sac_nivel_acesso', nivelAcessoLogado);
         }} catch(e) {{}}
+
+        aplicarRegrasDeAcesso();
         verificarSessaoSAC();
       }} else {{
         erroBox.classList.remove('hidden');
@@ -1234,10 +1328,15 @@ html_code = f"""
 
     function realizarLogoutSAC() {{
       atendenteSACLogado = "";
+      loginUsuarioConectado = "";
+      nivelAcessoLogado = "";
       try {{
         sessionStorage.removeItem('sac_atendente_conectado');
+        sessionStorage.removeItem('sac_usuario_login');
+        sessionStorage.removeItem('sac_nivel_acesso');
       }} catch(e) {{}}
       document.getElementById('sacLoginForm').reset();
+      aplicarRegrasDeAcesso();
       verificarSessaoSAC();
     }}
 
@@ -1691,7 +1790,7 @@ html_code = f"""
     }}
 
     // =========================================================================
-    // ROTINAS DA PÁGINA: CADASTRO DE CLIENTES (ABA "CLIENTES")
+    // ROTINAS DA PÁGINA: CADASTRO DE CLIENTES
     // =========================================================================
     function limparFormCliente() {{
       clienteEmEdicao = null;
@@ -1707,6 +1806,11 @@ html_code = f"""
     }}
 
     function editarCliente(index) {{
+      if ((nivelAcessoLogado || '').trim().toLowerCase() !== 'geral') {{
+        alert('⛔ Operação não permitida: Apenas usuários com perfil Geral podem editar clientes.');
+        return;
+      }}
+
       const item = listaCadastroClientes[index];
       if (!item) return;
 
@@ -1729,6 +1833,11 @@ html_code = f"""
     }}
 
     function excluirCliente(index) {{
+      if ((nivelAcessoLogado || '').trim().toLowerCase() !== 'geral') {{
+        alert('⛔ Operação não permitida: Apenas usuários com perfil Geral podem excluir clientes.');
+        return;
+      }}
+
       const item = listaCadastroClientes[index];
       if (!item) return;
 
@@ -1840,7 +1949,11 @@ html_code = f"""
     function handleClienteSubmit(e) {{
       e.preventDefault();
 
-      // Garante conversão de primeiras letras maiúsculas em todos os 6 campos
+      if ((nivelAcessoLogado || '').trim().toLowerCase() !== 'geral') {{
+        alert('⛔ Operação não permitida: Apenas usuários com perfil Geral podem cadastrar clientes.');
+        return;
+      }}
+
       const cliente = converterParaPrimeirasMaiusculas(document.getElementById('cadCliCliente').value.trim());
       const local = converterParaPrimeirasMaiusculas(document.getElementById('cadCliLocal').value.trim());
       const localInterno = converterParaPrimeirasMaiusculas(document.getElementById('cadCliLocalInterno').value.trim());
@@ -1894,7 +2007,6 @@ html_code = f"""
         listaCadastroClientes.unshift(novoItem);
       }}
 
-      // Atualiza também a lista em memória dos selects do SAC
       dadosSAC.clientes.push({{
         cliente: cliente,
         local: localInterno,
@@ -2096,6 +2208,7 @@ html_code = f"""
       }}
     }} catch(e) {{}}
     
+    aplicarRegrasDeAcesso();
     switchPage(abaInicial);
   </script>
 </body>
