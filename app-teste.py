@@ -62,7 +62,6 @@ logo_base64_src = obter_logo_base64()
 SPREADSHEET_SAC_ID = "1YUS9AwQti0Gl79X-TGCIqZSkOfF0bE0BX5gyDClo3rc"
 GID_SAC_CHAMADOS = "0"
 GID_SAC_CLIENTES = "1332839106"
-# Aba Usuarios apontada para o GID 437161325 na planilha informada
 GID_SAC_USUARIOS = "437161325"
 
 SPREADSHEET_SAC_CONFIG_ID = "1vOa6QpGPZ6rZ1doT2RRU1SAXWR5usPzv"
@@ -146,10 +145,6 @@ def carregar_dados_sac():
     except Exception:
         pass
 
-    # ==========================================================================
-    # USUÁRIOS: COLUNA A (NOME), B (USUÁRIO), C (SENHA), D (ACESSO)
-    # TRATAMENTO COM CONVERSÃO EM MINÚSCULAS PARA LOGIN E SENHA
-    # ==========================================================================
     usuarios_validos = []
     try:
         df_usr = pd.read_csv(URL_CSV_SAC_USUARIOS, dtype=str)
@@ -332,7 +327,69 @@ html_code = f"""
     </div>
   </div>
 
-  <!-- TELA INICIAL DE LOGIN DO SISTEMA (NO TOPO DA PÁGINA) -->
+  <!-- MODAL DE EDIÇÃO DIRETA DE CHAMADOS ABERTOS -->
+  <div id="modalEdicaoChamadoAberto" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in duration-200">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <div class="p-2 bg-sky-100 text-sky-700 rounded-xl">
+            <i data-lucide="edit-3" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Editar Chamado Aberto</h3>
+            <span id="modalAbertoChamadoNum" class="text-xs font-mono font-bold text-sky-600">SAC-0000-0000</span>
+          </div>
+        </div>
+        <button type="button" onclick="fecharModalEdicaoChamadoAberto()" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <form id="formEdicaoAberto" onsubmit="salvarEdicaoChamadoAberto(event)" class="space-y-4">
+        <input type="hidden" id="editAbertoChamado">
+        <input type="hidden" id="editAbertoLinha">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Data *</label>
+            <input type="date" id="editAbertoData" required class="w-full text-xs rounded-xl border border-slate-300 px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Cliente *</label>
+            <input type="text" id="editAbertoCliente" required class="w-full text-xs font-semibold rounded-xl border border-slate-300 px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white">
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Nome do Cliente *</label>
+            <input type="text" id="editAbertoNomeCliente" required onblur="formatarNomeProprio(this)" class="w-full text-xs rounded-xl border border-slate-300 px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-emerald-800 mb-1">Valor (R$) *</label>
+            <input type="number" step="0.01" min="0" id="editAbertoValor" required class="w-full text-xs font-bold rounded-xl border border-emerald-300 px-3 py-2 text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Reembolso</label>
+            <input type="text" id="editAbertoReembolso" onblur="formatarNomeProprio(this)" placeholder="Ex: Pix, Crédito..." class="w-full text-xs rounded-xl border border-slate-300 px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white">
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Pix - Reembolso</label>
+            <input type="text" id="editAbertoPix" placeholder="Chave Pix informada..." class="w-full text-xs rounded-xl border border-slate-300 px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white">
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="fecharModalEdicaoChamadoAberto()" class="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition">
+            Cancelar
+          </button>
+          <button type="submit" class="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-md shadow-sky-600/20 transition">
+            <i data-lucide="save" class="w-3.5 h-3.5"></i>
+            Salvar Alterações
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TELA INICIAL DE LOGIN DO SISTEMA -->
   <div id="systemLoginScreen" class="w-full flex justify-center pt-8 sm:pt-12 px-4 pb-12">
     <div class="max-w-md w-full bg-white p-8 sm:p-10 rounded-3xl border border-slate-200 shadow-2xl space-y-6">
       
@@ -405,6 +462,12 @@ html_code = f"""
             <button id="navSAC" type="button" class="nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('sac')">
               <i data-lucide="headphones" class="w-4 h-4"></i>
               Lançamento SAC
+            </button>
+
+            <!-- NOVA ABA: CHAMADOS ABERTOS (DISPONÍVEL PARA ATENDENTE E GERAL) -->
+            <button id="navChamadosAbertos" type="button" class="nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('chamadosAbertos')">
+              <i data-lucide="inbox" class="w-4 h-4"></i>
+              Chamados Abertos
             </button>
             
             <!-- BOTÃO COM LIBERAÇÃO POR PERMISSÃO: SÓ APARECE PARA ACESSO GERAL -->
@@ -604,7 +667,7 @@ html_code = f"""
             </button>
           </div>
 
-          <!-- MENSAGEM NO TOPO DINÂMICA (SUCESSO / EDIÇÃO / EXCLUSÃO) -->
+          <!-- MENSAGEM NO TOPO DINÂMICA -->
           <div id="alertSACSuccess" class="hidden p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition">
             <div class="flex items-center gap-3">
               <div id="alertSACIconBadge" class="p-2 bg-emerald-600 text-white rounded-xl">
@@ -648,27 +711,23 @@ html_code = f"""
             <form id="sacForm" onsubmit="handleSACSubmit(event)" class="space-y-6">
               <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-5 rounded-2xl bg-slate-50/90 border border-slate-200">
                 
-                <!-- Chamado com Trava Atômica e Prévia de Numeração -->
                 <div>
                   <label class="block text-xs font-bold text-sky-900 mb-1">Chamado (Automático) *</label>
                   <input type="text" id="sacChamado" readonly class="w-full text-sm font-mono font-black rounded-xl border border-sky-300 bg-white px-3.5 py-2 text-sky-700 cursor-not-allowed shadow-inner" placeholder="[Automático do Servidor]">
                   <span class="text-[10px] text-slate-400 mt-0.5 block">🔒 Número atômico gerado no envio</span>
                 </div>
 
-                <!-- Data do Chamado -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Data *</label>
                   <input type="date" id="sacData" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
 
-                <!-- Cliente -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Cliente *</label>
                   <input list="listaSACClientes" id="sacCliente" placeholder="Selecione o cliente..." required onchange="validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente', true)" onblur="validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente', true)" class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                   <datalist id="listaSACClientes"></datalist>
                 </div>
 
-                <!-- Local Interno -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Local Interno *</label>
                   <select id="sacLocalInterno" required onchange="aoMudarLocalInternoSAC()" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
@@ -676,21 +735,18 @@ html_code = f"""
                   </select>
                 </div>
 
-                <!-- Filial Responsável -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Filial Responsável *</label>
                   <input list="listaSACCidades" id="sacCidade" placeholder="Filial de atendimento..." required onchange="validarInputComLista('sacCidade', 'listaSACCidades', 'Filial Responsável')" onblur="validarInputComLista('sacCidade', 'listaSACCidades', 'Filial Responsável')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                   <datalist id="listaSACCidades"></datalist>
                 </div>
 
-                <!-- Descrição -->
                 <div class="md:col-span-2 lg:col-span-3">
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Descrição *</label>
                   <input list="listaSACDescricoes" id="sacDescricao" placeholder="Selecione a descrição do ocorrido..." required onchange="validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição')" onblur="validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                   <datalist id="listaSACDescricoes"></datalist>
                 </div>
 
-                <!-- Produto -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Produto *</label>
                   <select id="sacProduto" required class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
@@ -700,69 +756,58 @@ html_code = f"""
                   </select>
                 </div>
 
-                <!-- Data da Transação -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Data da Transação *</label>
                   <input type="date" id="sacDataTransacao" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
 
-                <!-- Hora da Transação -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Hora da Transação *</label>
                   <input type="time" id="sacHoraTransacao" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
 
-                <!-- Valor (R$) -->
                 <div>
                   <label class="block text-xs font-semibold text-emerald-800 mb-1">Valor (R$) *</label>
                   <input type="number" step="0.01" min="0" id="sacValor" placeholder="0,00" required class="w-full text-sm font-bold rounded-xl border border-emerald-300 bg-white px-3 py-2 text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
 
-                <!-- Nome / Sobrenome -->
                 <div class="md:col-span-2">
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Nome / Sobrenome *</label>
                   <input type="text" id="sacNome" placeholder="Ex: João Da Silva" required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
 
-                <!-- Celular -->
                 <div class="md:col-span-2">
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Celular *</label>
                   <input type="text" id="sacCelular" placeholder="(00) 00000-0000" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
 
-                <!-- Problemas -->
                 <div class="md:col-span-2">
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Problemas *</label>
                   <input list="listaSACProblemas" id="sacProblema" placeholder="Selecione o problema..." required onchange="validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas')" onblur="validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                   <datalist id="listaSACProblemas"></datalist>
                 </div>
 
-                <!-- Forma de Pagamento -->
                 <div class="md:col-span-2">
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Forma de Pagamento *</label>
                   <input list="listaSACFormasPgto" id="sacFormaPgto" placeholder="Selecione a forma de pagamento..." required onchange="validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento')" onblur="validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                   <datalist id="listaSACFormasPgto"></datalist>
                 </div>
 
-                <!-- Reembolso -->
                 <div class="md:col-span-2">
                   <label class="block text-xs font-bold text-sky-900 mb-1">Reembolso</label>
                   <input type="text" id="sacReembolso" placeholder="Como foi feito o reembolso (Ex: Pix, Crédito Máquina, Dinheiro)..." onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-sky-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
 
-                <!-- Pix - Reembolso -->
                 <div class="md:col-span-2">
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Pix - Reembolso</label>
                   <input type="text" id="sacPix" placeholder="Chave Pix (CPF, Celular, E-mail ou Aleatória)..." class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
 
-                <!-- Atendente (Coluna A) -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Atendente *</label>
                   <input type="text" id="sacAtendente" readonly class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-slate-700 cursor-not-allowed">
                 </div>
 
-                <!-- Data/Hora Lançamento -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Data/Hora Lançamento</label>
                   <input type="text" id="sacDataHoraAuto" readonly value="Automático no Envio" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-slate-500 cursor-not-allowed">
@@ -833,10 +878,62 @@ html_code = f"""
         </div>
       </div>
 
-      <!-- PÁGINA 3: CADASTRO DE CLIENTES (ACESSO EXCLUSIVO: GERAL) -->
+      <!-- PÁGINA 3: TODOS OS CHAMADOS ABERTOS (ACESSO: ATENDENTE E GERAL) -->
+      <div id="pageChamadosAbertos" class="hidden space-y-6">
+        
+        <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+            <div class="flex items-center gap-3">
+              <div class="p-2.5 bg-sky-600 text-white rounded-xl shadow-lg shadow-sky-500/20">
+                <i data-lucide="inbox" class="w-6 h-6"></i>
+              </div>
+              <div>
+                <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                  Todos os Chamados Abertos
+                </h2>
+                <p class="text-xs text-slate-500">Painel com visão simplificada e edição rápida para Atendentes</p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <div class="relative">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                <input type="text" id="searchAbertos" placeholder="Filtrar chamados, cliente, nome..." oninput="filtrarChamadosAbertos()" class="text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 w-64">
+              </div>
+              <span id="badgeContadorAbertos" class="text-xs px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 font-bold border border-sky-200">
+                0 chamado(s)
+              </span>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-600">
+              <thead class="bg-slate-50 uppercase font-semibold text-slate-500">
+                <tr>
+                  <th class="py-2.5 px-3 rounded-l-lg font-mono">Chamado</th>
+                  <th class="py-2.5 px-3">Data</th>
+                  <th class="py-2.5 px-3">Cliente</th>
+                  <th class="py-2.5 px-3 text-right">Valor</th>
+                  <th class="py-2.5 px-3">Nome do Cliente</th>
+                  <th class="py-2.5 px-3">Reembolso</th>
+                  <th class="py-2.5 px-3">Pix - Reembolso</th>
+                  <th class="py-2.5 px-3 rounded-r-lg text-center w-24">Ação</th>
+                </tr>
+              </thead>
+              <tbody id="tableChamadosAbertosBody" class="divide-y divide-slate-100">
+                <tr>
+                  <td colspan="8" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado aberto encontrado.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- PÁGINA 4: CADASTRO DE CLIENTES (ACESSO EXCLUSIVO: GERAL) -->
       <div id="pageCadastroClientes" class="hidden space-y-6">
 
-        <!-- BLOQUEIO DE SEGURANÇA PARA ATENDENTE SEM PERMISSÃO -->
         <div id="bloqueioAcessoClientes" class="hidden max-w-lg mx-auto my-12 bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
           <div class="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
             <i data-lucide="shield-alert" class="w-8 h-8"></i>
@@ -851,7 +948,6 @@ html_code = f"""
         </div>
 
         <div id="containerAcessoClientes" class="space-y-6">
-          <!-- ALERTA DE EDIÇÃO DE CLIENTE -->
           <div id="alertCliEditMode" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex justify-between items-center shadow-sm">
             <div class="flex items-center gap-3">
               <div class="p-2 bg-amber-500 text-white rounded-xl"><i data-lucide="edit-3" class="w-5 h-5"></i></div>
@@ -865,7 +961,6 @@ html_code = f"""
             </button>
           </div>
 
-          <!-- MENSAGEM NO TOPO DINÂMICA -->
           <div id="alertCliSuccess" class="hidden p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition">
             <div class="flex items-center gap-3">
               <div id="alertCliIconBadge" class="p-2 bg-emerald-600 text-white rounded-xl">
@@ -881,7 +976,6 @@ html_code = f"""
             </button>
           </div>
 
-          <!-- FORMULÁRIO DE CADASTRO DE CLIENTE -->
           <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-6 border-b border-slate-100 gap-4">
               <div class="flex items-center gap-3">
@@ -902,43 +996,30 @@ html_code = f"""
 
             <form id="clienteForm" onsubmit="handleClienteSubmit(event)" class="space-y-6">
               <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-5 rounded-2xl bg-slate-50/90 border border-slate-200">
-                
-                <!-- Cliente -->
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">Cliente *</label>
                   <input type="text" id="cadCliCliente" placeholder="Ex: Embraer, Coca Cola..." required onblur="formatarNomeProprio(this)" class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-
-                <!-- Local -->
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">Local *</label>
                   <input type="text" id="cadCliLocal" placeholder="Ex: Fábrica 1, Administrativo..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-
-                <!-- Local interno -->
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">Local interno *</label>
                   <input type="text" id="cadCliLocalInterno" placeholder="Ex: Refeitório, Recepção, Bloco B..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-
-                <!-- Máquina -->
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">Máquina *</label>
                   <input type="text" id="cadCliMaquina" placeholder="Ex: Máquina 01, M05..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-
-                <!-- Modelo de máquina -->
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">Modelo de máquina *</label>
                   <input type="text" id="cadCliModeloMaquina" placeholder="Ex: Lei Saeco, Krea, Snaky..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-
-                <!-- Filial Responsavel -->
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">Filial Responsavel *</label>
                   <input list="listaSACCidades" id="cadCliFilial" placeholder="Ex: Ribeirão Preto, São Carlos..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-
               </div>
 
               <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
@@ -953,7 +1034,6 @@ html_code = f"""
             </form>
           </section>
 
-          <!-- LISTA DE CLIENTES CADASTRADOS -->
           <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
               <div>
@@ -1046,6 +1126,7 @@ html_code = f"""
         aplicarRegrasDeAcesso();
         inicializarFormularioSAC();
         renderizarTabelaChamadosSAC();
+        renderizarTabelaChamadosAbertos();
 
         let abaDesejada = 'dashboardSAC';
         try {{
@@ -1063,12 +1144,10 @@ html_code = f"""
 
     function realizarLoginGlobal(e) {{
       e.preventDefault();
-      // Tratamento para preenchimento em minúsculas e sem espaços nas pontas
       const u = (document.getElementById('globalLoginUser').value || '').trim().toLowerCase();
       const p = (document.getElementById('globalLoginPass').value || '').trim().toLowerCase();
       const erroBox = document.getElementById('globalLoginErro');
 
-      // Validação conferindo campos tratados em minúsculas
       const userValido = dadosSAC.usuarios.find(x => 
         String(x.usuario || '').trim().toLowerCase() === u && 
         String(x.senha || '').trim().toLowerCase() === p
@@ -1076,10 +1155,8 @@ html_code = f"""
 
       if (userValido) {{
         erroBox.classList.add('hidden');
-        // Coluna A: Nome do Atendente
         atendenteSACLogado = userValido.nome || userValido.usuario;
         loginUsuarioConectado = userValido.usuario;
-        // Coluna D: Acesso (Geral ou Atendente)
         nivelAcessoLogado = userValido.acesso || "Atendente";
 
         try {{
@@ -1109,9 +1186,6 @@ html_code = f"""
       verificarEstadoAutenticacao();
     }}
 
-    // =========================================================================
-    // ATUALIZAÇÃO DA INTERFACE BASEADA NO NÍVEL DE ACESSO
-    // =========================================================================
     function aplicarRegrasDeAcesso() {{
       const btnCadastro = document.getElementById('navCadastroClientes');
       const badgeAcesso = document.getElementById('badgeNivelAcesso');
@@ -1148,9 +1222,6 @@ html_code = f"""
       }}
     }}
 
-    // =========================================================================
-    // FORMATAÇÃO DE TEXTO: PRIMEIRAS MAIÚSCULAS
-    // =========================================================================
     function converterParaPrimeirasMaiusculas(texto) {{
       if (!texto) return '';
       const preposicoes = ['de', 'da', 'do', 'das', 'dos', 'e'];
@@ -1173,9 +1244,6 @@ html_code = f"""
       input.value = converterParaPrimeirasMaiusculas(input.value);
     }}
 
-    // =========================================================================
-    // TRAVAMENTO RÍGIDO DE PRÉ-LISTA
-    // =========================================================================
     function obterValoresDeDatalist(datalistId) {{
       const dl = document.getElementById(datalistId);
       if (!dl) return [];
@@ -1360,12 +1428,14 @@ html_code = f"""
       const pages = {{
         dashboardSAC: document.getElementById('pageDashboardSAC'),
         sac: document.getElementById('pageSAC'),
+        chamadosAbertos: document.getElementById('pageChamadosAbertos'),
         cadastroClientes: document.getElementById('pageCadastroClientes')
       }};
 
       const buttons = {{
         dashboardSAC: document.getElementById('navDashboardSAC'),
         sac: document.getElementById('navSAC'),
+        chamadosAbertos: document.getElementById('navChamadosAbertos'),
         cadastroClientes: document.getElementById('navCadastroClientes')
       }};
 
@@ -1387,6 +1457,8 @@ html_code = f"""
 
       if (page === 'dashboardSAC') {{
         atualizarDashboardSAC();
+      }} else if (page === 'chamadosAbertos') {{
+        renderizarTabelaChamadosAbertos();
       }} else if (page === 'cadastroClientes') {{
         aplicarRegrasDeAcesso();
         renderizarTabelaClientes();
@@ -1396,7 +1468,7 @@ html_code = f"""
     }}
 
     // =========================================================================
-    // ROTINAS SAC
+    // ROTINAS SAC E FORMULÁRIO PRINCIPAL
     // =========================================================================
     function calcularPreviaProximoChamado(ano) {{
       let maior = dadosSAC.maior_sac_ano[ano] || 0;
@@ -1552,6 +1624,7 @@ html_code = f"""
       const item = listaChamadosSAC.find(c => c.chamado === numeroChamado);
       if (!item) return;
 
+      switchPage('sac');
       chamadoEmEdicao = item;
       document.getElementById('sacChamado').value = item.chamado;
       document.getElementById('sacData').value = item.data;
@@ -1613,6 +1686,7 @@ html_code = f"""
 
       listaChamadosSAC = listaChamadosSAC.filter(c => c.chamado !== numeroChamado);
       renderizarTabelaChamadosSAC();
+      renderizarTabelaChamadosAbertos();
 
       if (chamadoEmEdicao && chamadoEmEdicao.chamado === numeroChamado) {{
         limparFormSAC();
@@ -1691,6 +1765,151 @@ html_code = f"""
       `).join('');
 
       lucide.createIcons();
+    }}
+
+    // =========================================================================
+    // ROTINAS DA PÁGINA: CHAMADOS ABERTOS (TODOS OS CHAMADOS COM OS 7 CAMPOS)
+    // =========================================================================
+    function renderizarTabelaChamadosAbertos(lista = listaChamadosSAC) {{
+      const tbody = document.getElementById('tableChamadosAbertosBody');
+      const badge = document.getElementById('badgeContadorAbertos');
+      if (badge) badge.innerText = lista.length + ' chamado(s)';
+
+      if (!tbody) return;
+
+      if (!lista || lista.length === 0) {{
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado aberto encontrado.</td></tr>';
+        return;
+      }}
+
+      tbody.innerHTML = lista.map(c => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-2.5 px-3 font-mono font-bold text-sky-700">${{c.chamado}}</td>
+          <td class="py-2.5 px-3 text-slate-700">${{c.data || '-'}}</td>
+          <td class="py-2.5 px-3 font-semibold text-slate-800">${{c.cliente || '-'}}</td>
+          <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
+          <td class="py-2.5 px-3 font-medium text-slate-800">${{c.nomeSobrenome || '-'}}</td>
+          <td class="py-2.5 px-3 text-sky-900 font-semibold">${{c.reembolso || '-'}}</td>
+          <td class="py-2.5 px-3 font-mono text-slate-600">${{c.pix || '-'}}</td>
+          <td class="py-2.5 px-3 text-center whitespace-nowrap">
+            <button type="button" onclick="abrirModalEdicaoChamadoAberto('${{c.chamado}}')" title="Editar informações do chamado ${{c.chamado}}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
+              <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+              Editar
+            </button>
+          </td>
+        </tr>
+      `).join('');
+
+      lucide.createIcons();
+    }}
+
+    function filtrarChamadosAbertos() {{
+      const termo = (document.getElementById('searchAbertos')?.value || '').trim().toLowerCase();
+      if (!termo) {{
+        renderizarTabelaChamadosAbertos(listaChamadosSAC);
+        return;
+      }}
+      const filtrados = listaChamadosSAC.filter(c => 
+        (c.chamado && c.chamado.toLowerCase().includes(termo)) ||
+        (c.cliente && c.cliente.toLowerCase().includes(termo)) ||
+        (c.nomeSobrenome && c.nomeSobrenome.toLowerCase().includes(termo)) ||
+        (c.reembolso && c.reembolso.toLowerCase().includes(termo)) ||
+        (c.pix && c.pix.toLowerCase().includes(termo))
+      );
+      renderizarTabelaChamadosAbertos(filtrados);
+    }}
+
+    function abrirModalEdicaoChamadoAberto(numeroChamado) {{
+      const item = listaChamadosSAC.find(c => c.chamado === numeroChamado);
+      if (!item) return;
+
+      document.getElementById('modalAbertoChamadoNum').innerText = item.chamado;
+      document.getElementById('editAbertoChamado').value = item.chamado;
+      document.getElementById('editAbertoLinha').value = item.linha || '';
+      document.getElementById('editAbertoData').value = item.data || '';
+      document.getElementById('editAbertoCliente').value = item.cliente || '';
+      document.getElementById('editAbertoNomeCliente').value = item.nomeSobrenome || '';
+      
+      const vLimpo = parseFloat(String(item.valor).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')) || 0;
+      document.getElementById('editAbertoValor').value = vLimpo || '';
+      document.getElementById('editAbertoReembolso').value = item.reembolso || '';
+      document.getElementById('editAbertoPix').value = item.pix || '';
+
+      document.getElementById('modalEdicaoChamadoAberto').classList.remove('hidden');
+      lucide.createIcons();
+    }}
+
+    function fecharModalEdicaoChamadoAberto() {{
+      document.getElementById('modalEdicaoChamadoAberto').classList.add('hidden');
+    }}
+
+    function salvarEdicaoChamadoAberto(e) {{
+      e.preventDefault();
+      const chamado = document.getElementById('editAbertoChamado').value.trim();
+      const linha = document.getElementById('editAbertoLinha').value;
+      const data = document.getElementById('editAbertoData').value;
+      const cliente = converterParaPrimeirasMaiusculas(document.getElementById('editAbertoCliente').value.trim());
+      const nomeSobrenome = converterParaPrimeirasMaiusculas(document.getElementById('editAbertoNomeCliente').value.trim());
+      const valor = parseFloat(document.getElementById('editAbertoValor').value) || 0;
+      const reembolso = converterParaPrimeirasMaiusculas(document.getElementById('editAbertoReembolso').value.trim());
+      const pix = document.getElementById('editAbertoPix').value.trim();
+
+      const itemExistente = listaChamadosSAC.find(c => c.chamado === chamado);
+      if (!itemExistente) return;
+
+      fecharModalEdicaoChamadoAberto();
+
+      abrirModalLoading(
+        'Salvando Chamado...',
+        'Atualizando as informações do chamado ' + chamado + ' na planilha.',
+        'loading'
+      );
+
+      const payload = {{
+        "acao": "editar",
+        "action": "editar",
+        "linha": linha || itemExistente.linha || "",
+        "Chamado": chamado,
+        "Data": data,
+        "Cliente": cliente,
+        "Local Interno": itemExistente.localInterno || "",
+        "Cidade": itemExistente.cidade || "",
+        "Descrição": itemExistente.descricao || "",
+        "Produto": itemExistente.produto || "",
+        "Data da Transação": itemExistente.dataTransacao || "",
+        "Hora da Transação": itemExistente.horaTransacao || "",
+        "Valor": valor,
+        "Nome/Sobrenome": nomeSobrenome,
+        "Celular": itemExistente.celular || "",
+        "Problemas": itemExistente.problemas || "",
+        "Forma de Pagamento": itemExistente.formaPgto || "",
+        "Reembolso": reembolso,
+        "Pix - Reembolso": pix,
+        "Atendente": itemExistente.atendente || atendenteSACLogado,
+        "Data/Hora do lançamento": itemExistente.dataHoraLancamento || ""
+      }};
+
+      enviarParaPlanilhaGarantido(payload);
+
+      // Atualiza o registro em memória
+      itemExistente.data = data;
+      itemExistente.cliente = cliente;
+      itemExistente.nomeSobrenome = nomeSobrenome;
+      itemExistente.valor = formatCurrency(valor);
+      itemExistente.reembolso = reembolso;
+      itemExistente.pix = pix;
+
+      renderizarTabelaChamadosAbertos();
+      renderizarTabelaChamadosSAC();
+
+      setTimeout(() => {{
+        abrirModalLoading(
+          'Chamado Atualizado!',
+          'As informações do chamado ' + chamado + ' foram salvas com sucesso.',
+          'sucesso'
+        );
+        setTimeout(fecharModalLoading, 1000);
+      }}, 500);
     }}
 
     function handleSACSubmit(e) {{
@@ -1829,6 +2048,7 @@ html_code = f"""
 
       limparFormSAC();
       renderizarTabelaChamadosSAC();
+      renderizarTabelaChamadosAbertos();
 
       setTimeout(() => {{
         abrirModalLoading(
