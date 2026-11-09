@@ -62,15 +62,16 @@ logo_base64_src = obter_logo_base64()
 SPREADSHEET_SAC_ID = "1YUS9AwQti0Gl79X-TGCIqZSkOfF0bE0BX5gyDClo3rc"
 GID_SAC_CHAMADOS = "0"
 GID_SAC_CLIENTES = "1332839106"
+# Aba Usuarios apontada para o GID 437161325 na planilha informada
+GID_SAC_USUARIOS = "437161325"
 
 SPREADSHEET_SAC_CONFIG_ID = "1vOa6QpGPZ6rZ1doT2RRU1SAXWR5usPzv"
 GID_SAC_CONFIGS = "1833376686"
-GID_SAC_USUARIOS = "772646879"
 
 URL_CSV_SAC_CHAMADOS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_CHAMADOS}"
 URL_CSV_SAC_CLIENTES = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_CLIENTES}"
 URL_CSV_SAC_CONFIGS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_CONFIG_ID}/export?format=csv&gid={GID_SAC_CONFIGS}"
-URL_CSV_SAC_USUARIOS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_CONFIG_ID}/export?format=csv&gid={GID_SAC_USUARIOS}"
+URL_CSV_SAC_USUARIOS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_USUARIOS}"
 
 @st.cache_data(ttl=5)
 def carregar_dados_sac():
@@ -146,7 +147,8 @@ def carregar_dados_sac():
         pass
 
     # ==========================================================================
-    # USUÁRIOS: COLUNA A (NOME), B (USER), C (SENHA), D (ACESSO)
+    # USUÁRIOS: COLUNA A (NOME), B (USUÁRIO), C (SENHA), D (ACESSO)
+    # TRATAMENTO COM CONVERSÃO EM MINÚSCULAS PARA LOGIN E SENHA
     # ==========================================================================
     usuarios_validos = []
     try:
@@ -159,11 +161,11 @@ def carregar_dados_sac():
 
             for _, r in df_usr.iterrows():
                 nome = str(r[col_nome]).strip() if pd.notna(r[col_nome]) else ""
-                u = str(r[col_u]).strip() if pd.notna(r[col_u]) else ""
-                s = str(r[col_s]).strip() if pd.notna(r[col_s]) else ""
+                u = str(r[col_u]).strip().lower() if pd.notna(r[col_u]) else ""
+                s = str(r[col_s]).strip().lower() if pd.notna(r[col_s]) else ""
                 acesso = str(r[col_acesso]).strip() if (col_acesso and pd.notna(r[col_acesso])) else "Atendente"
 
-                if u and u.lower() not in ["nan", "usuario", "usuário", "login"]:
+                if u and u not in ["nan", "usuario", "usuário", "login"]:
                     usuarios_validos.append({
                         "nome": nome or u,
                         "usuario": u,
@@ -330,7 +332,7 @@ html_code = f"""
     </div>
   </div>
 
-  <!-- TELA INICIAL DE LOGIN DO SISTEMA (POSICIONADA DIRETAMENTE NO TOPO DA PÁGINA) -->
+  <!-- TELA INICIAL DE LOGIN DO SISTEMA (NO TOPO DA PÁGINA) -->
   <div id="systemLoginScreen" class="w-full flex justify-center pt-8 sm:pt-12 px-4 pb-12">
     <div class="max-w-md w-full bg-white p-8 sm:p-10 rounded-3xl border border-slate-200 shadow-2xl space-y-6">
       
@@ -350,11 +352,11 @@ html_code = f"""
       <form id="globalLoginForm" onsubmit="realizarLoginGlobal(event)" class="space-y-4">
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Usuário para Login *</label>
-          <input type="text" id="globalLoginUser" placeholder="Digite seu usuário..." required class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium">
+          <input type="text" id="globalLoginUser" placeholder="Digite seu usuário..." required oninput="this.value = this.value.toLowerCase()" class="w-full text-sm lowercase rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium">
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Senha *</label>
-          <input type="password" id="globalLoginPass" placeholder="••••••••" required class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          <input type="password" id="globalLoginPass" placeholder="••••••••" required oninput="this.value = this.value.toLowerCase()" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
         </div>
         <div id="globalLoginErro" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
           <i data-lucide="alert-circle" class="w-4 h-4"></i>
@@ -1061,14 +1063,15 @@ html_code = f"""
 
     function realizarLoginGlobal(e) {{
       e.preventDefault();
-      const u = (document.getElementById('globalLoginUser').value || '').trim();
-      const p = (document.getElementById('globalLoginPass').value || '').trim();
+      // Tratamento para preenchimento em minúsculas e sem espaços nas pontas
+      const u = (document.getElementById('globalLoginUser').value || '').trim().toLowerCase();
+      const p = (document.getElementById('globalLoginPass').value || '').trim().toLowerCase();
       const erroBox = document.getElementById('globalLoginErro');
 
-      // Coluna B: Usuário | Coluna C: Senha
+      // Validação conferindo campos tratados em minúsculas
       const userValido = dadosSAC.usuarios.find(x => 
-        (x.usuario || '').toLowerCase() === u.toLowerCase() && 
-        String(x.senha).trim() === p
+        String(x.usuario || '').trim().toLowerCase() === u && 
+        String(x.senha || '').trim().toLowerCase() === p
       );
 
       if (userValido) {{
@@ -1131,7 +1134,6 @@ html_code = f"""
           badgeHeader.className = "text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block";
         }}
       }} else {{
-        // Perfil Atendente: Esconde totalmente o cadastro de clientes
         if (btnCadastro) btnCadastro.classList.add('hidden');
         if (containerCli) containerCli.classList.add('hidden');
         if (bloqueioCli) bloqueioCli.classList.remove('hidden');
@@ -1147,7 +1149,7 @@ html_code = f"""
     }}
 
     // =========================================================================
-    // FORMATAÇÃO DE TEXTO: PRIMEIRAS MAIÚSCULAS (TITLE CASE INTELIGENTE)
+    // FORMATAÇÃO DE TEXTO: PRIMEIRAS MAIÚSCULAS
     // =========================================================================
     function converterParaPrimeirasMaiusculas(texto) {{
       if (!texto) return '';
