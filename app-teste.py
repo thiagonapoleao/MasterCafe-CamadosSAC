@@ -278,6 +278,8 @@ html_code = f"""
       font-family: 'Inter', system-ui, -apple-system, sans-serif; 
       background-color: #f1f5f9; 
       color: #1e293b; 
+      margin: 0;
+      padding: 0;
     }}
     .kpi-card {{
       background-color: #ffffff;
@@ -328,8 +330,8 @@ html_code = f"""
     </div>
   </div>
 
-  <!-- TELA INICIAL DE LOGIN DO SISTEMA (OBRIGATÓRIO PARA QUALQUER ACESSO) -->
-  <div id="systemLoginScreen" class="min-h-screen flex items-center justify-center p-4">
+  <!-- TELA INICIAL DE LOGIN DO SISTEMA (POSICIONADA DIRETAMENTE NO TOPO DA PÁGINA) -->
+  <div id="systemLoginScreen" class="w-full flex justify-center pt-8 sm:pt-12 px-4 pb-12">
     <div class="max-w-md w-full bg-white p-8 sm:p-10 rounded-3xl border border-slate-200 shadow-2xl space-y-6">
       
       <div class="text-center space-y-3">
@@ -1343,7 +1345,6 @@ html_code = f"""
     // NAVEGAÇÃO ENTRE PÁGINAS
     // =========================================================================
     function switchPage(page) {{
-      // Bloqueio de segurança: Se for Atendente tentando acessar o cadastro
       if (page === 'cadastroClientes' && (nivelAcessoLogado || '').trim().toLowerCase() !== 'geral') {{
         alert('⛔ Acesso Restrito:\\nSeu perfil não tem permissão para cadastrar ou gerenciar clientes.');
         switchPage('sac');
