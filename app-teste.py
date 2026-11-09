@@ -146,7 +146,7 @@ def carregar_dados_sac():
         pass
 
     # ==========================================================================
-    # CARREGAMENTO DOS USUÁRIOS: COLUNA A (NOME), B (USER), C (SENHA), D (ACESSO)
+    # USUÁRIOS: COLUNA A (NOME), B (USER), C (SENHA), D (ACESSO)
     # ==========================================================================
     usuarios_validos = []
     try:
@@ -328,645 +328,676 @@ html_code = f"""
     </div>
   </div>
 
-  <!-- Header Superior -->
-  <header class="sticky top-0 z-40 bg-white/95 border-b border-slate-200 backdrop-blur-md px-6 py-3">
-    <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-      <div class="flex items-center gap-4">
-        <div class="flex items-center justify-center p-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" style="height: 54px; min-width: 54px;">
-          <img id="headerLogoImg" src="{logo_base64_src}" alt="Logotipo" class="max-h-12 w-auto object-contain" onerror="this.style.display='none'; document.getElementById('headerFallbackIcon').style.display='flex';">
-          <div id="headerFallbackIcon" style="display: {'none' if logo_base64_src else 'flex'};" class="w-10 h-10 bg-amber-700 text-white rounded-lg items-center justify-center font-black text-sm">
+  <!-- TELA INICIAL DE LOGIN DO SISTEMA (OBRIGATÓRIO PARA QUALQUER ACESSO) -->
+  <div id="systemLoginScreen" class="min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-md w-full bg-white p-8 sm:p-10 rounded-3xl border border-slate-200 shadow-2xl space-y-6">
+      
+      <div class="text-center space-y-3">
+        <div class="inline-flex items-center justify-center p-2 bg-white rounded-2xl border border-slate-200 shadow-sm mx-auto overflow-hidden" style="height: 64px; min-width: 64px;">
+          <img src="{logo_base64_src}" alt="Logotipo" class="max-h-12 w-auto object-contain" onerror="this.style.display='none'; document.getElementById('loginFallbackIcon').style.display='flex';">
+          <div id="loginFallbackIcon" style="display: {'none' if logo_base64_src else 'flex'};" class="w-12 h-12 bg-amber-700 text-white rounded-xl items-center justify-center font-black text-base">
             ☕
           </div>
         </div>
         <div>
-          <h1 class="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            Painel Executivo de Gestão & SAC
-          </h1>
-          <p class="text-xs text-slate-500">Controle Operacional, Atendimento & Análises · {total_chamados_carregados} chamados registrados</p>
+          <h2 class="text-xl font-black text-slate-900">Acesso ao Sistema</h2>
+          <p class="text-xs text-slate-500 mt-0.5">Painel Executivo de Gestão, SAC & Atendimento</p>
         </div>
       </div>
-      
-      <!-- Navegação Entre Páginas -->
-      <div class="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 flex-wrap">
-        <button id="navDashboardSAC" type="button" class="nav-btn active flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('dashboardSAC')">
-          <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-          Dashboard SAC
+
+      <form id="globalLoginForm" onsubmit="realizarLoginGlobal(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Usuário para Login *</label>
+          <input type="text" id="globalLoginUser" placeholder="Digite seu usuário..." required class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Senha *</label>
+          <input type="password" id="globalLoginPass" placeholder="••••••••" required class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+        </div>
+        <div id="globalLoginErro" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+          <i data-lucide="alert-circle" class="w-4 h-4"></i>
+          <span>Usuário ou senha incorretos!</span>
+        </div>
+        <button type="submit" class="w-full py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-lg shadow-sky-600/25 transition flex items-center justify-center gap-2 cursor-pointer">
+          <i data-lucide="log-in" class="w-4 h-4"></i>
+          Entrar no Sistema
         </button>
-        <button id="navSAC" type="button" class="nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('sac')">
-          <i data-lucide="headphones" class="w-4 h-4"></i>
-          Lançamento SAC
-        </button>
-        <!-- BOTÃO COM CONTROLE DE ACESSO: APENAS ACESSO GERAL -->
-        <button id="navCadastroClientes" type="button" class="hidden nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('cadastroClientes')">
-          <i data-lucide="user-plus" class="w-4 h-4"></i>
-          Cadastro de Clientes
-        </button>
-        <button type="button" onclick="executarRefresh()" title="Clique para recarregar da planilha" class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 cursor-pointer transition">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span> Sincronizar 🔄
-        </button>
+      </form>
+
+      <div class="pt-2 border-t border-slate-100 text-center">
+        <span class="text-[11px] text-slate-400">Validação oficial por níveis de acesso: <strong class="text-slate-600">Geral</strong> e <strong class="text-slate-600">Atendente</strong></span>
       </div>
     </div>
-  </header>
+  </div>
 
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+  <!-- CONTAINER DO SISTEMA LOGADO -->
+  <div id="systemAppContainer" class="hidden">
 
-    <!-- PÁGINA 1: DASHBOARD SAC -->
-    <div id="pageDashboardSAC" class="space-y-6">
-      <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-        <div class="flex items-center justify-between mb-3">
-          <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
-            <i data-lucide="sliders" class="w-4 h-4 text-sky-500"></i>
-            <span>Filtros do Painel SAC</span>
+    <!-- Header Superior -->
+    <header class="sticky top-0 z-40 bg-white/95 border-b border-slate-200 backdrop-blur-md px-6 py-3">
+      <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-4">
+          <div class="flex items-center justify-center p-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" style="height: 54px; min-width: 54px;">
+            <img id="headerLogoImg" src="{logo_base64_src}" alt="Logotipo" class="max-h-12 w-auto object-contain" onerror="this.style.display='none'; document.getElementById('headerFallbackIcon').style.display='flex';">
+            <div id="headerFallbackIcon" style="display: {'none' if logo_base64_src else 'flex'};" class="w-10 h-10 bg-amber-700 text-white rounded-lg items-center justify-center font-black text-sm">
+              ☕
+            </div>
           </div>
-          <span id="badgeFiltroSAC" class="text-xs font-medium text-slate-500">Filtrando: Todos os chamados</span>
+          <div>
+            <h1 class="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+              Painel Executivo de Gestão & SAC
+            </h1>
+            <p class="text-xs text-slate-500">Controle Operacional, Atendimento & Análises · {total_chamados_carregados} chamados registrados</p>
+          </div>
         </div>
+        
+        <!-- Navegação Entre Páginas e Informações do Atendente -->
+        <div class="flex items-center gap-3 flex-wrap">
+          <div class="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 flex-wrap">
+            <button id="navDashboardSAC" type="button" class="nav-btn active flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('dashboardSAC')">
+              <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+              Dashboard SAC
+            </button>
+            <button id="navSAC" type="button" class="nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('sac')">
+              <i data-lucide="headphones" class="w-4 h-4"></i>
+              Lançamento SAC
+            </button>
+            
+            <!-- BOTÃO COM LIBERAÇÃO POR PERMISSÃO: SÓ APARECE PARA ACESSO GERAL -->
+            <button id="navCadastroClientes" type="button" class="hidden nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('cadastroClientes')">
+              <i data-lucide="user-plus" class="w-4 h-4"></i>
+              Cadastro de Clientes
+            </button>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Cliente</label>
-            <select id="filterSACCliente" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-slate-800">
-              <option value="ALL">Todos os Clientes</option>
-            </select>
+            <button type="button" onclick="executarRefresh()" title="Clique para recarregar da planilha" class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 cursor-pointer transition">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span> Sincronizar 🔄
+            </button>
           </div>
 
-          <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Produto</label>
-            <select id="filterSACProduto" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-slate-800">
-              <option value="ALL">Todos os Produtos</option>
-              <option value="Café">Café</option>
-              <option value="Snaky">Snaky</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Atendente</label>
-            <select id="filterSACAtendente" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-slate-800">
-              <option value="ALL">Todos os Atendentes</option>
-            </select>
-          </div>
-
-          <div class="flex items-end">
-            <button id="btnLimparFiltrosSAC" class="w-full py-2 px-4 rounded-xl border border-slate-300 bg-slate-100 text-xs font-semibold text-slate-600 hover:bg-slate-200 transition flex items-center justify-center gap-1.5 cursor-pointer">
-              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-              Limpar Filtros
+          <div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="text-right">
+              <span id="labelHeaderAtendente" class="text-xs font-bold text-slate-800 block">Atendente</span>
+              <span id="badgeHeaderNivelAcesso" class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block">Geral</span>
+            </div>
+            <button type="button" onclick="realizarLogoutGlobal()" title="Sair do Sistema" class="p-2 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition cursor-pointer">
+              <i data-lucide="log-out" class="w-4 h-4"></i>
             </button>
           </div>
         </div>
-      </section>
+      </div>
+    </header>
 
-      <!-- CARDS KPIS DO SAC -->
-      <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between">
-          <div class="flex items-center justify-between">
-            <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total de Chamados</span>
-            <span class="p-1.5 rounded-lg bg-sky-50 text-sky-600"><i data-lucide="headphones" class="w-4 h-4"></i></span>
-          </div>
-          <div class="mt-3">
-            <span id="kpiSACTotal" class="text-xl font-bold tracking-tight text-slate-800">0</span>
-            <p id="kpiSACTotalSub" class="text-[11px] text-slate-400 mt-0.5">Ocorrências registradas</p>
-          </div>
-        </div>
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
-        <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between border-emerald-200">
-          <div class="flex items-center justify-between">
-            <span class="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider">Valor Ressarcido</span>
-            <span class="p-1.5 rounded-lg bg-emerald-50 text-emerald-600"><i data-lucide="badge-dollar-sign" class="w-4 h-4"></i></span>
-          </div>
-          <div class="mt-3">
-            <span id="kpiSACValorTotal" class="text-xl font-bold tracking-tight text-emerald-600">R$ 0,00</span>
-            <p class="text-[11px] text-slate-400 mt-0.5">Soma total de reembolsos</p>
-          </div>
-        </div>
-
-        <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between border-amber-200">
-          <div class="flex items-center justify-between">
-            <span class="text-[11px] font-semibold text-amber-600 uppercase tracking-wider">Chamados Café</span>
-            <span class="p-1.5 rounded-lg bg-amber-50 text-amber-600"><i data-lucide="coffee" class="w-4 h-4"></i></span>
-          </div>
-          <div class="mt-3 flex items-baseline justify-between">
-            <div>
-              <span id="kpiSACCafé" class="text-xl font-bold tracking-tight text-amber-700">0</span>
-              <p class="text-[11px] text-slate-400 mt-0.5">Linha de Bebidas</p>
-            </div>
-            <span id="kpiSACCaféPct" class="text-xs font-semibold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800">0%</span>
-          </div>
-        </div>
-
-        <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between border-indigo-200">
-          <div class="flex items-center justify-between">
-            <span class="text-[11px] font-semibold text-indigo-600 uppercase tracking-wider">Chamados Snaky</span>
-            <span class="p-1.5 rounded-lg bg-indigo-50 text-indigo-600"><i data-lucide="cookie" class="w-4 h-4"></i></span>
-          </div>
-          <div class="mt-3 flex items-baseline justify-between">
-            <div>
-              <span id="kpiSACSnaky" class="text-xl font-bold tracking-tight text-indigo-600">0</span>
-              <p class="text-[11px] text-slate-400 mt-0.5">Máquinas de Snacks</p>
-            </div>
-            <span id="kpiSACSnakyPct" class="text-xs font-semibold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800">0%</span>
-          </div>
-        </div>
-
-        <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between">
-          <div class="flex items-center justify-between">
-            <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Clientes Únicos</span>
-            <span class="p-1.5 rounded-lg bg-blue-50 text-blue-600"><i data-lucide="building" class="w-4 h-4"></i></span>
-          </div>
-          <div class="mt-3">
-            <span id="kpiSACClientes" class="text-xl font-bold tracking-tight text-slate-800">0</span>
-            <p class="text-[11px] text-slate-400 mt-0.5">Pontos atendidos</p>
-          </div>
-        </div>
-
-        <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between">
-          <div class="flex items-center justify-between">
-            <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Ticket Médio</span>
-            <span class="p-1.5 rounded-lg bg-cyan-50 text-cyan-600"><i data-lucide="calculator" class="w-4 h-4"></i></span>
-          </div>
-          <div class="mt-3">
-            <span id="kpiSACTicketMedio" class="text-xl font-bold tracking-tight text-slate-800">R$ 0,00</span>
-            <p class="text-[11px] text-slate-400 mt-0.5">Média por chamado</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- GRÁFICOS DO DASHBOARD SAC -->
-      <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+      <!-- PÁGINA 1: DASHBOARD SAC -->
+      <div id="pageDashboardSAC" class="space-y-6">
+        <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <div class="flex items-center justify-between mb-3">
-            <div>
-              <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
-                <i data-lucide="bar-chart-2" class="w-4 h-4 text-sky-600"></i>
-                Top 10 Problemas Mais Frequentes
-              </h3>
-              <p class="text-xs text-slate-400">Classificação de ocorrências recorrentes no SAC</p>
+            <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <i data-lucide="sliders" class="w-4 h-4 text-sky-500"></i>
+              <span>Filtros do Painel SAC</span>
             </div>
-            <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200">Ocorrências</span>
+            <span id="badgeFiltroSAC" class="text-xs font-medium text-slate-500">Filtrando: Todos os chamados</span>
           </div>
-          <div class="relative h-80"><canvas id="chartTopProblemasSAC"></canvas></div>
-        </div>
 
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div class="flex items-center justify-between mb-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
-                <i data-lucide="users" class="w-4 h-4 text-emerald-600"></i>
-                Chamados por Atendente
-              </h3>
-              <p class="text-xs text-slate-400">Volume de atendimentos realizados por operador</p>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Cliente</label>
+              <select id="filterSACCliente" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-slate-800">
+                <option value="ALL">Todos os Clientes</option>
+              </select>
             </div>
-            <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Volume</span>
-          </div>
-          <div class="relative h-80"><canvas id="chartAtendentesSAC"></canvas></div>
-        </div>
-      </section>
-    </div>
 
-    <!-- PÁGINA 2: LANÇAMENTO SAC -->
-    <div id="pageSAC" class="hidden space-y-6">
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Produto</label>
+              <select id="filterSACProduto" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-slate-800">
+                <option value="ALL">Todos os Produtos</option>
+                <option value="Café">Café</option>
+                <option value="Snaky">Snaky</option>
+              </select>
+            </div>
 
-      <!-- TELA DE LOGIN / AUTENTICAÇÃO (COLUNAS A, B, C E D) -->
-      <div id="sacAuthScreen" class="max-w-md mx-auto my-8 bg-white p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6">
-        <div class="text-center space-y-2">
-          <div class="w-14 h-14 bg-sky-100 text-sky-700 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
-            <i data-lucide="shield-check" class="w-7 h-7"></i>
-          </div>
-          <h2 class="text-xl font-black text-slate-900">Autenticação do Sistema</h2>
-          <p class="text-xs text-slate-500">Validação oficial na aba "Usuarios" (Colunas A, B, C e D)</p>
-        </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Atendente</label>
+              <select id="filterSACAtendente" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-slate-800">
+                <option value="ALL">Todos os Atendentes</option>
+              </select>
+            </div>
 
-        <form id="sacLoginForm" onsubmit="realizarLoginSAC(event)" class="space-y-4">
-          <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Usuário para Login *</label>
-            <input type="text" id="sacLoginUser" placeholder="Digite seu usuário (Coluna B)..." required class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium">
+            <div class="flex items-end">
+              <button id="btnLimparFiltrosSAC" class="w-full py-2 px-4 rounded-xl border border-slate-300 bg-slate-100 text-xs font-semibold text-slate-600 hover:bg-slate-200 transition flex items-center justify-center gap-1.5 cursor-pointer">
+                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                Limpar Filtros
+              </button>
+            </div>
           </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Senha *</label>
-            <input type="password" id="sacLoginPass" placeholder="••••••••" required class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+        </section>
+
+        <!-- CARDS KPIS DO SAC -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total de Chamados</span>
+              <span class="p-1.5 rounded-lg bg-sky-50 text-sky-600"><i data-lucide="headphones" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3">
+              <span id="kpiSACTotal" class="text-xl font-bold tracking-tight text-slate-800">0</span>
+              <p id="kpiSACTotalSub" class="text-[11px] text-slate-400 mt-0.5">Ocorrências registradas</p>
+            </div>
           </div>
-          <div id="sacLoginErro" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
-            <i data-lucide="alert-circle" class="w-4 h-4"></i>
-            <span>Usuário ou senha incorretos!</span>
+
+          <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between border-emerald-200">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider">Valor Ressarcido</span>
+              <span class="p-1.5 rounded-lg bg-emerald-50 text-emerald-600"><i data-lucide="badge-dollar-sign" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3">
+              <span id="kpiSACValorTotal" class="text-xl font-bold tracking-tight text-emerald-600">R$ 0,00</span>
+              <p class="text-[11px] text-slate-400 mt-0.5">Soma total de reembolsos</p>
+            </div>
           </div>
-          <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-md shadow-sky-600/25 transition flex items-center justify-center gap-2 cursor-pointer">
-            <i data-lucide="log-in" class="w-4 h-4"></i>
-            Entrar no Sistema
-          </button>
-        </form>
+
+          <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between border-amber-200">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-amber-600 uppercase tracking-wider">Chamados Café</span>
+              <span class="p-1.5 rounded-lg bg-amber-50 text-amber-600"><i data-lucide="coffee" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3 flex items-baseline justify-between">
+              <div>
+                <span id="kpiSACCafé" class="text-xl font-bold tracking-tight text-amber-700">0</span>
+                <p class="text-[11px] text-slate-400 mt-0.5">Linha de Bebidas</p>
+              </div>
+              <span id="kpiSACCaféPct" class="text-xs font-semibold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800">0%</span>
+            </div>
+          </div>
+
+          <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between border-indigo-200">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-indigo-600 uppercase tracking-wider">Chamados Snaky</span>
+              <span class="p-1.5 rounded-lg bg-indigo-50 text-indigo-600"><i data-lucide="cookie" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3 flex items-baseline justify-between">
+              <div>
+                <span id="kpiSACSnaky" class="text-xl font-bold tracking-tight text-indigo-600">0</span>
+                <p class="text-[11px] text-slate-400 mt-0.5">Máquinas de Snacks</p>
+              </div>
+              <span id="kpiSACSnakyPct" class="text-xs font-semibold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800">0%</span>
+            </div>
+          </div>
+
+          <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Clientes Únicos</span>
+              <span class="p-1.5 rounded-lg bg-blue-50 text-blue-600"><i data-lucide="building" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3">
+              <span id="kpiSACClientes" class="text-xl font-bold tracking-tight text-slate-800">0</span>
+              <p class="text-[11px] text-slate-400 mt-0.5">Pontos atendidos</p>
+            </div>
+          </div>
+
+          <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Ticket Médio</span>
+              <span class="p-1.5 rounded-lg bg-cyan-50 text-cyan-600"><i data-lucide="calculator" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3">
+              <span id="kpiSACTicketMedio" class="text-xl font-bold tracking-tight text-slate-800">R$ 0,00</span>
+              <p class="text-[11px] text-slate-400 mt-0.5">Média por chamado</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- GRÁFICOS DO DASHBOARD SAC -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                  <i data-lucide="bar-chart-2" class="w-4 h-4 text-sky-600"></i>
+                  Top 10 Problemas Mais Frequentes
+                </h3>
+                <p class="text-xs text-slate-400">Classificação de ocorrências recorrentes no SAC</p>
+              </div>
+              <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200">Ocorrências</span>
+            </div>
+            <div class="relative h-80"><canvas id="chartTopProblemasSAC"></canvas></div>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                  <i data-lucide="users" class="w-4 h-4 text-emerald-600"></i>
+                  Chamados por Atendente
+                </h3>
+                <p class="text-xs text-slate-400">Volume de atendimentos realizados por operador</p>
+              </div>
+              <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Volume</span>
+            </div>
+            <div class="relative h-80"><canvas id="chartAtendentesSAC"></canvas></div>
+          </div>
+        </section>
       </div>
 
-      <!-- PAINEL DO FORMULÁRIO DO SAC -->
-      <div id="sacMainPanel" class="hidden space-y-6">
+      <!-- PÁGINA 2: LANÇAMENTO SAC -->
+      <div id="pageSAC" class="hidden space-y-6">
 
-        <!-- ALERTA DE EDIÇÃO DE CHAMADO -->
-        <div id="alertSACEditMode" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex justify-between items-center shadow-sm">
-          <div class="flex items-center gap-3">
-            <div class="p-2 bg-amber-500 text-white rounded-xl"><i data-lucide="edit-3" class="w-5 h-5"></i></div>
-            <div>
-              <p class="text-sm font-bold">Modo de Edição de Chamado: <span id="labelSACEditChamado" class="font-mono text-amber-800">SAC-0000-0000</span></p>
-              <p class="text-xs text-amber-700">Você está alterando este chamado do SAC. Ao salvar, os dados serão atualizados na planilha.</p>
-            </div>
-          </div>
-          <button type="button" onclick="cancelarEdicaoSAC()" class="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 rounded-xl text-xs font-bold text-amber-900 transition cursor-pointer">
-            Cancelar Edição ✕
-          </button>
-        </div>
+        <!-- PAINEL DO FORMULÁRIO DO SAC -->
+        <div id="sacMainPanel" class="space-y-6">
 
-        <!-- MENSAGEM NO TOPO DINÂMICA (SUCESSO / EDIÇÃO / EXCLUSÃO) -->
-        <div id="alertSACSuccess" class="hidden p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition">
-          <div class="flex items-center gap-3">
-            <div id="alertSACIconBadge" class="p-2 bg-emerald-600 text-white rounded-xl">
-              <i id="alertSACLucideIcon" data-lucide="check-circle" class="w-5 h-5"></i>
-            </div>
-            <div>
-              <p id="alertSACSuccessTitle" class="text-sm font-bold">Ação realizada com sucesso!</p>
-              <p id="alertSACSuccessSub" class="text-xs text-emerald-700">A planilha oficial foi atualizada em tempo real.</p>
-            </div>
-          </div>
-          <button type="button" onclick="document.getElementById('alertSACSuccess').classList.add('hidden')" class="px-3 py-2 rounded-xl hover:bg-emerald-100 text-xs font-semibold text-emerald-800 transition cursor-pointer">
-            Fechar
-          </button>
-        </div>
-
-        <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-6 border-b border-slate-100 gap-4">
+          <!-- ALERTA DE EDIÇÃO DE CHAMADO -->
+          <div id="alertSACEditMode" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex justify-between items-center shadow-sm">
             <div class="flex items-center gap-3">
-              <div class="p-2.5 bg-sky-600 text-white rounded-xl shadow-lg shadow-sky-500/25">
-                <i data-lucide="headphones" class="w-6 h-6"></i>
+              <div class="p-2 bg-amber-500 text-white rounded-xl"><i data-lucide="edit-3" class="w-5 h-5"></i></div>
+              <div>
+                <p class="text-sm font-bold">Modo de Edição de Chamado: <span id="labelSACEditChamado" class="font-mono text-amber-800">SAC-0000-0000</span></p>
+                <p class="text-xs text-amber-700">Você está alterando este chamado do SAC. Ao salvar, os dados serão atualizados na planilha.</p>
+              </div>
+            </div>
+            <button type="button" onclick="cancelarEdicaoSAC()" class="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 rounded-xl text-xs font-bold text-amber-900 transition cursor-pointer">
+              Cancelar Edição ✕
+            </button>
+          </div>
+
+          <!-- MENSAGEM NO TOPO DINÂMICA (SUCESSO / EDIÇÃO / EXCLUSÃO) -->
+          <div id="alertSACSuccess" class="hidden p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition">
+            <div class="flex items-center gap-3">
+              <div id="alertSACIconBadge" class="p-2 bg-emerald-600 text-white rounded-xl">
+                <i id="alertSACLucideIcon" data-lucide="check-circle" class="w-5 h-5"></i>
               </div>
               <div>
-                <h2 id="sacFormTitleText" class="text-base font-bold text-slate-900">Lançamento de Ocorrências do SAC</h2>
-                <p class="text-xs text-slate-500">Registro de chamados, ressarcimentos e reembolsos · Aba: Chamados</p>
+                <p id="alertSACSuccessTitle" class="text-sm font-bold">Ação realizada com sucesso!</p>
+                <p id="alertSACSuccessSub" class="text-xs text-emerald-700">A planilha oficial foi atualizada em tempo real.</p>
               </div>
             </div>
-            <div class="flex items-center gap-3">
-              <div class="text-right">
-                <span class="text-[10px] uppercase font-bold text-slate-400 block">Atendente Conectado</span>
-                <div class="flex items-center gap-1.5 justify-end">
-                  <span id="labelSACAtendenteLogado" class="text-xs font-bold text-sky-800 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200">Operador</span>
-                  <span id="badgeNivelAcesso" class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Geral</span>
+            <button type="button" onclick="document.getElementById('alertSACSuccess').classList.add('hidden')" class="px-3 py-2 rounded-xl hover:bg-emerald-100 text-xs font-semibold text-emerald-800 transition cursor-pointer">
+              Fechar
+            </button>
+          </div>
+
+          <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-6 border-b border-slate-100 gap-4">
+              <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-sky-600 text-white rounded-xl shadow-lg shadow-sky-500/25">
+                  <i data-lucide="headphones" class="w-6 h-6"></i>
+                </div>
+                <div>
+                  <h2 id="sacFormTitleText" class="text-base font-bold text-slate-900">Lançamento de Ocorrências do SAC</h2>
+                  <p class="text-xs text-slate-500">Registro de chamados, ressarcimentos e reembolsos · Aba: Chamados</p>
                 </div>
               </div>
-              <button type="button" onclick="realizarLogoutSAC()" title="Sair da Sessão" class="p-2 rounded-xl border border-slate-200 hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition cursor-pointer">
-                <i data-lucide="log-out" class="w-4 h-4"></i>
-              </button>
-            </div>
-          </div>
-
-          <form id="sacForm" onsubmit="handleSACSubmit(event)" class="space-y-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-5 rounded-2xl bg-slate-50/90 border border-slate-200">
-              
-              <!-- Chamado com Trava Atômica e Prévia de Numeração -->
-              <div>
-                <label class="block text-xs font-bold text-sky-900 mb-1">Chamado (Automático) *</label>
-                <input type="text" id="sacChamado" readonly class="w-full text-sm font-mono font-black rounded-xl border border-sky-300 bg-white px-3.5 py-2 text-sky-700 cursor-not-allowed shadow-inner" placeholder="[Automático do Servidor]">
-                <span class="text-[10px] text-slate-400 mt-0.5 block">🔒 Número atômico gerado no envio</span>
+              <div class="flex items-center gap-3">
+                <div class="text-right">
+                  <span class="text-[10px] uppercase font-bold text-slate-400 block">Atendente Conectado</span>
+                  <div class="flex items-center gap-1.5 justify-end">
+                    <span id="labelSACAtendenteLogado" class="text-xs font-bold text-sky-800 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200">Operador</span>
+                    <span id="badgeNivelAcesso" class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Geral</span>
+                  </div>
+                </div>
+                <button type="button" onclick="realizarLogoutGlobal()" title="Sair do Sistema" class="p-2 rounded-xl border border-slate-200 hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition cursor-pointer">
+                  <i data-lucide="log-out" class="w-4 h-4"></i>
+                </button>
               </div>
-
-              <!-- Data do Chamado -->
-              <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Data *</label>
-                <input type="date" id="sacData" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-              </div>
-
-              <!-- Cliente -->
-              <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Cliente *</label>
-                <input list="listaSACClientes" id="sacCliente" placeholder="Selecione o cliente..." required onchange="validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente', true)" onblur="validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente', true)" class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-                <datalist id="listaSACClientes"></datalist>
-              </div>
-
-              <!-- Local Interno -->
-              <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Local Interno *</label>
-                <select id="sacLocalInterno" required onchange="aoMudarLocalInternoSAC()" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-                  <option value="">Selecione primeiro o Cliente...</option>
-                </select>
-              </div>
-
-              <!-- Filial Responsável -->
-              <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Filial Responsável *</label>
-                <input list="listaSACCidades" id="sacCidade" placeholder="Filial de atendimento..." required onchange="validarInputComLista('sacCidade', 'listaSACCidades', 'Filial Responsável')" onblur="validarInputComLista('sacCidade', 'listaSACCidades', 'Filial Responsável')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-                <datalist id="listaSACCidades"></datalist>
-              </div>
-
-              <!-- Descrição -->
-              <div class="md:col-span-2 lg:col-span-3">
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Descrição *</label>
-                <input list="listaSACDescricoes" id="sacDescricao" placeholder="Selecione a descrição do ocorrido..." required onchange="validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição')" onblur="validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-                <datalist id="listaSACDescricoes"></datalist>
-              </div>
-
-              <!-- Produto -->
-              <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Produto *</label>
-                <select id="sacProduto" required class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-                  <option value="" selected disabled>Selecione o Produto...</option>
-                  <option value="Café">Café</option>
-                  <option value="Snaky">Snaky</option>
-                </select>
-              </div>
-
-              <!-- Data da Transação -->
-              <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Data da Transação *</label>
-                <input type="date" id="sacDataTransacao" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-              </div>
-
-              <!-- Hora da Transação -->
-              <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Hora da Transação *</label>
-                <input type="time" id="sacHoraTransacao" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-              </div>
-
-              <!-- Valor (R$) -->
-              <div>
-                <label class="block text-xs font-semibold text-emerald-800 mb-1">Valor (R$) *</label>
-                <input type="number" step="0.01" min="0" id="sacValor" placeholder="0,00" required class="w-full text-sm font-bold rounded-xl border border-emerald-300 bg-white px-3 py-2 text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-              </div>
-
-              <!-- Nome / Sobrenome -->
-              <div class="md:col-span-2">
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Nome / Sobrenome *</label>
-                <input type="text" id="sacNome" placeholder="Ex: João Da Silva" required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-              </div>
-
-              <!-- Celular -->
-              <div class="md:col-span-2">
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Celular *</label>
-                <input type="text" id="sacCelular" placeholder="(00) 00000-0000" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-              </div>
-
-              <!-- Problemas -->
-              <div class="md:col-span-2">
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Problemas *</label>
-                <input list="listaSACProblemas" id="sacProblema" placeholder="Selecione o problema..." required onchange="validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas')" onblur="validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-                <datalist id="listaSACProblemas"></datalist>
-              </div>
-
-              <!-- Forma de Pagamento -->
-              <div class="md:col-span-2">
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Forma de Pagamento *</label>
-                <input list="listaSACFormasPgto" id="sacFormaPgto" placeholder="Selecione a forma de pagamento..." required onchange="validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento')" onblur="validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-                <datalist id="listaSACFormasPgto"></datalist>
-              </div>
-
-              <!-- Reembolso -->
-              <div class="md:col-span-2">
-                <label class="block text-xs font-bold text-sky-900 mb-1">Reembolso</label>
-                <input type="text" id="sacReembolso" placeholder="Como foi feito o reembolso (Ex: Pix, Crédito Máquina, Dinheiro)..." onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-sky-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-              </div>
-
-              <!-- Pix - Reembolso -->
-              <div class="md:col-span-2">
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Pix - Reembolso</label>
-                <input type="text" id="sacPix" placeholder="Chave Pix (CPF, Celular, E-mail ou Aleatória)..." class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-              </div>
-
-              <!-- Atendente (Nome vindo da Coluna A) -->
-              <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Atendente *</label>
-                <input type="text" id="sacAtendente" readonly class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-slate-700 cursor-not-allowed">
-              </div>
-
-              <!-- Data/Hora Lançamento -->
-              <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Data/Hora Lançamento</label>
-                <input type="text" id="sacDataHoraAuto" readonly value="Automático no Envio" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-slate-500 cursor-not-allowed">
-              </div>
-
             </div>
 
-            <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-              <button type="button" onclick="limparFormSAC()" class="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">
-                Limpar Campos
-              </button>
-              <button type="submit" id="btnSalvarSAC" class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-sky-600 text-white text-xs font-bold shadow-lg shadow-sky-500/25 hover:bg-sky-700 transition cursor-pointer">
-                <i data-lucide="send" class="w-4 h-4"></i>
-                <span id="btnSalvarSACText">Lançar Ocorrência SAC</span>
-              </button>
-            </div>
-          </form>
-        </section>
+            <form id="sacForm" onsubmit="handleSACSubmit(event)" class="space-y-6">
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-5 rounded-2xl bg-slate-50/90 border border-slate-200">
+                
+                <!-- Chamado com Trava Atômica e Prévia de Numeração -->
+                <div>
+                  <label class="block text-xs font-bold text-sky-900 mb-1">Chamado (Automático) *</label>
+                  <input type="text" id="sacChamado" readonly class="w-full text-sm font-mono font-black rounded-xl border border-sky-300 bg-white px-3.5 py-2 text-sky-700 cursor-not-allowed shadow-inner" placeholder="[Automático do Servidor]">
+                  <span class="text-[10px] text-slate-400 mt-0.5 block">🔒 Número atômico gerado no envio</span>
+                </div>
 
-        <!-- LISTA DE TODOS OS CHAMADOS REALIZADOS -->
-        <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
-            <div>
-              <h2 class="text-base font-bold flex items-center gap-2 text-slate-800">
-                <i data-lucide="list-checks" class="w-4 h-4 text-sky-600"></i>
-                Chamados Realizados no SAC
-              </h2>
-              <p class="text-xs text-slate-500">Histórico completo de ocorrências registradas na aba Chamados</p>
-            </div>
-            <div class="flex items-center gap-3">
-              <div class="relative">
-                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
-                <input type="text" id="searchSACChamados" placeholder="Buscar chamado, cliente, cliente/nome..." oninput="filtrarChamadosSAC()" class="text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 w-64">
+                <!-- Data do Chamado -->
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Data *</label>
+                  <input type="date" id="sacData" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Cliente -->
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Cliente *</label>
+                  <input list="listaSACClientes" id="sacCliente" placeholder="Selecione o cliente..." required onchange="validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente', true)" onblur="validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente', true)" class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                  <datalist id="listaSACClientes"></datalist>
+                </div>
+
+                <!-- Local Interno -->
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Local Interno *</label>
+                  <select id="sacLocalInterno" required onchange="aoMudarLocalInternoSAC()" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    <option value="">Selecione primeiro o Cliente...</option>
+                  </select>
+                </div>
+
+                <!-- Filial Responsável -->
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Filial Responsável *</label>
+                  <input list="listaSACCidades" id="sacCidade" placeholder="Filial de atendimento..." required onchange="validarInputComLista('sacCidade', 'listaSACCidades', 'Filial Responsável')" onblur="validarInputComLista('sacCidade', 'listaSACCidades', 'Filial Responsável')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                  <datalist id="listaSACCidades"></datalist>
+                </div>
+
+                <!-- Descrição -->
+                <div class="md:col-span-2 lg:col-span-3">
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Descrição *</label>
+                  <input list="listaSACDescricoes" id="sacDescricao" placeholder="Selecione a descrição do ocorrido..." required onchange="validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição')" onblur="validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                  <datalist id="listaSACDescricoes"></datalist>
+                </div>
+
+                <!-- Produto -->
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Produto *</label>
+                  <select id="sacProduto" required class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    <option value="" selected disabled>Selecione o Produto...</option>
+                    <option value="Café">Café</option>
+                    <option value="Snaky">Snaky</option>
+                  </select>
+                </div>
+
+                <!-- Data da Transação -->
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Data da Transação *</label>
+                  <input type="date" id="sacDataTransacao" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Hora da Transação -->
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Hora da Transação *</label>
+                  <input type="time" id="sacHoraTransacao" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Valor (R$) -->
+                <div>
+                  <label class="block text-xs font-semibold text-emerald-800 mb-1">Valor (R$) *</label>
+                  <input type="number" step="0.01" min="0" id="sacValor" placeholder="0,00" required class="w-full text-sm font-bold rounded-xl border border-emerald-300 bg-white px-3 py-2 text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+
+                <!-- Nome / Sobrenome -->
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Nome / Sobrenome *</label>
+                  <input type="text" id="sacNome" placeholder="Ex: João Da Silva" required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Celular -->
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Celular *</label>
+                  <input type="text" id="sacCelular" placeholder="(00) 00000-0000" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Problemas -->
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Problemas *</label>
+                  <input list="listaSACProblemas" id="sacProblema" placeholder="Selecione o problema..." required onchange="validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas')" onblur="validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                  <datalist id="listaSACProblemas"></datalist>
+                </div>
+
+                <!-- Forma de Pagamento -->
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Forma de Pagamento *</label>
+                  <input list="listaSACFormasPgto" id="sacFormaPgto" placeholder="Selecione a forma de pagamento..." required onchange="validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento')" onblur="validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                  <datalist id="listaSACFormasPgto"></datalist>
+                </div>
+
+                <!-- Reembolso -->
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-bold text-sky-900 mb-1">Reembolso</label>
+                  <input type="text" id="sacReembolso" placeholder="Como foi feito o reembolso (Ex: Pix, Crédito Máquina, Dinheiro)..." onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-sky-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Pix - Reembolso -->
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Pix - Reembolso</label>
+                  <input type="text" id="sacPix" placeholder="Chave Pix (CPF, Celular, E-mail ou Aleatória)..." class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Atendente (Coluna A) -->
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Atendente *</label>
+                  <input type="text" id="sacAtendente" readonly class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-slate-700 cursor-not-allowed">
+                </div>
+
+                <!-- Data/Hora Lançamento -->
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Data/Hora Lançamento</label>
+                  <input type="text" id="sacDataHoraAuto" readonly value="Automático no Envio" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-slate-500 cursor-not-allowed">
+                </div>
+
               </div>
-              <span id="badgeContadorSAC" class="text-xs px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 font-bold border border-sky-200">
-                0 chamado(s)
-              </span>
+
+              <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button type="button" onclick="limparFormSAC()" class="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">
+                  Limpar Campos
+                </button>
+                <button type="submit" id="btnSalvarSAC" class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-sky-600 text-white text-xs font-bold shadow-lg shadow-sky-500/25 hover:bg-sky-700 transition cursor-pointer">
+                  <i data-lucide="send" class="w-4 h-4"></i>
+                  <span id="btnSalvarSACText">Lançar Ocorrência SAC</span>
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <!-- LISTA DE TODOS OS CHAMADOS REALIZADOS -->
+          <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+              <div>
+                <h2 class="text-base font-bold flex items-center gap-2 text-slate-800">
+                  <i data-lucide="list-checks" class="w-4 h-4 text-sky-600"></i>
+                  Chamados Realizados no SAC
+                </h2>
+                <p class="text-xs text-slate-500">Histórico completo de ocorrências registradas na aba Chamados</p>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="relative">
+                  <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                  <input type="text" id="searchSACChamados" placeholder="Buscar chamado, cliente, cliente/nome..." oninput="filtrarChamadosSAC()" class="text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 w-64">
+                </div>
+                <span id="badgeContadorSAC" class="text-xs px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 font-bold border border-sky-200">
+                  0 chamado(s)
+                </span>
+              </div>
             </div>
-          </div>
 
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-slate-600">
-              <thead class="bg-slate-50 uppercase font-semibold text-slate-500">
-                <tr>
-                  <th class="py-2.5 px-3 rounded-l-lg">Ações</th>
-                  <th class="py-2.5 px-3 font-mono">Chamado</th>
-                  <th class="py-2.5 px-3">Data</th>
-                  <th class="py-2.5 px-3">Cliente</th>
-                  <th class="py-2.5 px-3">Local</th>
-                  <th class="py-2.5 px-3">Filial</th>
-                  <th class="py-2.5 px-3">Produto</th>
-                  <th class="py-2.5 px-3 text-right">Valor</th>
-                  <th class="py-2.5 px-3">Nome Cliente</th>
-                  <th class="py-2.5 px-3">Reembolso</th>
-                  <th class="py-2.5 px-3">Atendente</th>
-                  <th class="py-2.5 px-3 rounded-r-lg">Data Lançamento</th>
-                </tr>
-              </thead>
-              <tbody id="tableSACChamadosBody" class="divide-y divide-slate-100">
-                <tr>
-                  <td colspan="12" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado registrado ainda.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-50 uppercase font-semibold text-slate-500">
+                  <tr>
+                    <th class="py-2.5 px-3 rounded-l-lg">Ações</th>
+                    <th class="py-2.5 px-3 font-mono">Chamado</th>
+                    <th class="py-2.5 px-3">Data</th>
+                    <th class="py-2.5 px-3">Cliente</th>
+                    <th class="py-2.5 px-3">Local</th>
+                    <th class="py-2.5 px-3">Filial</th>
+                    <th class="py-2.5 px-3">Produto</th>
+                    <th class="py-2.5 px-3 text-right">Valor</th>
+                    <th class="py-2.5 px-3">Nome Cliente</th>
+                    <th class="py-2.5 px-3">Reembolso</th>
+                    <th class="py-2.5 px-3">Atendente</th>
+                    <th class="py-2.5 px-3 rounded-r-lg">Data Lançamento</th>
+                  </tr>
+                </thead>
+                <tbody id="tableSACChamadosBody" class="divide-y divide-slate-100">
+                  <tr>
+                    <td colspan="12" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado registrado ainda.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
 
-      </div>
-    </div>
-
-    <!-- PÁGINA 3: CADASTRO DE CLIENTES (ACESSO EXCLUSIVO: GERAL) -->
-    <div id="pageCadastroClientes" class="hidden space-y-6">
-
-      <!-- BLOQUEIO DE SEGURANÇA PARA ATENDENTE SEM PERMISSÃO -->
-      <div id="bloqueioAcessoClientes" class="hidden max-w-lg mx-auto my-12 bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
-        <div class="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
-          <i data-lucide="shield-alert" class="w-8 h-8"></i>
         </div>
-        <h2 class="text-lg font-black text-slate-800">Acesso Restrito ao Cadastro</h2>
-        <p class="text-xs text-slate-500 leading-relaxed">
-          Seu perfil de login está categorizado como <span class="font-bold text-rose-600">Atendente</span> na coluna D da planilha. O gerenciamento e cadastro de clientes é exclusivo para perfis com acesso <span class="font-bold text-emerald-700">Geral</span>.
-        </p>
-        <button type="button" onclick="switchPage('sac')" class="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-md transition cursor-pointer">
-          Voltar para Lançamento SAC
-        </button>
       </div>
 
-      <div id="containerAcessoClientes" class="space-y-6">
-        <!-- ALERTA DE EDIÇÃO DE CLIENTE -->
-        <div id="alertCliEditMode" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex justify-between items-center shadow-sm">
-          <div class="flex items-center gap-3">
-            <div class="p-2 bg-amber-500 text-white rounded-xl"><i data-lucide="edit-3" class="w-5 h-5"></i></div>
-            <div>
-              <p class="text-sm font-bold">Modo de Edição de Cliente: <span id="labelCliEditNome" class="font-bold text-amber-800">Cliente</span></p>
-              <p class="text-xs text-amber-700">Você está alterando os dados cadastrais deste ponto. Ao salvar, os dados serão atualizados na aba Clientes.</p>
-            </div>
+      <!-- PÁGINA 3: CADASTRO DE CLIENTES (ACESSO EXCLUSIVO: GERAL) -->
+      <div id="pageCadastroClientes" class="hidden space-y-6">
+
+        <!-- BLOQUEIO DE SEGURANÇA PARA ATENDENTE SEM PERMISSÃO -->
+        <div id="bloqueioAcessoClientes" class="hidden max-w-lg mx-auto my-12 bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+          <div class="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+            <i data-lucide="shield-alert" class="w-8 h-8"></i>
           </div>
-          <button type="button" onclick="cancelarEdicaoCliente()" class="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 rounded-xl text-xs font-bold text-amber-900 transition cursor-pointer">
-            Cancelar Edição ✕
+          <h2 class="text-lg font-black text-slate-800">Acesso Restrito ao Cadastro</h2>
+          <p class="text-xs text-slate-500 leading-relaxed">
+            Seu perfil de login está categorizado como <span class="font-bold text-rose-600">Atendente</span> na coluna D da planilha. O gerenciamento e cadastro de clientes é exclusivo para perfis com permissão de acesso <span class="font-bold text-emerald-700">Geral</span>.
+          </p>
+          <button type="button" onclick="switchPage('sac')" class="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-md transition cursor-pointer">
+            Voltar para Lançamento SAC
           </button>
         </div>
 
-        <!-- MENSAGEM NO TOPO DINÂMICA -->
-        <div id="alertCliSuccess" class="hidden p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition">
-          <div class="flex items-center gap-3">
-            <div id="alertCliIconBadge" class="p-2 bg-emerald-600 text-white rounded-xl">
-              <i id="alertCliLucideIcon" data-lucide="check-circle" class="w-5 h-5"></i>
+        <div id="containerAcessoClientes" class="space-y-6">
+          <!-- ALERTA DE EDIÇÃO DE CLIENTE -->
+          <div id="alertCliEditMode" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex justify-between items-center shadow-sm">
+            <div class="flex items-center gap-3">
+              <div class="p-2 bg-amber-500 text-white rounded-xl"><i data-lucide="edit-3" class="w-5 h-5"></i></div>
+              <div>
+                <p class="text-sm font-bold">Modo de Edição de Cliente: <span id="labelCliEditNome" class="font-bold text-amber-800">Cliente</span></p>
+                <p class="text-xs text-amber-700">Você está alterando os dados cadastrais deste ponto. Ao salvar, os dados serão atualizados na aba Clientes.</p>
+              </div>
             </div>
-            <div>
-              <p id="alertCliSuccessTitle" class="text-sm font-bold">Ação realizada com sucesso!</p>
-              <p id="alertCliSuccessSub" class="text-xs text-emerald-700">A aba Clientes foi atualizada com sucesso.</p>
-            </div>
+            <button type="button" onclick="cancelarEdicaoCliente()" class="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 rounded-xl text-xs font-bold text-amber-900 transition cursor-pointer">
+              Cancelar Edição ✕
+            </button>
           </div>
-          <button type="button" onclick="document.getElementById('alertCliSuccess').classList.add('hidden')" class="px-3 py-2 rounded-xl hover:bg-emerald-100 text-xs font-semibold text-emerald-800 transition cursor-pointer">
-            Fechar
-          </button>
+
+          <!-- MENSAGEM NO TOPO DINÂMICA -->
+          <div id="alertCliSuccess" class="hidden p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition">
+            <div class="flex items-center gap-3">
+              <div id="alertCliIconBadge" class="p-2 bg-emerald-600 text-white rounded-xl">
+                <i id="alertCliLucideIcon" data-lucide="check-circle" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <p id="alertCliSuccessTitle" class="text-sm font-bold">Ação realizada com sucesso!</p>
+                <p id="alertCliSuccessSub" class="text-xs text-emerald-700">A aba Clientes foi atualizada com sucesso.</p>
+              </div>
+            </div>
+            <button type="button" onclick="document.getElementById('alertCliSuccess').classList.add('hidden')" class="px-3 py-2 rounded-xl hover:bg-emerald-100 text-xs font-semibold text-emerald-800 transition cursor-pointer">
+              Fechar
+            </button>
+          </div>
+
+          <!-- FORMULÁRIO DE CADASTRO DE CLIENTE -->
+          <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-6 border-b border-slate-100 gap-4">
+              <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-sky-600 text-white rounded-xl shadow-lg shadow-sky-500/25">
+                  <i data-lucide="building-2" class="w-6 h-6"></i>
+                </div>
+                <div>
+                  <h2 id="cliFormTitleText" class="text-base font-bold text-slate-900">Cadastro de Clientes e Pontos de Atendimento</h2>
+                  <p class="text-xs text-slate-500">Gerenciamento de máquinas, locais e filiais responsáveis · Aba: Clientes</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs px-3 py-1 rounded-lg bg-sky-50 text-sky-800 font-semibold border border-sky-200 flex items-center gap-1.5">
+                  <i data-lucide="sheet" class="w-3.5 h-3.5 text-sky-600"></i> Aba "Clientes"
+                </span>
+              </div>
+            </div>
+
+            <form id="clienteForm" onsubmit="handleClienteSubmit(event)" class="space-y-6">
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-5 rounded-2xl bg-slate-50/90 border border-slate-200">
+                
+                <!-- Cliente -->
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Cliente *</label>
+                  <input type="text" id="cadCliCliente" placeholder="Ex: Embraer, Coca Cola..." required onblur="formatarNomeProprio(this)" class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Local -->
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Local *</label>
+                  <input type="text" id="cadCliLocal" placeholder="Ex: Fábrica 1, Administrativo..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Local interno -->
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Local interno *</label>
+                  <input type="text" id="cadCliLocalInterno" placeholder="Ex: Refeitório, Recepção, Bloco B..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Máquina -->
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Máquina *</label>
+                  <input type="text" id="cadCliMaquina" placeholder="Ex: Máquina 01, M05..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Modelo de máquina -->
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Modelo de máquina *</label>
+                  <input type="text" id="cadCliModeloMaquina" placeholder="Ex: Lei Saeco, Krea, Snaky..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Filial Responsavel -->
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Filial Responsavel *</label>
+                  <input list="listaSACCidades" id="cadCliFilial" placeholder="Ex: Ribeirão Preto, São Carlos..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+
+              </div>
+
+              <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button type="button" onclick="limparFormCliente()" class="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">
+                  Limpar Campos
+                </button>
+                <button type="submit" id="btnSalvarCliente" class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-sky-600 text-white text-xs font-bold shadow-lg shadow-sky-500/25 hover:bg-sky-700 transition cursor-pointer">
+                  <i data-lucide="save" class="w-4 h-4"></i>
+                  <span id="btnSalvarClienteText">Cadastrar Cliente</span>
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <!-- LISTA DE CLIENTES CADASTRADOS -->
+          <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+              <div>
+                <h2 class="text-base font-bold flex items-center gap-2 text-slate-800">
+                  <i data-lucide="users" class="w-4 h-4 text-sky-600"></i>
+                  Clientes Cadastrados
+                </h2>
+                <p class="text-xs text-slate-500">Base oficial de pontos sincronizada com a aba "Clientes"</p>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="relative">
+                  <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                  <input type="text" id="searchClientesCadastrados" placeholder="Buscar cliente, local, máquina, filial..." oninput="filtrarClientesCadastrados()" class="text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 w-64">
+                </div>
+                <span id="badgeContadorClientes" class="text-xs px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 font-bold border border-sky-200">
+                  0 cliente(s)
+                </span>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-50 uppercase font-semibold text-slate-500">
+                  <tr>
+                    <th class="py-2.5 px-3 rounded-l-lg w-24">Ações</th>
+                    <th class="py-2.5 px-3">Cliente</th>
+                    <th class="py-2.5 px-3">Local</th>
+                    <th class="py-2.5 px-3">Local interno</th>
+                    <th class="py-2.5 px-3">Máquina</th>
+                    <th class="py-2.5 px-3">Modelo de máquina</th>
+                    <th class="py-2.5 px-3 rounded-r-lg">Filial Responsavel</th>
+                  </tr>
+                </thead>
+                <tbody id="tableClientesBody" class="divide-y divide-slate-100">
+                  <tr>
+                    <td colspan="7" class="text-center py-6 text-slate-400 font-semibold">Nenhum cliente carregado.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
 
-        <!-- FORMULÁRIO DE CADASTRO DE CLIENTE -->
-        <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-6 border-b border-slate-100 gap-4">
-            <div class="flex items-center gap-3">
-              <div class="p-2.5 bg-sky-600 text-white rounded-xl shadow-lg shadow-sky-500/25">
-                <i data-lucide="building-2" class="w-6 h-6"></i>
-              </div>
-              <div>
-                <h2 id="cliFormTitleText" class="text-base font-bold text-slate-900">Cadastro de Clientes e Pontos de Atendimento</h2>
-                <p class="text-xs text-slate-500">Gerenciamento de máquinas, locais e filiais responsáveis · Aba: Clientes</p>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-xs px-3 py-1 rounded-lg bg-sky-50 text-sky-800 font-semibold border border-sky-200 flex items-center gap-1.5">
-                <i data-lucide="sheet" class="w-3.5 h-3.5 text-sky-600"></i> Aba "Clientes"
-              </span>
-            </div>
-          </div>
-
-          <form id="clienteForm" onsubmit="handleClienteSubmit(event)" class="space-y-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-5 rounded-2xl bg-slate-50/90 border border-slate-200">
-              
-              <!-- Cliente -->
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Cliente *</label>
-                <input type="text" id="cadCliCliente" placeholder="Ex: Embraer, Coca Cola..." required onblur="formatarNomeProprio(this)" class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-              </div>
-
-              <!-- Local -->
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Local *</label>
-                <input type="text" id="cadCliLocal" placeholder="Ex: Fábrica 1, Administrativo..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-              </div>
-
-              <!-- Local interno -->
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Local interno *</label>
-                <input type="text" id="cadCliLocalInterno" placeholder="Ex: Refeitório, Recepção, Bloco B..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-              </div>
-
-              <!-- Máquina -->
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Máquina *</label>
-                <input type="text" id="cadCliMaquina" placeholder="Ex: Máquina 01, M05..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-              </div>
-
-              <!-- Modelo de máquina -->
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Modelo de máquina *</label>
-                <input type="text" id="cadCliModeloMaquina" placeholder="Ex: Lei Saeco, Krea, Snaky..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-              </div>
-
-              <!-- Filial Responsavel -->
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Filial Responsavel *</label>
-                <input list="listaSACCidades" id="cadCliFilial" placeholder="Ex: Ribeirão Preto, São Carlos..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
-              </div>
-
-            </div>
-
-            <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-              <button type="button" onclick="limparFormCliente()" class="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">
-                Limpar Campos
-              </button>
-              <button type="submit" id="btnSalvarCliente" class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-sky-600 text-white text-xs font-bold shadow-lg shadow-sky-500/25 hover:bg-sky-700 transition cursor-pointer">
-                <i data-lucide="save" class="w-4 h-4"></i>
-                <span id="btnSalvarClienteText">Cadastrar Cliente</span>
-              </button>
-            </div>
-          </form>
-        </section>
-
-        <!-- LISTA DE CLIENTES CADASTRADOS -->
-        <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
-            <div>
-              <h2 class="text-base font-bold flex items-center gap-2 text-slate-800">
-                <i data-lucide="users" class="w-4 h-4 text-sky-600"></i>
-                Clientes Cadastrados
-              </h2>
-              <p class="text-xs text-slate-500">Base oficial de pontos sincronizada com a aba "Clientes"</p>
-            </div>
-            <div class="flex items-center gap-3">
-              <div class="relative">
-                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
-                <input type="text" id="searchClientesCadastrados" placeholder="Buscar cliente, local, máquina, filial..." oninput="filtrarClientesCadastrados()" class="text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 w-64">
-              </div>
-              <span id="badgeContadorClientes" class="text-xs px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 font-bold border border-sky-200">
-                0 cliente(s)
-              </span>
-            </div>
-          </div>
-
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-slate-600">
-              <thead class="bg-slate-50 uppercase font-semibold text-slate-500">
-                <tr>
-                  <th class="py-2.5 px-3 rounded-l-lg w-24">Ações</th>
-                  <th class="py-2.5 px-3">Cliente</th>
-                  <th class="py-2.5 px-3">Local</th>
-                  <th class="py-2.5 px-3">Local interno</th>
-                  <th class="py-2.5 px-3">Máquina</th>
-                  <th class="py-2.5 px-3">Modelo de máquina</th>
-                  <th class="py-2.5 px-3 rounded-r-lg">Filial Responsavel</th>
-                </tr>
-              </thead>
-              <tbody id="tableClientesBody" class="divide-y divide-slate-100">
-                <tr>
-                  <td colspan="7" class="text-center py-6 text-slate-400 font-semibold">Nenhum cliente carregado.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
       </div>
 
-    </div>
+    </main>
 
-  </main>
+  </div>
 
   <script>
     lucide.createIcons();
@@ -979,7 +1010,7 @@ html_code = f"""
     let chamadoEmEdicao = null;
     let clienteEmEdicao = null;
     
-    // VARIÁVEIS DE SESSÃO E PERMISSÃO
+    // VARIÁVEIS GLOBAIS DE SESSÃO
     let atendenteSACLogado = "";
     let loginUsuarioConectado = "";
     let nivelAcessoLogado = "";
@@ -991,17 +1022,101 @@ html_code = f"""
     }} catch(e) {{}}
 
     // =========================================================================
+    // CONTROLE DE SESSÃO GLOBAL DO SISTEMA
+    // =========================================================================
+    function verificarEstadoAutenticacao() {{
+      const loginScreen = document.getElementById('systemLoginScreen');
+      const appContainer = document.getElementById('systemAppContainer');
+
+      if (!atendenteSACLogado) {{
+        loginScreen.classList.remove('hidden');
+        appContainer.classList.add('hidden');
+      }} else {{
+        loginScreen.classList.add('hidden');
+        appContainer.classList.remove('hidden');
+
+        document.getElementById('labelHeaderAtendente').innerText = atendenteSACLogado;
+        document.getElementById('labelSACAtendenteLogado').innerText = atendenteSACLogado;
+        document.getElementById('sacAtendente').value = atendenteSACLogado;
+
+        aplicarRegrasDeAcesso();
+        inicializarFormularioSAC();
+        renderizarTabelaChamadosSAC();
+
+        let abaDesejada = 'dashboardSAC';
+        try {{
+          abaDesejada = sessionStorage.getItem('aba_ativa_atual') || 'dashboardSAC';
+        }} catch(e) {{}}
+
+        if (abaDesejada === 'cadastroClientes' && (nivelAcessoLogado || '').toLowerCase() !== 'geral') {{
+          abaDesejada = 'sac';
+        }}
+
+        switchPage(abaDesejada);
+      }}
+      lucide.createIcons();
+    }}
+
+    function realizarLoginGlobal(e) {{
+      e.preventDefault();
+      const u = (document.getElementById('globalLoginUser').value || '').trim();
+      const p = (document.getElementById('globalLoginPass').value || '').trim();
+      const erroBox = document.getElementById('globalLoginErro');
+
+      // Coluna B: Usuário | Coluna C: Senha
+      const userValido = dadosSAC.usuarios.find(x => 
+        (x.usuario || '').toLowerCase() === u.toLowerCase() && 
+        String(x.senha).trim() === p
+      );
+
+      if (userValido) {{
+        erroBox.classList.add('hidden');
+        // Coluna A: Nome do Atendente
+        atendenteSACLogado = userValido.nome || userValido.usuario;
+        loginUsuarioConectado = userValido.usuario;
+        // Coluna D: Acesso (Geral ou Atendente)
+        nivelAcessoLogado = userValido.acesso || "Atendente";
+
+        try {{
+          sessionStorage.setItem('sac_atendente_conectado', atendenteSACLogado);
+          sessionStorage.setItem('sac_usuario_login', loginUsuarioConectado);
+          sessionStorage.setItem('sac_nivel_acesso', nivelAcessoLogado);
+          sessionStorage.setItem('aba_ativa_atual', 'dashboardSAC');
+        }} catch(e) {{}}
+
+        verificarEstadoAutenticacao();
+      }} else {{
+        erroBox.classList.remove('hidden');
+      }}
+    }}
+
+    function realizarLogoutGlobal() {{
+      atendenteSACLogado = "";
+      loginUsuarioConectado = "";
+      nivelAcessoLogado = "";
+      try {{
+        sessionStorage.removeItem('sac_atendente_conectado');
+        sessionStorage.removeItem('sac_usuario_login');
+        sessionStorage.removeItem('sac_nivel_acesso');
+        sessionStorage.removeItem('aba_ativa_atual');
+      }} catch(e) {{}}
+      document.getElementById('globalLoginForm').reset();
+      verificarEstadoAutenticacao();
+    }}
+
+    // =========================================================================
     // ATUALIZAÇÃO DA INTERFACE BASEADA NO NÍVEL DE ACESSO
     // =========================================================================
     function aplicarRegrasDeAcesso() {{
       const btnCadastro = document.getElementById('navCadastroClientes');
       const badgeAcesso = document.getElementById('badgeNivelAcesso');
+      const badgeHeader = document.getElementById('badgeHeaderNivelAcesso');
       const containerCli = document.getElementById('containerAcessoClientes');
       const bloqueioCli = document.getElementById('bloqueioAcessoClientes');
 
       const ehGeral = (nivelAcessoLogado || '').trim().toLowerCase() === 'geral';
 
-      if (atendenteSACLogado && ehGeral) {{
+      if (ehGeral) {{
         if (btnCadastro) btnCadastro.classList.remove('hidden');
         if (containerCli) containerCli.classList.remove('hidden');
         if (bloqueioCli) bloqueioCli.classList.add('hidden');
@@ -1009,14 +1124,22 @@ html_code = f"""
           badgeAcesso.innerText = "Geral";
           badgeAcesso.className = "text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200";
         }}
+        if (badgeHeader) {{
+          badgeHeader.innerText = "Geral";
+          badgeHeader.className = "text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block";
+        }}
       }} else {{
-        // Perfil Atendente ou deslogado
+        // Perfil Atendente: Esconde totalmente o cadastro de clientes
         if (btnCadastro) btnCadastro.classList.add('hidden');
         if (containerCli) containerCli.classList.add('hidden');
         if (bloqueioCli) bloqueioCli.classList.remove('hidden');
         if (badgeAcesso) {{
           badgeAcesso.innerText = "Atendente";
           badgeAcesso.className = "text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200";
+        }}
+        if (badgeHeader) {{
+          badgeHeader.innerText = "Atendente";
+          badgeHeader.className = "text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 inline-block";
         }}
       }}
     }}
@@ -1220,7 +1343,7 @@ html_code = f"""
     // NAVEGAÇÃO ENTRE PÁGINAS
     // =========================================================================
     function switchPage(page) {{
-      // Se não for Geral, bloqueia a ida para o cadastro de clientes
+      // Bloqueio de segurança: Se for Atendente tentando acessar o cadastro
       if (page === 'cadastroClientes' && (nivelAcessoLogado || '').trim().toLowerCase() !== 'geral') {{
         alert('⛔ Acesso Restrito:\\nSeu perfil não tem permissão para cadastrar ou gerenciar clientes.');
         switchPage('sac');
@@ -1261,8 +1384,6 @@ html_code = f"""
 
       if (page === 'dashboardSAC') {{
         atualizarDashboardSAC();
-      }} else if (page === 'sac') {{
-        verificarSessaoSAC();
       }} else if (page === 'cadastroClientes') {{
         aplicarRegrasDeAcesso();
         renderizarTabelaClientes();
@@ -1272,74 +1393,8 @@ html_code = f"""
     }}
 
     // =========================================================================
-    // ROTINAS SAC E AUTENTICAÇÃO COM COLUNAS A, B, C E D
+    // ROTINAS SAC
     // =========================================================================
-    function verificarSessaoSAC() {{
-      const authScreen = document.getElementById('sacAuthScreen');
-      const mainPanel = document.getElementById('sacMainPanel');
-
-      if (atendenteSACLogado) {{
-        authScreen.classList.add('hidden');
-        mainPanel.classList.remove('hidden');
-        document.getElementById('labelSACAtendenteLogado').innerText = atendenteSACLogado;
-        document.getElementById('sacAtendente').value = atendenteSACLogado;
-        aplicarRegrasDeAcesso();
-        inicializarFormularioSAC();
-        renderizarTabelaChamadosSAC();
-      }} else {{
-        authScreen.classList.remove('hidden');
-        mainPanel.classList.add('hidden');
-        aplicarRegrasDeAcesso();
-      }}
-    }}
-
-    function realizarLoginSAC(e) {{
-      e.preventDefault();
-      const u = (document.getElementById('sacLoginUser').value || '').trim();
-      const p = (document.getElementById('sacLoginPass').value || '').trim();
-      const erroBox = document.getElementById('sacLoginErro');
-
-      // Coluna B: Usuario | Coluna C: Senha
-      const userValido = dadosSAC.usuarios.find(x => 
-        (x.usuario || '').toLowerCase() === u.toLowerCase() && 
-        String(x.senha).trim() === p
-      );
-
-      if (userValido) {{
-        erroBox.classList.add('hidden');
-        // Coluna A: Nome do atendente
-        atendenteSACLogado = userValido.nome || userValido.usuario;
-        loginUsuarioConectado = userValido.usuario;
-        // Coluna D: Nível de Acesso (Geral ou Atendente)
-        nivelAcessoLogado = userValido.acesso || "Atendente";
-
-        try {{
-          sessionStorage.setItem('sac_atendente_conectado', atendenteSACLogado);
-          sessionStorage.setItem('sac_usuario_login', loginUsuarioConectado);
-          sessionStorage.setItem('sac_nivel_acesso', nivelAcessoLogado);
-        }} catch(e) {{}}
-
-        aplicarRegrasDeAcesso();
-        verificarSessaoSAC();
-      }} else {{
-        erroBox.classList.remove('hidden');
-      }}
-    }}
-
-    function realizarLogoutSAC() {{
-      atendenteSACLogado = "";
-      loginUsuarioConectado = "";
-      nivelAcessoLogado = "";
-      try {{
-        sessionStorage.removeItem('sac_atendente_conectado');
-        sessionStorage.removeItem('sac_usuario_login');
-        sessionStorage.removeItem('sac_nivel_acesso');
-      }} catch(e) {{}}
-      document.getElementById('sacLoginForm').reset();
-      aplicarRegrasDeAcesso();
-      verificarSessaoSAC();
-    }}
-
     function calcularPreviaProximoChamado(ano) {{
       let maior = dadosSAC.maior_sac_ano[ano] || 0;
       listaChamadosSAC.forEach(c => {{
@@ -2198,18 +2253,9 @@ html_code = f"""
     }});
 
     // =========================================================================
-    // INICIALIZAÇÃO DA ABA ATIVA
+    // DISPARO INICIAL
     // =========================================================================
-    let abaInicial = 'dashboardSAC';
-    try {{
-      abaInicial = sessionStorage.getItem('aba_ativa_atual') || 'dashboardSAC';
-      if (abaInicial !== 'dashboardSAC' && abaInicial !== 'sac' && abaInicial !== 'cadastroClientes') {{
-        abaInicial = 'dashboardSAC';
-      }}
-    }} catch(e) {{}}
-    
-    aplicarRegrasDeAcesso();
-    switchPage(abaInicial);
+    verificarEstadoAutenticacao();
   </script>
 </body>
 </html>
