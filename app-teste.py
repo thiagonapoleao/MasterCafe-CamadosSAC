@@ -821,9 +821,9 @@ html_code = f"""
                   <input type="text" id="sacAtendente" readonly class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-slate-700 cursor-not-allowed">
                 </div>
 
-                <!-- NOVO CAMPO: Observação (Coluna U) -->
+                <!-- Observação -->
                 <div class="md:col-span-2 lg:col-span-2">
-                  <label class="block text-xs font-bold text-indigo-900 mb-1">Observação (Coluna U)</label>
+                  <label class="block text-xs font-bold text-indigo-900 mb-1">Observação</label>
                   <input type="text" id="sacObservacao" placeholder="Notas, histórico de contato ou detalhes adicionais..." class="w-full text-sm rounded-xl border border-indigo-200 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
 
