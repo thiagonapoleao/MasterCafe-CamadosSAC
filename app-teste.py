@@ -440,7 +440,7 @@ html_code = f"""
         </div>
       </section>
 
-      <!-- GRÁFICOS DO DASHBOARD SAC (SEM A TABELA ABAIXO) -->
+      <!-- GRÁFICOS DO DASHBOARD SAC -->
       <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
           <div class="flex items-center justify-between mb-3">
@@ -576,14 +576,14 @@ html_code = f"""
                 <input type="date" id="sacData" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
               </div>
 
-              <!-- Cliente -->
+              <!-- Cliente (Travado na pré-lista) -->
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Cliente *</label>
-                <input list="listaSACClientes" id="sacCliente" placeholder="Selecione o cliente..." required onchange="aoMudarClienteSAC()" oninput="aoMudarClienteSAC()" class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <input list="listaSACClientes" id="sacCliente" placeholder="Selecione o cliente..." required onchange="validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente', true)" onblur="validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente', true)" class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 <datalist id="listaSACClientes"></datalist>
               </div>
 
-              <!-- Local Interno (Filtro por cliente) -->
+              <!-- Local Interno (Filtro rígido do cliente) -->
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Local Interno *</label>
                 <select id="sacLocalInterno" required onchange="aoMudarLocalInternoSAC()" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
@@ -591,17 +591,17 @@ html_code = f"""
                 </select>
               </div>
 
-              <!-- Cidade com fallback em pré-lista da aba Dados coluna E -->
+              <!-- Cidade (Travada na pré-lista da aba Dados coluna E) -->
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Cidade *</label>
-                <input list="listaSACCidades" id="sacCidade" placeholder="Cidade do atendimento..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <input list="listaSACCidades" id="sacCidade" placeholder="Cidade do atendimento..." required onchange="validarInputComLista('sacCidade', 'listaSACCidades', 'Cidade')" onblur="validarInputComLista('sacCidade', 'listaSACCidades', 'Cidade')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 <datalist id="listaSACCidades"></datalist>
               </div>
 
-              <!-- Descrição -->
+              <!-- Descrição (Travada na pré-lista) -->
               <div class="md:col-span-2 lg:col-span-3">
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Descrição *</label>
-                <input list="listaSACDescricoes" id="sacDescricao" placeholder="Selecione ou digite a descrição do ocorrido..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <input list="listaSACDescricoes" id="sacDescricao" placeholder="Selecione a descrição do ocorrido..." required onchange="validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição')" onblur="validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 <datalist id="listaSACDescricoes"></datalist>
               </div>
 
@@ -645,17 +645,17 @@ html_code = f"""
                 <input type="text" id="sacCelular" placeholder="(00) 00000-0000" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
               </div>
 
-              <!-- Problemas -->
+              <!-- Problemas (Travado na pré-lista) -->
               <div class="md:col-span-2">
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Problemas *</label>
-                <input list="listaSACProblemas" id="sacProblema" placeholder="Selecione ou digite o problema..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <input list="listaSACProblemas" id="sacProblema" placeholder="Selecione o problema..." required onchange="validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas')" onblur="validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 <datalist id="listaSACProblemas"></datalist>
               </div>
 
-              <!-- Forma de Pagamento -->
+              <!-- Forma de Pagamento (Travada na pré-lista) -->
               <div class="md:col-span-2">
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Forma de Pagamento *</label>
-                <input list="listaSACFormasPgto" id="sacFormaPgto" placeholder="Selecione a forma de pagamento..." required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <input list="listaSACFormasPgto" id="sacFormaPgto" placeholder="Selecione a forma de pagamento..." required onchange="validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento')" onblur="validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 <datalist id="listaSACFormasPgto"></datalist>
               </div>
 
@@ -764,6 +764,42 @@ html_code = f"""
       atendenteSACLogado = sessionStorage.getItem('sac_atendente_conectado') || "";
     }} catch(e) {{}}
 
+    // =========================================================================
+    // TRAVAMENTO RÍGIDO DE PRÉ-LISTA
+    // =========================================================================
+    function obterValoresDeDatalist(datalistId) {{
+      const dl = document.getElementById(datalistId);
+      if (!dl) return [];
+      return Array.from(dl.options).map(opt => (opt.value || '').trim());
+    }}
+
+    function validarInputComLista(inputId, datalistId, nomeAmigavel, dispararCascataCliente = false) {{
+      const input = document.getElementById(inputId);
+      if (!input) return false;
+      const valor = (input.value || '').trim();
+      if (!valor) return true;
+
+      const opcoesValidas = obterValoresDeDatalist(datalistId);
+      const achado = opcoesValidas.find(item => item.toLowerCase() === valor.toLowerCase());
+
+      if (!achado) {{
+        alert('⛔ Bloqueio de Segurança:\\nO valor digitado no campo "' + nomeAmigavel + '" não está cadastrado na base de dados.\\nPor favor, selecione exclusivamente um dos itens disponíveis na listagem.');
+        input.value = '';
+        if (dispararCascataCliente) {{
+          document.getElementById('sacLocalInterno').innerHTML = '<option value="">Selecione primeiro o Cliente...</option>';
+          document.getElementById('sacCidade').value = '';
+        }}
+        setTimeout(() => {{ input.focus(); }}, 50);
+        return false;
+      }} else {{
+        input.value = achado;
+        if (dispararCascataCliente) {{
+          aoMudarClienteSAC();
+        }}
+        return true;
+      }}
+    }}
+
     // CONTROLE DINÂMICO DE MODAL DE PROCESSAMENTO
     function abrirModalLoading(titulo, subtitulo, tipoAcao = 'loading') {{
       const modal = document.getElementById('modalLoadingAcao');
@@ -805,7 +841,7 @@ html_code = f"""
       if (modal) modal.classList.add('hidden');
     }}
 
-    // EXIBE MENSAGEM NO BANNER DO TOPO COM ATUALIZAÇÃO DE TIPO (LANÇAMENTO, EDIÇÃO OU EXCLUSÃO)
+    // EXIBE MENSAGEM NO BANNER DO TOPO COM ATUALIZAÇÃO DE TIPO
     function exibirMensagemTopo(titulo, subtitulo, tipo = 'sucesso') {{
       const alertBox = document.getElementById('alertSACSuccess');
       const alertTitle = document.getElementById('alertSACSuccessTitle');
@@ -1277,6 +1313,36 @@ html_code = f"""
     function handleSACSubmit(e) {{
       e.preventDefault();
 
+      // VALIDAÇÕES RÍGIDAS DE PRÉ-LISTA ANTES DO SUBMIT
+      const cliValido = validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente');
+      if (!cliValido) return;
+
+      const selectLocal = document.getElementById('sacLocalInterno');
+      if (!selectLocal.value) {{
+        alert('⛔ Bloqueio de Segurança:\\nPor favor, selecione um Local Interno vinculado ao cliente.');
+        selectLocal.focus();
+        return;
+      }}
+
+      const cidValida = validarInputComLista('sacCidade', 'listaSACCidades', 'Cidade');
+      if (!cidValida) return;
+
+      const descValida = validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição');
+      if (!descValida) return;
+
+      const probValido = validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas');
+      if (!probValido) return;
+
+      const pgtoValido = validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento');
+      if (!pgtoValido) return;
+
+      const selectProduto = document.getElementById('sacProduto');
+      if (!selectProduto.value) {{
+        alert('⛔ Bloqueio de Segurança:\\nPor favor, selecione o Produto (Café ou Snaky).');
+        selectProduto.focus();
+        return;
+      }}
+
       const ehEdicao = (chamadoEmEdicao !== null);
       let chamado = document.getElementById('sacChamado').value.trim();
       const anoAtual = new Date().getFullYear();
@@ -1406,7 +1472,7 @@ html_code = f"""
     }}
 
     // =========================================================================
-    // DASHBOARD SAC (SOMENTE GRÁFICOS E KPIS - LISTA REMOVIDA)
+    // DASHBOARD SAC
     // =========================================================================
     const filterSACCliente = document.getElementById('filterSACCliente');
     const filterSACProduto = document.getElementById('filterSACProduto');
