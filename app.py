@@ -197,13 +197,12 @@ def carregar_dados_sac():
             col_nome_atend = get_col(["Nome/Sobrenome", "Nome", "nomeSobrenome"]) or (cols[10] if len(cols) > 10 else "")
             col_cel = get_col(["Celular", "celular"]) or (cols[11] if len(cols) > 11 else "")
             col_prob = get_col(["Problemas", "Problema", "problemas"]) or (cols[12] if len(cols) > 12 else "")
-            col_pag = get_col(["Forma de Pagamento", "Forma Pagamento", "formaPgto"]) or (cols[13] if len(cols) > 13 else "")
+            col_pag = get_col(["Forma de Pagamento", "Forma Pagamento", "formaPgto", "forma de pagamento"]) or (cols[13] if len(cols) > 13 else "")
             col_reemb = get_col(["Reembolso", "reembolso", "Reebolso"])
             col_pix = get_col(["Pix - Reembolso", "Pix", "pix"])
             col_atend = get_col(["Atendente", "atendente"])
             col_dthr = get_col(["Data/Hora do lançamento", "Data/Hora", "dataHoraLancamento"])
             
-            # Reconhecimento amplo da Coluna S (Reembolso Realizado)
             col_reemb_realizado = get_col([
                 "Reembolso Realizado", "reembolsoRealizado", "Reembolso Realizado?", 
                 "Reemb. Pago?", "Reemb Pago", "Reembolso Pago", "Pago", "reembolso_realizado"
@@ -211,7 +210,6 @@ def carregar_dados_sac():
             if not col_reemb_realizado and len(cols) >= 19:
                 col_reemb_realizado = cols[18]
 
-            # Reconhecimento do Financeiro Responsável (Coluna T)
             col_fin_resp = get_col([
                 "Financeiro Responsavel", "Financeiro Responsável", "financeiroResponsavel",
                 "Financeiro", "Resp Financeiro", "Resp. Financeiro"
@@ -219,7 +217,6 @@ def carregar_dados_sac():
             if not col_fin_resp and len(cols) >= 20:
                 col_fin_resp = cols[19]
 
-            # Reconhecimento da Observação (Coluna U)
             col_obs = get_col([
                 "Observação", "Observacao", "observacao", "observação", 
                 "Observações", "Observacoes", "Obs", "obs"
@@ -329,7 +326,6 @@ html_code = f"""
       border: 1px solid #e2e8f0; 
     }}
 
-    /* TABELA COM LARGURA RIGOROSAMENTE FIXADA PARA NÃO TRANSBORDAR O CARD */
     .table-fixed-layout {{
       table-layout: fixed !important;
       width: 100% !important;
@@ -355,7 +351,7 @@ html_code = f"""
     <input type="hidden" name="data" id="hiddenSACSubmissionData">
   </form>
 
-  <!-- MODAL DE PROCESSAMENTO / AÇÃO EM ANDAMENTO -->
+  <!-- MODAL DE PROCESSAMENTO -->
   <div id="modalLoadingAcao" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl border border-slate-100 flex flex-col items-center text-center space-y-4 animate-in fade-in zoom-in duration-200">
       <div id="modalIconContainer" class="w-16 h-16 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shadow-inner">
@@ -376,10 +372,9 @@ html_code = f"""
     </div>
   </div>
 
-  <!-- TELA INICIAL DE LOGIN DO SISTEMA (NO TOPO DA PÁGINA) -->
+  <!-- TELA INICIAL DE LOGIN -->
   <div id="systemLoginScreen" class="w-full flex justify-center pt-8 sm:pt-12 px-4 pb-12">
     <div class="max-w-md w-full bg-white p-8 sm:p-10 rounded-3xl border border-slate-200 shadow-2xl space-y-6">
-      
       <div class="text-center space-y-3">
         <div class="inline-flex items-center justify-center p-2 bg-white rounded-2xl border border-slate-200 shadow-sm mx-auto overflow-hidden" style="height: 64px; min-width: 64px;">
           <img src="{logo_base64_src}" alt="Logotipo" class="max-h-12 w-auto object-contain" onerror="this.style.display='none'; document.getElementById('loginFallbackIcon').style.display='flex';">
@@ -411,17 +406,11 @@ html_code = f"""
           Entrar no Sistema
         </button>
       </form>
-
-      <div class="pt-2 border-t border-slate-100 text-center">
-        <span class="text-[11px] text-slate-400">Validação oficial por níveis de acesso: <strong class="text-slate-600">Geral</strong> e <strong class="text-slate-600">Atendente</strong></span>
-      </div>
     </div>
   </div>
 
   <!-- CONTAINER DO SISTEMA LOGADO -->
   <div id="systemAppContainer" class="hidden">
-
-    <!-- Cabeçalho Superior -->
     <header class="sticky top-0 z-40 bg-white/95 border-b border-slate-200 backdrop-blur-md px-6 py-3">
       <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
         <div class="flex items-center gap-4">
@@ -439,7 +428,6 @@ html_code = f"""
           </div>
         </div>
         
-        <!-- Navegação Entre Páginas e Informações do Atendente -->
         <div class="flex items-center gap-3 flex-wrap">
           <div class="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 flex-wrap">
             <button id="navDashboardSAC" type="button" class="nav-btn active flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('dashboardSAC')">
@@ -450,19 +438,14 @@ html_code = f"""
               <i data-lucide="headphones" class="w-4 h-4"></i>
               Lançamento SAC
             </button>
-            
-            <!-- ABA: CHAMADOS ABERTOS -->
             <button id="navChamadosAbertos" type="button" class="nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('chamadosAbertos')">
               <i data-lucide="inbox" class="w-4 h-4"></i>
               Chamados Abertos
             </button>
-
-            <!-- BOTÃO COM LIBERAÇÃO POR PERMISSÃO: SÓ APARECE PARA ACESSO GERAL -->
             <button id="navCadastroClientes" type="button" class="hidden nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('cadastroClientes')">
               <i data-lucide="user-plus" class="w-4 h-4"></i>
               Cadastro de Clientes
             </button>
-
             <button type="button" onclick="executarRefresh()" title="Clique para recarregar da planilha" class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 cursor-pointer transition">
               <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span> Sincronizar 🔄
             </button>
@@ -481,10 +464,11 @@ html_code = f"""
       </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 space-y-4">
+    <main class="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 space-y-6">
 
       <!-- PÁGINA 1: DASHBOARD SAC -->
       <div id="pageDashboardSAC" class="space-y-6">
+        <!-- FILTROS GERAIS -->
         <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
@@ -501,7 +485,6 @@ html_code = f"""
                 <option value="ALL">Todos os Clientes</option>
               </select>
             </div>
-
             <div>
               <label class="block text-xs font-medium text-slate-500 mb-1">Produto</label>
               <select id="filterSACProduto" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-slate-800">
@@ -510,14 +493,12 @@ html_code = f"""
                 <option value="Snaky">Snaky</option>
               </select>
             </div>
-
             <div>
               <label class="block text-xs font-medium text-slate-500 mb-1">Atendente</label>
               <select id="filterSACAtendente" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-slate-800">
                 <option value="ALL">Todos os Atendentes</option>
               </select>
             </div>
-
             <div class="flex items-end">
               <button id="btnLimparFiltrosSAC" class="w-full py-2 px-4 rounded-xl border border-slate-300 bg-slate-100 text-xs font-semibold text-slate-600 hover:bg-slate-200 transition flex items-center justify-center gap-1.5 cursor-pointer">
                 <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
@@ -547,7 +528,7 @@ html_code = f"""
             </div>
             <div class="mt-3">
               <span id="kpiSACValorTotal" class="text-xl font-bold tracking-tight text-emerald-600">R$ 0,00</span>
-              <p class="text-[11px] text-slate-400 mt-0.5">Soma total de reembolsos</p>
+              <p class="text-[11px] text-slate-400 mt-0.5">Soma coluna J (Valor)</p>
             </div>
           </div>
 
@@ -602,7 +583,7 @@ html_code = f"""
           </div>
         </section>
 
-        <!-- GRÁFICOS DO DASHBOARD SAC -->
+        <!-- GRÁFICOS: TOP PROBLEMAS & ATENDENTES -->
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex items-center justify-between mb-3">
@@ -611,7 +592,7 @@ html_code = f"""
                   <i data-lucide="bar-chart-2" class="w-4 h-4 text-sky-600"></i>
                   Top 10 Problemas Mais Frequentes
                 </h3>
-                <p class="text-xs text-slate-400">Classificação de ocorrências recorrentes no SAC</p>
+                <p class="text-xs text-slate-400">Classificação de ocorrências no SAC</p>
               </div>
               <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200">Ocorrências</span>
             </div>
@@ -625,22 +606,177 @@ html_code = f"""
                   <i data-lucide="users" class="w-4 h-4 text-emerald-600"></i>
                   Chamados por Atendente
                 </h3>
-                <p class="text-xs text-slate-400">Volume de atendimentos realizados por operador</p>
+                <p class="text-xs text-slate-400">Volume de atendimentos realizados</p>
               </div>
               <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Volume</span>
             </div>
             <div class="relative h-80"><canvas id="chartAtendentesSAC"></canvas></div>
           </div>
         </section>
+
+        <!-- SEPARADOS: TOP 5 LOCAIS NO MÊS ANTERIOR & TOP 5 LOCAIS NO MÊS ATUAL -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Top 5 Locais Internos: Mês Anterior -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+              <div>
+                <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                  <i data-lucide="calendar-arrow-down" class="w-4 h-4 text-slate-600"></i>
+                  Top 5 Locais: Mês Anterior
+                </h3>
+                <p class="text-xs text-slate-400">Ranking dos 5 locais mais demandados no mês anterior</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="text-[11px] font-bold text-slate-500">Mês Anterior:</label>
+                <input type="month" id="filterMesLocaisAnterior" onchange="atualizarGraficoLocaisAnterior()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2 py-1 text-slate-700">
+              </div>
+            </div>
+            <div class="relative h-80"><canvas id="chartLocaisAnterior"></canvas></div>
+          </div>
+
+          <!-- Top 5 Locais Internos: Mês Atual -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+              <div>
+                <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                  <i data-lucide="calendar-check" class="w-4 h-4 text-indigo-600"></i>
+                  Top 5 Locais: Mês Atual
+                </h3>
+                <p class="text-xs text-slate-400">Ranking dos 5 locais mais demandados no mês atual</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="text-[11px] font-bold text-slate-500">Mês Atual:</label>
+                <input type="month" id="filterMesLocaisAtual" onchange="atualizarGraficoLocaisAtual()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2 py-1 text-slate-700">
+              </div>
+            </div>
+            <div class="relative h-80"><canvas id="chartLocaisAtual"></canvas></div>
+          </div>
+        </section>
+
+        <!-- SEPARADOS: CHAMADOS POR MÊS (QUANTIDADE) & CHAMADOS POR MÊS (VALORES R$) -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Quantidade de Chamados por Mês -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+              <div>
+                <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                  <i data-lucide="bar-chart" class="w-4 h-4 text-sky-600"></i>
+                  Chamados por Mês (Quantidade)
+                </h3>
+                <p class="text-xs text-slate-400">Total mensal de ocorrências registradas</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="text-[11px] font-bold text-slate-500">Ano:</label>
+                <select id="filterAnoMesesQtd" onchange="atualizarGraficoMesesQtd()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1 text-slate-700 font-semibold"></select>
+              </div>
+            </div>
+            <div class="relative h-80"><canvas id="chartMesesQtd"></canvas></div>
+          </div>
+
+          <!-- Valores de Chamados por Mês (R$) - AGORA EM BARRAS -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+              <div>
+                <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                  <i data-lucide="badge-dollar-sign" class="w-4 h-4 text-emerald-600"></i>
+                  Valores Ressarcidos por Mês (R$)
+                </h3>
+                <p class="text-xs text-slate-400">Total financeiro mensal reembolsado</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="text-[11px] font-bold text-slate-500">Ano:</label>
+                <select id="filterAnoMesesVal" onchange="atualizarGraficoMesesVal()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1 text-slate-700 font-semibold"></select>
+              </div>
+            </div>
+            <div class="relative h-80"><canvas id="chartMesesVal"></canvas></div>
+          </div>
+        </section>
+
+        <!-- SEPARADOS: CHAMADOS POR DIA (QUANTIDADE) & CHAMADOS POR DIA (VALORES R$) -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Quantidade de Chamados por Dia (Dias Preenchidos) -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+              <div>
+                <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                  <i data-lucide="calendar-days" class="w-4 h-4 text-sky-600"></i>
+                  Chamados por Dia (Quantidade)
+                </h3>
+                <p class="text-xs text-slate-400">Dias com atendimentos registrados no mês</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="text-[11px] font-bold text-slate-500">Mês:</label>
+                <input type="month" id="filterMesDiasQtd" onchange="atualizarGraficoDiasQtd()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2 py-1 text-slate-700">
+              </div>
+            </div>
+            <div class="relative h-80"><canvas id="chartDiasQtd"></canvas></div>
+          </div>
+
+          <!-- Valores de Chamados por Dia (R$) - AGORA EM BARRAS & DIAS PREENCHIDOS -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+              <div>
+                <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                  <i data-lucide="trending-up" class="w-4 h-4 text-amber-600"></i>
+                  Valores por Dia (R$)
+                </h3>
+                <p class="text-xs text-slate-400">Dias com reembolsos registrados no mês</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="text-[11px] font-bold text-slate-500">Mês:</label>
+                <input type="month" id="filterMesDiasVal" onchange="atualizarGraficoDiasVal()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2 py-1 text-slate-700">
+              </div>
+            </div>
+            <div class="relative h-80"><canvas id="chartDiasVal"></canvas></div>
+          </div>
+        </section>
+
+        <!-- TOP 10 LOCAIS NA SEMANA/PERÍODO & TOP 3 LOCAIS POR FILIAL -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Top 10 Locais na Semana / Período -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+              <div>
+                <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                  <i data-lucide="map-pin" class="w-4 h-4 text-rose-600"></i>
+                  Top 10 Locais na Semana (Período)
+                </h3>
+                <p class="text-xs text-slate-400">Foco dinâmico padrão nos últimos 7 dias</p>
+              </div>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <input type="date" id="filterTopSemanaDtIni" onchange="atualizarGraficoTopSemana()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2 py-1 text-slate-700">
+                <span class="text-xs text-slate-400">até</span>
+                <input type="date" id="filterTopSemanaDtFim" onchange="atualizarGraficoTopSemana()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2 py-1 text-slate-700">
+              </div>
+            </div>
+            <div class="relative h-80"><canvas id="chartTop10Semana"></canvas></div>
+          </div>
+
+          <!-- Top 3 Locais por Filial -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+              <div>
+                <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                  <i data-lucide="building-2" class="w-4 h-4 text-amber-600"></i>
+                  Top 3 Locais por Filial (Período)
+                </h3>
+                <p class="text-xs text-slate-400">Locais com maior volume por filial responsável</p>
+              </div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <select id="filterTopFilialSelect" onchange="atualizarGraficoTopFilial()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2 py-1 text-slate-700 font-semibold"></select>
+                <input type="date" id="filterTopFilialDtIni" onchange="atualizarGraficoTopFilial()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2 py-1 text-slate-700">
+                <span class="text-xs text-slate-400">até</span>
+                <input type="date" id="filterTopFilialDtFim" onchange="atualizarGraficoTopFilial()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2 py-1 text-slate-700">
+              </div>
+            </div>
+            <div class="relative h-80"><canvas id="chartTop3Filial"></canvas></div>
+          </div>
+        </section>
       </div>
 
       <!-- PÁGINA 2: LANÇAMENTO SAC -->
       <div id="pageSAC" class="hidden space-y-4">
-
-        <!-- PAINEL DO FORMULÁRIO DO SAC -->
         <div id="sacMainPanel" class="space-y-4">
-
-          <!-- ALERTA DE EDIÇÃO DE CHAMADO -->
           <div id="alertSACEditMode" class="hidden p-3 sm:p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex justify-between items-center shadow-sm">
             <div class="flex items-center gap-3">
               <div class="p-2 bg-amber-500 text-white rounded-xl"><i data-lucide="edit-3" class="w-5 h-5"></i></div>
@@ -654,7 +790,6 @@ html_code = f"""
             </button>
           </div>
 
-          <!-- MENSAGEM NO TOPO DINÂMICA (SUCESSO / EDIÇÃO / EXCLUSÃO) -->
           <div id="alertSACSuccess" class="hidden p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm transition">
             <div class="flex items-center gap-3">
               <div id="alertSACIconBadge" class="p-2 bg-emerald-600 text-white rounded-xl">
@@ -697,50 +832,36 @@ html_code = f"""
 
             <form id="sacForm" onsubmit="handleSACSubmit(event)" class="space-y-4">
               <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 p-3.5 sm:p-4 rounded-2xl bg-slate-50/90 border border-slate-200">
-                
-                <!-- Chamado com Trava Atômica e Prévia de Numeração -->
                 <div>
                   <label class="block text-xs font-bold text-sky-900 mb-1">Chamado (Automático) *</label>
                   <input type="text" id="sacChamado" readonly class="w-full text-sm font-mono font-black rounded-xl border border-sky-300 bg-white px-3 py-1.5 text-sky-700 cursor-not-allowed shadow-inner" placeholder="[Automático do Servidor]">
                   <span class="text-[10px] text-slate-400 mt-0.5 block">🔒 Número atômico gerado no envio</span>
                 </div>
-
-                <!-- Data do Chamado -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Data *</label>
                   <input type="date" id="sacData" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-
-                <!-- Cliente -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Cliente *</label>
                   <input list="listaSACClientes" id="sacCliente" placeholder="Selecione o cliente..." required onchange="validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente', true)" onblur="validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente', true)" class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                   <datalist id="listaSACClientes"></datalist>
                 </div>
-
-                <!-- Local Interno -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Local Interno *</label>
                   <select id="sacLocalInterno" required onchange="aoMudarLocalInternoSAC()" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                     <option value="">Selecione primeiro o Cliente...</option>
                   </select>
                 </div>
-
-                <!-- Filial Responsável -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Filial Responsável *</label>
                   <input list="listaSACCidades" id="sacCidade" placeholder="Filial de atendimento..." required onchange="validarInputComLista('sacCidade', 'listaSACCidades', 'Filial Responsável')" onblur="validarInputComLista('sacCidade', 'listaSACCidades', 'Filial Responsável')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                   <datalist id="listaSACCidades"></datalist>
                 </div>
-
-                <!-- Descrição -->
                 <div class="md:col-span-2 lg:col-span-3">
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Descrição *</label>
                   <input list="listaSACDescricoes" id="sacDescricao" placeholder="Selecione a descrição do ocorrido..." required onchange="validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição')" onblur="validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                   <datalist id="listaSACDescricoes"></datalist>
                 </div>
-
-                <!-- Produto -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Produto *</label>
                   <select id="sacProduto" required class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
@@ -749,52 +870,36 @@ html_code = f"""
                     <option value="Snaky">Snaky</option>
                   </select>
                 </div>
-
-                <!-- Data da Transação -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Data da Transação *</label>
                   <input type="date" id="sacDataTransacao" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-
-                <!-- Hora da Transação -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Hora da Transação *</label>
                   <input type="time" id="sacHoraTransacao" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-
-                <!-- Valor (R$) -->
                 <div>
                   <label class="block text-xs font-semibold text-emerald-800 mb-1">Valor (R$) *</label>
                   <input type="number" step="0.01" min="0" id="sacValor" placeholder="0,00" required class="w-full text-sm font-bold rounded-xl border border-emerald-300 bg-white px-3 py-1.5 text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
-
-                <!-- Nome / Sobrenome -->
                 <div class="md:col-span-2">
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Nome / Sobrenome *</label>
                   <input type="text" id="sacNome" placeholder="Ex: João Da Silva" required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-
-                <!-- Celular -->
                 <div class="md:col-span-2">
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Celular *</label>
                   <input type="text" id="sacCelular" placeholder="(00) 00000-0000" required class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-
-                <!-- Problemas -->
                 <div class="md:col-span-2">
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Problemas *</label>
                   <input list="listaSACProblemas" id="sacProblema" placeholder="Selecione o problema..." required onchange="validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas')" onblur="validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                   <datalist id="listaSACProblemas"></datalist>
                 </div>
-
-                <!-- Forma de Pagamento -->
                 <div class="md:col-span-2">
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Forma de Pagamento *</label>
                   <input list="listaSACFormasPgto" id="sacFormaPgto" placeholder="Selecione a forma de pagamento..." required onchange="validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento')" onblur="validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento')" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                   <datalist id="listaSACFormasPgto"></datalist>
                 </div>
-
-                <!-- Reembolso (Começa limpo com pré-lista atualizada) -->
                 <div class="md:col-span-2">
                   <label class="block text-xs font-bold text-sky-900 mb-1">Reembolso</label>
                   <select id="sacReembolso" class="w-full text-sm font-semibold rounded-xl border border-sky-300 bg-white px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
@@ -804,14 +909,10 @@ html_code = f"""
                     <option value="Crédito Remoto">Crédito Remoto</option>
                   </select>
                 </div>
-
-                <!-- Pix - Reembolso -->
                 <div class="md:col-span-2">
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Pix - Reembolso</label>
                   <input type="text" id="sacPix" placeholder="Chave Pix (CPF, Celular, E-mail ou Aleatória)..." class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-
-                <!-- Reembolso Realizado (Coluna S) -->
                 <div>
                   <label class="block text-xs font-bold text-emerald-800 mb-1">Reembolso Realizado? *</label>
                   <select id="sacReembolsoRealizado" required class="w-full text-sm font-bold rounded-xl border border-emerald-300 bg-white px-3 py-1.5 text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm">
@@ -819,25 +920,18 @@ html_code = f"""
                     <option value="Sim">Sim</option>
                   </select>
                 </div>
-
-                <!-- Atendente (Coluna A) -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Atendente *</label>
                   <input type="text" id="sacAtendente" readonly class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-slate-100 px-3 py-1.5 text-slate-700 cursor-not-allowed">
                 </div>
-
-                <!-- Observação -->
                 <div class="md:col-span-2 lg:col-span-2">
                   <label class="block text-xs font-bold text-indigo-900 mb-1">Observação</label>
                   <input type="text" id="sacObservacao" placeholder="Notas, histórico de contato ou detalhes adicionais..." class="w-full text-sm rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
-
-                <!-- Data/Hora Lançamento -->
                 <div class="md:col-span-2 lg:col-span-2">
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Data/Hora Lançamento</label>
                   <input type="text" id="sacDataHoraAuto" readonly value="Automático no Envio" class="w-full text-sm rounded-xl border border-slate-300 bg-slate-100 px-3 py-1.5 text-slate-500 cursor-not-allowed">
                 </div>
-
               </div>
 
               <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
@@ -852,7 +946,7 @@ html_code = f"""
             </form>
           </section>
 
-          <!-- LISTA DE TODOS OS CHAMADOS REALIZADOS -->
+          <!-- LISTA DE TODOS OS CHAMADOS REALIZADOS (COM FORMA DE PGTO) -->
           <section class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 overflow-hidden">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
               <div>
@@ -880,32 +974,32 @@ html_code = f"""
                     <th style="width: 5%;" class="rounded-l-lg text-center">Ações</th>
                     <th style="width: 8%;" class="font-mono">Chamado</th>
                     <th style="width: 7%;">Data</th>
-                    <th style="width: 11%;">Cliente</th>
-                    <th style="width: 9%;">Local</th>
-                    <th style="width: 8%;">Filial</th>
-                    <th style="width: 6%;">Produto</th>
-                    <th style="width: 7%;" class="text-right">Valor</th>
-                    <th style="width: 10%;">Nome Cliente</th>
+                    <th style="width: 10%;">Cliente</th>
+                    <th style="width: 8%;">Local</th>
+                    <th style="width: 7%;">Filial</th>
+                    <th style="width: 5%;">Produto</th>
+                    <th style="width: 6%;" class="text-right">Valor</th>
+                    <th style="width: 9%;">Nome Cliente</th>
+                    <th style="width: 7%;">Forma Pgto</th>
                     <th style="width: 8%;">Reembolso</th>
                     <th style="width: 5%;" class="text-center">Pago?</th>
-                    <th style="width: 8%;">Fin. Resp.</th>
-                    <th style="width: 10%;">Observação</th>
-                    <th style="width: 8%;" class="rounded-r-lg">Atendente</th>
+                    <th style="width: 7%;">Fin. Resp.</th>
+                    <th style="width: 9%;">Observação</th>
+                    <th style="width: 7%;" class="rounded-r-lg">Atendente</th>
                   </tr>
                 </thead>
                 <tbody id="tableSACChamadosBody" class="divide-y divide-slate-100">
                   <tr>
-                    <td colspan="14" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado registrado ainda.</td>
+                    <td colspan="15" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado registrado ainda.</td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </section>
-
         </div>
       </div>
 
-      <!-- PÁGINA 3: TODOS OS CHAMADOS ABERTOS -->
+      <!-- PÁGINA 3: TODOS OS CHAMADOS ABERTOS (COM FORMA DE PGTO) -->
       <div id="pageChamadosAbertos" class="space-y-6 hidden">
         <section class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 overflow-hidden">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
@@ -938,19 +1032,20 @@ html_code = f"""
                 <tr>
                   <th style="width: 8%;" class="rounded-l-lg font-mono">Chamado</th>
                   <th style="width: 7%;">Data</th>
-                  <th style="width: 12%;">Cliente</th>
-                  <th style="width: 7%;" class="text-right">Valor</th>
-                  <th style="width: 13%;">Nome do Cliente</th>
-                  <th style="width: 11%;">Pix - Reembolso</th>
-                  <th style="width: 6%;" class="text-center">Pago?</th>
-                  <th style="width: 11%;">Fin. Responsável</th>
-                  <th style="width: 20%;">Observação</th>
+                  <th style="width: 11%;">Cliente</th>
+                  <th style="width: 6%;" class="text-right">Valor</th>
+                  <th style="width: 11%;">Nome do Cliente</th>
+                  <th style="width: 9%;">Forma Pgto</th>
+                  <th style="width: 10%;">Pix - Reembolso</th>
+                  <th style="width: 5%;" class="text-center">Pago?</th>
+                  <th style="width: 9%;">Fin. Responsável</th>
+                  <th style="width: 19%;">Observação</th>
                   <th style="width: 5%;" class="rounded-r-lg text-center">Ação</th>
                 </tr>
               </thead>
               <tbody id="tableChamadosAbertosBody" class="divide-y divide-slate-100">
                 <tr>
-                  <td colspan="10" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado aberto encontrado.</td>
+                  <td colspan="11" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado aberto encontrado.</td>
                 </tr>
               </tbody>
             </table>
@@ -960,8 +1055,6 @@ html_code = f"""
 
       <!-- PÁGINA 4: CADASTRO DE CLIENTES -->
       <div id="pageCadastroClientes" class="hidden space-y-6">
-
-        <!-- BLOQUEIO DE SEGURANÇA PARA ATENDENTE SEM PERMISSÃO -->
         <div id="bloqueioAcessoClientes" class="hidden max-w-lg mx-auto my-12 bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
           <div class="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
             <i data-lucide="shield-alert" class="w-8 h-8"></i>
@@ -976,7 +1069,6 @@ html_code = f"""
         </div>
 
         <div id="containerAcessoClientes" class="space-y-6">
-          <!-- ALERTA DE EDIÇÃO DE CLIENTE -->
           <div id="alertCliEditMode" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex justify-between items-center shadow-sm">
             <div class="flex items-center gap-3">
               <div class="p-2 bg-amber-500 text-white rounded-xl"><i data-lucide="edit-3" class="w-5 h-5"></i></div>
@@ -990,7 +1082,6 @@ html_code = f"""
             </button>
           </div>
 
-          <!-- MENSAGEM NO TOPO DINÂMICA -->
           <div id="alertCliSuccess" class="hidden p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition">
             <div class="flex items-center gap-3">
               <div id="alertCliIconBadge" class="p-2 bg-emerald-600 text-white rounded-xl">
@@ -1006,7 +1097,6 @@ html_code = f"""
             </button>
           </div>
 
-          <!-- FORMULÁRIO DE CADASTRO DE CLIENTE -->
           <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-6 border-b border-slate-100 gap-4">
               <div class="flex items-center gap-3">
@@ -1027,43 +1117,30 @@ html_code = f"""
 
             <form id="clienteForm" onsubmit="handleClienteSubmit(event)" class="space-y-6">
               <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-5 rounded-2xl bg-slate-50/90 border border-slate-200">
-                
-                <!-- Cliente -->
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">Cliente *</label>
                   <input type="text" id="cadCliCliente" placeholder="Ex: Embraer, Coca Cola..." required onblur="formatarNomeProprio(this)" class="w-full text-sm font-semibold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-
-                <!-- Local -->
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">Local *</label>
                   <input type="text" id="cadCliLocal" placeholder="Ex: Fábrica 1, Administrativo..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-
-                <!-- Local interno -->
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">Local interno *</label>
                   <input type="text" id="cadCliLocalInterno" placeholder="Ex: Refeitório, Recepção, Bloco B..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-
-                <!-- Máquina -->
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">Máquina *</label>
                   <input type="text" id="cadCliMaquina" placeholder="Ex: Máquina 01, M05..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-
-                <!-- Modelo de máquina -->
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">Modelo de máquina *</label>
                   <input type="text" id="cadCliModeloMaquina" placeholder="Ex: Lei Saeco, Krea, Snaky..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-
-                <!-- Filial Responsável -->
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">Filial Responsável *</label>
                   <input list="listaSACCidades" id="cadCliFilial" placeholder="Ex: Ribeirão Preto, São Carlos..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-
               </div>
 
               <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
@@ -1121,11 +1198,9 @@ html_code = f"""
             </div>
           </section>
         </div>
-
       </div>
 
     </main>
-
   </div>
 
   <script>
@@ -1140,7 +1215,6 @@ html_code = f"""
     let clienteEmEdicao = null;
     let origemEdicaoSAC = 'sac';
     
-    // VARIÁVEIS GLOBAIS DE SESSÃO
     let atendenteSACLogado = "";
     let loginUsuarioConectado = "";
     let nivelAcessoLogado = "";
@@ -1151,9 +1225,55 @@ html_code = f"""
       nivelAcessoLogado = sessionStorage.getItem('sac_nivel_acesso') || "";
     }} catch(e) {{}}
 
-    // =========================================================================
-    // CONTROLE DE SESSÃO GLOBAL DO SISTEMA
-    // =========================================================================
+    // CONVERSORES DE DATAS ENTRE ISO (YYYY-MM-DD) E PT-BR (DD/MM/AAAA)
+    function dataIsoParaPtBr(isoStr) {{
+      if (!isoStr) return '';
+      const s = String(isoStr).trim();
+      if (/^\\d{{4}}-\\d{{2}}-\\d{{2}}/.test(s)) {{
+        const [a, m, d] = s.substring(0, 10).split('-');
+        return `${{d}}/${{m}}/${{a}}`;
+      }}
+      return s;
+    }}
+
+    function dataPtBrParaIso(ptBrStr) {{
+      if (!ptBrStr) return '';
+      const s = String(ptBrStr).trim();
+      const parts = s.split(/[/ -]/);
+      if (parts.length === 3) {{
+        if (parts[2].length === 4) {{
+          return `${{parts[2]}}-${{parts[1].padStart(2, '0')}}-${{parts[0].padStart(2, '0')}}`;
+        }}
+        if (parts[0].length === 4) {{
+          return `${{parts[0]}}-${{parts[1].padStart(2, '0')}}-${{parts[2].padStart(2, '0')}}`;
+        }}
+      }}
+      return '';
+    }}
+
+    // PARSER RIGOROSO DE VALORES NUMÉRICOS (COLUNA J)
+    function parseValorNumerico(v) {{
+      if (v === null || v === undefined) return 0;
+      let s = String(v).trim().replace('R$', '').replace(/\\s+/g, '');
+      if (!s) return 0;
+      if (s.includes(',') && s.includes('.')) {{
+        if (s.lastIndexOf(',') > s.lastIndexOf('.')) {{
+          s = s.replace(/\\./g, '').replace(',', '.');
+        }} else {{
+          s = s.replace(/,/g, '');
+        }}
+      }} else if (s.includes(',')) {{
+        s = s.replace(',', '.');
+      }}
+      const n = parseFloat(s);
+      return isNaN(n) ? 0 : n;
+    }}
+
+    function formatCurrency(val) {{
+      return (val || 0).toLocaleString('pt-BR', {{ style: 'currency', currency: 'BRL' }});
+    }}
+
+    // CONTROLE DE AUTENTICAÇÃO
     function verificarEstadoAutenticacao() {{
       const loginScreen = document.getElementById('systemLoginScreen');
       const appContainer = document.getElementById('systemAppContainer');
@@ -1326,10 +1446,8 @@ html_code = f"""
     function abrirModalLoading(titulo, subtitulo, tipoAcao = 'loading') {{
       const modal = document.getElementById('modalLoadingAcao');
       if (!modal) return;
-
       document.getElementById('modalLoadingTitle').innerText = titulo;
       document.getElementById('modalLoadingSub').innerText = subtitulo;
-
       const spinner = document.getElementById('modalSpinner');
       const iconCheck = document.getElementById('modalIconCheck');
       const iconTrash = document.getElementById('modalIconTrash');
@@ -1353,7 +1471,6 @@ html_code = f"""
         progressBar.classList.add('hidden');
         badge.className = "w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shadow-inner";
       }}
-
       modal.classList.remove('hidden');
       lucide.createIcons();
     }}
@@ -1369,12 +1486,10 @@ html_code = f"""
       const alertSub = document.getElementById('alertSACSuccessSub');
       const iconBadge = document.getElementById('alertSACIconBadge');
       const lucideIcon = document.getElementById('alertSACLucideIcon');
-
       if (!alertBox) return;
 
       alertTitle.innerText = titulo;
       alertSub.innerText = subtitulo;
-
       if (tipo === 'excluir') {{
         alertBox.className = "p-5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition";
         iconBadge.className = "p-2 bg-rose-600 text-white rounded-xl";
@@ -1388,38 +1503,6 @@ html_code = f"""
         iconBadge.className = "p-2 bg-emerald-600 text-white rounded-xl";
         lucideIcon.setAttribute('data-lucide', 'check-circle');
       }}
-
-      alertBox.classList.remove('hidden');
-      alertBox.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
-      lucide.createIcons();
-    }}
-
-    function exibirMensagemTopoCliente(titulo, subtitulo, tipo = 'sucesso') {{
-      const alertBox = document.getElementById('alertCliSuccess');
-      const alertTitle = document.getElementById('alertCliSuccessTitle');
-      const alertSub = document.getElementById('alertCliSuccessSub');
-      const iconBadge = document.getElementById('alertCliIconBadge');
-      const lucideIcon = document.getElementById('alertCliLucideIcon');
-
-      if (!alertBox) return;
-
-      alertTitle.innerText = titulo;
-      alertSub.innerText = subtitulo;
-
-      if (tipo === 'excluir') {{
-        alertBox.className = "p-5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition";
-        iconBadge.className = "p-2 bg-rose-600 text-white rounded-xl";
-        lucideIcon.setAttribute('data-lucide', 'trash-2');
-      }} else if (tipo === 'editar') {{
-        alertBox.className = "p-5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition";
-        iconBadge.className = "p-2 bg-amber-600 text-white rounded-xl";
-        lucideIcon.setAttribute('data-lucide', 'edit-3');
-      }} else {{
-        alertBox.className = "p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm transition";
-        iconBadge.className = "p-2 bg-emerald-600 text-white rounded-xl";
-        lucideIcon.setAttribute('data-lucide', 'check-circle');
-      }}
-
       alertBox.classList.remove('hidden');
       alertBox.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
       lucide.createIcons();
@@ -1428,7 +1511,6 @@ html_code = f"""
     function enviarParaPlanilhaGarantido(payload) {{
       const endpoint = APPS_SCRIPT_SAC_URL;
       const strData = JSON.stringify(payload);
-
       if (navigator.sendBeacon) {{
         try {{
           const blob = new Blob([strData], {{ type: 'text/plain;charset=utf-8' }});
@@ -1436,7 +1518,6 @@ html_code = f"""
           return Promise.resolve(true);
         }} catch (err) {{}}
       }}
-
       try {{
         fetch(endpoint, {{
           method: "POST",
@@ -1445,7 +1526,6 @@ html_code = f"""
           body: strData
         }}).catch(() => {{}});
       }} catch (err) {{}}
-
       return Promise.resolve(true);
     }}
 
@@ -1453,23 +1533,13 @@ html_code = f"""
       window.parent.location.reload();
     }}
 
-    function formatCurrency(val) {{
-      return (val || 0).toLocaleString('pt-BR', {{ style: 'currency', currency: 'BRL' }});
-    }}
-
-    // =========================================================================
-    // NAVEGAÇÃO ENTRE PÁGINAS
-    // =========================================================================
     function switchPage(page) {{
       if (page === 'cadastroClientes' && (nivelAcessoLogado || '').trim().toLowerCase() !== 'geral') {{
         alert('⛔ Acesso Restrito:\\nSeu perfil não tem permissão para cadastrar ou gerenciar clientes.');
         switchPage('sac');
         return;
       }}
-
-      try {{
-        sessionStorage.setItem('aba_ativa_atual', page);
-      }} catch(e) {{}}
+      try {{ sessionStorage.setItem('aba_ativa_atual', page); }} catch(e) {{}}
 
       const pages = {{
         dashboardSAC: document.getElementById('pageDashboardSAC'),
@@ -1477,7 +1547,6 @@ html_code = f"""
         chamadosAbertos: document.getElementById('pageChamadosAbertos'),
         cadastroClientes: document.getElementById('pageCadastroClientes')
       }};
-
       const buttons = {{
         dashboardSAC: document.getElementById('navDashboardSAC'),
         sac: document.getElementById('navSAC'),
@@ -1511,12 +1580,11 @@ html_code = f"""
         aplicarRegrasDeAcesso();
         renderizarTabelaClientes();
       }}
-
       lucide.createIcons();
     }}
 
     // =========================================================================
-    // ROTINAS SAC
+    // INICIALIZAÇÃO & FORMULÁRIO SAC
     // =========================================================================
     function calcularPreviaProximoChamado(ano) {{
       let maior = dadosSAC.maior_sac_ano[ano] || 0;
@@ -1529,17 +1597,14 @@ html_code = f"""
           }}
         }}
       }});
-      const proximo = String(maior + 1).padStart(4, '0');
-      return 'SAC-' + ano + '-' + proximo;
+      return 'SAC-' + ano + '-' + String(maior + 1).padStart(4, '0');
     }}
 
     function inicializarFormularioSAC() {{
       if (chamadoEmEdicao) return;
-
       const anoAtual = new Date().getFullYear();
       document.getElementById('sacChamado').value = calcularPreviaProximoChamado(anoAtual);
       document.getElementById('sacData').value = new Date().toISOString().split('T')[0];
-      
       document.getElementById('sacProduto').value = "";
       document.getElementById('sacDataTransacao').value = "";
       document.getElementById('sacHoraTransacao').value = "";
@@ -1555,73 +1620,48 @@ html_code = f"""
       document.getElementById('sacCliente').value = "";
       document.getElementById('sacCidade').value = "";
       document.getElementById('sacObservacao').value = "";
-      
-      const selectLocal = document.getElementById('sacLocalInterno');
-      selectLocal.innerHTML = '<option value="">Selecione primeiro o Cliente...</option>';
+      document.getElementById('sacLocalInterno').innerHTML = '<option value="">Selecione primeiro o Cliente...</option>';
 
       const dlCli = document.getElementById('listaSACClientes');
       dlCli.innerHTML = '';
-      const clientesUnicos = [...new Set(dadosSAC.clientes.map(c => c.cliente).filter(Boolean))].sort();
-      clientesUnicos.forEach(cli => {{
-        const opt = document.createElement('option');
-        opt.value = cli;
-        dlCli.appendChild(opt);
+      [...new Set(dadosSAC.clientes.map(c => c.cliente).filter(Boolean))].sort().forEach(cli => {{
+        const opt = document.createElement('option'); opt.value = cli; dlCli.appendChild(opt);
       }});
 
       const dlCid = document.getElementById('listaSACCidades');
       dlCid.innerHTML = '';
-      const cidadesGerais = dadosSAC.cidades && dadosSAC.cidades.length > 0 
-        ? dadosSAC.cidades 
-        : [...new Set(dadosSAC.clientes.map(c => c.cidade).filter(Boolean))].sort();
-      cidadesGerais.forEach(cid => {{
-        const opt = document.createElement('option');
-        opt.value = cid;
-        dlCid.appendChild(opt);
+      (dadosSAC.cidades?.length ? dadosSAC.cidades : [...new Set(dadosSAC.clientes.map(c => c.cidade).filter(Boolean))]).sort().forEach(cid => {{
+        const opt = document.createElement('option'); opt.value = cid; dlCid.appendChild(opt);
       }});
 
       const dlDesc = document.getElementById('listaSACDescricoes');
       dlDesc.innerHTML = '';
-      dadosSAC.descricoes.forEach(d => {{
-        const opt = document.createElement('option');
-        opt.value = d;
-        dlDesc.appendChild(opt);
-      }});
+      dadosSAC.descricoes.forEach(d => {{ const opt = document.createElement('option'); opt.value = d; dlDesc.appendChild(opt); }});
 
       const dlProb = document.getElementById('listaSACProblemas');
       dlProb.innerHTML = '';
-      dadosSAC.problemas.forEach(p => {{
-        const opt = document.createElement('option');
-        opt.value = p;
-        dlProb.appendChild(opt);
-      }});
+      dadosSAC.problemas.forEach(p => {{ const opt = document.createElement('option'); opt.value = p; dlProb.appendChild(opt); }});
 
       const dlPgto = document.getElementById('listaSACFormasPgto');
       dlPgto.innerHTML = '';
-      dadosSAC.formas_pagamento.forEach(f => {{
-        const opt = document.createElement('option');
-        opt.value = f;
-        dlPgto.appendChild(opt);
-      }});
+      dadosSAC.formas_pagamento.forEach(f => {{ const opt = document.createElement('option'); opt.value = f; dlPgto.appendChild(opt); }});
     }}
 
     function aoMudarClienteSAC() {{
       const cli = (document.getElementById('sacCliente').value || '').trim();
       const selectLocal = document.getElementById('sacLocalInterno');
       selectLocal.innerHTML = '<option value="">Selecione o Local Interno...</option>';
-
       if (!cli) return;
 
       const locaisDoCliente = dadosSAC.clientes.filter(c => c.cliente.toLowerCase() === cli.toLowerCase());
-      if (locaisDoCliente.length === 0) return;
+      if (!locaisDoCliente.length) return;
 
       const locaisUnicos = [...new Set(locaisDoCliente.map(l => l.local).filter(Boolean))].sort();
       locaisUnicos.forEach(loc => {{
         const opt = document.createElement('option');
-        opt.value = loc;
-        opt.textContent = loc;
+        opt.value = loc; opt.textContent = loc;
         selectLocal.appendChild(opt);
       }});
-
       if (locaisUnicos.length === 1) {{
         selectLocal.value = locaisUnicos[0];
         aoMudarLocalInternoSAC();
@@ -1632,17 +1672,13 @@ html_code = f"""
       const cli = (document.getElementById('sacCliente').value || '').trim();
       const loc = document.getElementById('sacLocalInterno').value;
       if (!cli || !loc) return;
-
       const achado = dadosSAC.clientes.find(c => c.cliente.toLowerCase() === cli.toLowerCase() && c.local === loc);
-      if (achado && achado.cidade) {{
-        document.getElementById('sacCidade').value = achado.cidade;
-      }}
+      if (achado && achado.cidade) document.getElementById('sacCidade').value = achado.cidade;
     }}
 
     function limparFormSAC() {{
       chamadoEmEdicao = null;
       document.getElementById('sacForm').reset();
-      
       document.getElementById('sacProduto').value = "";
       document.getElementById('sacLocalInterno').innerHTML = '<option value="">Selecione primeiro o Cliente...</option>';
       document.getElementById('sacCidade').value = "";
@@ -1669,7 +1705,6 @@ html_code = f"""
       document.getElementById('sacData').value = new Date().toISOString().split('T')[0];
       document.getElementById('sacAtendente').value = atendenteSACLogado;
       document.getElementById('sacDataHoraAuto').value = "Automático no Envio";
-
       lucide.createIcons();
     }}
 
@@ -1681,24 +1716,21 @@ html_code = f"""
       switchPage('sac');
       chamadoEmEdicao = item;
       document.getElementById('sacChamado').value = item.chamado;
-      document.getElementById('sacData').value = item.data;
+      document.getElementById('sacData').value = dataPtBrParaIso(item.data);
       document.getElementById('sacCliente').value = item.cliente;
       aoMudarClienteSAC();
       document.getElementById('sacLocalInterno').value = item.localInterno;
       document.getElementById('sacCidade').value = item.cidade;
       document.getElementById('sacDescricao').value = item.descricao;
       document.getElementById('sacProduto').value = item.produto || '';
-      document.getElementById('sacDataTransacao').value = item.dataTransacao || '';
+      document.getElementById('sacDataTransacao').value = dataPtBrParaIso(item.dataTransacao) || '';
       document.getElementById('sacHoraTransacao').value = item.horaTransacao || '';
-      
-      const vLimpo = parseFloat(String(item.valor).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')) || 0;
-      document.getElementById('sacValor').value = vLimpo || '';
+      document.getElementById('sacValor').value = parseValorNumerico(item.valor) || '';
       document.getElementById('sacNome').value = item.nomeSobrenome;
       document.getElementById('sacCelular').value = item.celular;
       document.getElementById('sacProblema').value = item.problemas;
-      document.getElementById('sacFormaPgto').value = item.formaPgto;
+      document.getElementById('sacFormaPgto').value = item.formaPgto || '';
 
-      // Ajusta o select de Reembolso para as opções válidas
       const rmbVal = (item.reembolso || '').trim().toLowerCase();
       if (rmbVal.includes('remoto') || rmbVal.includes('crédito') || rmbVal.includes('credito')) {{
         document.getElementById('sacReembolso').value = 'Crédito Remoto';
@@ -1712,12 +1744,8 @@ html_code = f"""
 
       document.getElementById('sacPix').value = item.pix || '';
       document.getElementById('sacObservacao').value = item.observacao || '';
-      
-      // Carrega o campo Reembolso Realizado
       var rReal = (item.reembolsoRealizado || 'Não').trim().toLowerCase();
       document.getElementById('sacReembolsoRealizado').value = (rReal === 'sim' || rReal === 's' || rReal === 'true') ? 'Sim' : 'Não';
-      
-      // Preserva e exibe o atendente e a data/hora originais
       document.getElementById('sacAtendente').value = item.atendente || atendenteSACLogado;
       document.getElementById('sacDataHoraAuto').value = item.dataHoraLancamento || 'Original Preservado';
 
@@ -1725,7 +1753,6 @@ html_code = f"""
       document.getElementById('labelSACEditChamado').innerText = item.chamado;
       document.getElementById('sacFormTitleText').innerText = 'Edição da Ocorrência: ' + item.chamado;
       document.getElementById('btnSalvarSACText').innerText = 'Salvar Alterações';
-
       document.getElementById('sacForm').scrollIntoView({{ behavior: 'smooth', block: 'start' }});
       lucide.createIcons();
     }}
@@ -1733,77 +1760,145 @@ html_code = f"""
     function cancelarEdicaoSAC() {{
       const origemAnterior = origemEdicaoSAC;
       limparFormSAC();
-      if (origemAnterior === 'chamadosAbertos') {{
-        switchPage('chamadosAbertos');
-      }}
+      if (origemAnterior === 'chamadosAbertos') switchPage('chamadosAbertos');
       origemEdicaoSAC = 'sac';
     }}
 
     function excluirChamadoSAC(numeroChamado) {{
-      if (!confirm('Deseja realmente excluir o chamado ' + numeroChamado + '? Esta ação solicitará a remoção na planilha.')) {{
-        return;
-      }}
-
-      abrirModalLoading(
-        'Excluindo Ocorrência...',
-        'Removendo a ocorrência ' + numeroChamado + ' da planilha oficial Chamados.',
-        'loading'
-      );
-
+      if (!confirm('Deseja realmente excluir o chamado ' + numeroChamado + '? Esta ação solicitará a remoção na planilha.')) return;
+      abrirModalLoading('Excluindo Ocorrência...', 'Removendo a ocorrência ' + numeroChamado + ' da planilha oficial Chamados.', 'loading');
       const item = listaChamadosSAC.find(c => c.chamado === numeroChamado);
 
-      const payloadExcluir = {{
-        "action": "excluir",
-        "acao": "excluir",
-        "tipo": "excluir_sac",
-        "Chamado": numeroChamado,
-        "chamado": numeroChamado,
-        "linha": item && item.linha ? item.linha : ""
-      }};
-
-      enviarParaPlanilhaGarantido(payloadExcluir);
+      enviarParaPlanilhaGarantido({{
+        "action": "excluir", "acao": "excluir", "tipo": "excluir_sac",
+        "Chamado": numeroChamado, "chamado": numeroChamado,
+        "linha": item?.linha || ""
+      }});
 
       listaChamadosSAC = listaChamadosSAC.filter(c => c.chamado !== numeroChamado);
       renderizarTabelaChamadosSAC();
       renderizarTabelaChamadosAbertos();
+      atualizarDashboardSAC();
 
-      if (chamadoEmEdicao && chamadoEmEdicao.chamado === numeroChamado) {{
-        limparFormSAC();
-      }}
+      if (chamadoEmEdicao && chamadoEmEdicao.chamado === numeroChamado) limparFormSAC();
 
       setTimeout(() => {{
-        abrirModalLoading(
-          'Chamado Excluído!',
-          'A ocorrência ' + numeroChamado + ' foi removida da base com sucesso.',
-          'excluir'
-        );
-
-        exibirMensagemTopo(
-          '🗑️ Chamado ' + numeroChamado + ' excluído!',
-          'A ocorrência foi removida do sistema e da planilha oficial.',
-          'excluir'
-        );
-
+        abrirModalLoading('Chamado Excluído!', 'A ocorrência ' + numeroChamado + ' foi removida da base com sucesso.', 'excluir');
+        exibirMensagemTopo('🗑️ Chamado ' + numeroChamado + ' excluído!', 'A ocorrência foi removida do sistema e da planilha oficial.', 'excluir');
         setTimeout(fecharModalLoading, 1000);
       }}, 500);
     }}
 
-    function filtrarChamadosSAC() {{
-      const termo = (document.getElementById('searchSACChamados')?.value || '').trim().toLowerCase();
-      if (!termo) {{
-        renderizarTabelaChamadosSAC(listaChamadosSAC);
+    function handleSACSubmit(e) {{
+      e.preventDefault();
+      if (!validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente')) return;
+      const selectLocal = document.getElementById('sacLocalInterno');
+      if (!selectLocal.value) {{ alert('⛔ Selecione um Local Interno.'); selectLocal.focus(); return; }}
+      if (!validarInputComLista('sacCidade', 'listaSACCidades', 'Filial Responsável')) return;
+      if (!validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição')) return;
+      if (!validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas')) return;
+      if (!validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento')) return;
+      const selectProduto = document.getElementById('sacProduto');
+      if (!selectProduto.value) {{ alert('⛔ Selecione o Produto (Café ou Snaky).'); selectProduto.focus(); return; }}
+
+      const ehEdicao = (chamadoEmEdicao !== null);
+      let chamado = document.getElementById('sacChamado').value.trim();
+      const anoAtual = new Date().getFullYear();
+      if (!ehEdicao) chamado = calcularPreviaProximoChamado(anoAtual);
+
+      if (!ehEdicao && listaChamadosSAC.some(c => c.chamado.toUpperCase() === chamado.toUpperCase())) {{
+        alert('⛔ Chamado Duplicado! O número "' + chamado + '" já existe.');
+        document.getElementById('sacChamado').value = calcularPreviaProximoChamado(anoAtual);
         return;
       }}
+
+      abrirModalLoading(
+        ehEdicao ? 'Atualizando Ocorrência...' : 'Lançando no Sistema...',
+        ehEdicao ? 'Gravando alterações do chamado ' + chamado + ' na planilha.' : 'Registrando a ocorrência ' + chamado + ' na planilha oficial.',
+        'loading'
+      );
+
+      // Data dos chamados no padrão oficial PT-BR DD/MM/AAAA
+      const dataIso = document.getElementById('sacData').value;
+      const data = dataIsoParaPtBr(dataIso);
+
+      const cliente = document.getElementById('sacCliente').value.trim();
+      const localInterno = document.getElementById('sacLocalInterno').value;
+      const cidade = document.getElementById('sacCidade').value.trim();
+      const descricao = document.getElementById('sacDescricao').value.trim();
+      const produto = document.getElementById('sacProduto').value;
+      const dataTransacaoIso = document.getElementById('sacDataTransacao').value;
+      const dataTransacao = dataIsoParaPtBr(dataTransacaoIso);
+      const horaTransacao = document.getElementById('sacHoraTransacao').value;
+      const valor = parseFloat(document.getElementById('sacValor').value) || 0;
+      const nomeSobrenome = converterParaPrimeirasMaiusculas(document.getElementById('sacNome').value.trim());
+      const celular = document.getElementById('sacCelular').value.trim();
+      const problemas = document.getElementById('sacProblema').value.trim();
+      const formaPgto = document.getElementById('sacFormaPgto').value.trim();
+      const reembolso = (document.getElementById('sacReembolso').value || '').trim();
+      const pix = document.getElementById('sacPix').value.trim();
+      const reembolsoRealizado = document.getElementById('sacReembolsoRealizado').value || "Não";
+      const observacao = document.getElementById('sacObservacao').value.trim();
+
+      let atendente = ehEdicao && chamadoEmEdicao?.atendente ? chamadoEmEdicao.atendente : (atendenteSACLogado || document.getElementById('sacAtendente').value);
+      let dataHoraLancamento = ehEdicao && chamadoEmEdicao?.dataHoraLancamento ? chamadoEmEdicao.dataHoraLancamento : (new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR'));
+      let financeiroResponsavel = (reembolsoRealizado === "Sim") ? (atendenteSACLogado || chamadoEmEdicao?.financeiroResponsavel || "") : (chamadoEmEdicao?.financeiroResponsavel || "");
+
+      const payloadSAC = {{
+        "acao": ehEdicao ? "editar" : "inserir", "action": ehEdicao ? "editar" : "inserir",
+        "linha": ehEdicao && chamadoEmEdicao.linha ? chamadoEmEdicao.linha : "",
+        "Chamado": chamado, "Data": data, "Cliente": cliente, "Local Interno": localInterno,
+        "Cidade": cidade, "Descrição": descricao, "Produto": produto,
+        "Data da Transação": dataTransacao, "Hora da Transação": horaTransacao,
+        "Valor": valor, "Nome/Sobrenome": nomeSobrenome, "Celular": celular,
+        "Problemas": problemas, "Forma de Pagamento": formaPgto, "Reembolso": reembolso,
+        "Pix - Reembolso": pix, "Atendente": atendente, "Data/Hora do lançamento": dataHoraLancamento,
+        "Reembolso Realizado": reembolsoRealizado, "Financeiro Responsavel": financeiroResponsavel,
+        "Observação": observacao, "coluna_u": observacao
+      }};
+
+      enviarParaPlanilhaGarantido(payloadSAC);
+
+      const novoItem = {{
+        linha: ehEdicao && chamadoEmEdicao.linha ? chamadoEmEdicao.linha : listaChamadosSAC.length + 2,
+        chamado, data, cliente, localInterno, cidade, descricao, produto,
+        dataTransacao, horaTransacao, valor: formatCurrency(valor),
+        nomeSobrenome, celular, problemas, formaPgto, reembolso, pix, atendente,
+        dataHoraLancamento, reembolsoRealizado, financeiroResponsavel, observacao
+      }};
+
+      if (ehEdicao) {{
+        listaChamadosSAC = listaChamadosSAC.map(c => c.chamado === chamado ? novoItem : c);
+      }} else {{
+        listaChamadosSAC.unshift(novoItem);
+      }}
+
+      const m = chamado.match(/SAC-(\d{{4}})-(\d+)/i);
+      if (m) dadosSAC.maior_sac_ano[m[1]] = Math.max(dadosSAC.maior_sac_ano[m[1]] || 0, parseInt(m[2], 10));
+
+      const destinoAposSalvar = (ehEdicao && origemEdicaoSAC === 'chamadosAbertos') ? 'chamadosAbertos' : 'sac';
+      limparFormSAC();
+      renderizarTabelaChamadosSAC();
+      renderizarTabelaChamadosAbertos();
+      atualizarDashboardSAC();
+      origemEdicaoSAC = 'sac';
+
+      setTimeout(() => {{
+        abrirModalLoading(ehEdicao ? 'Ocorrência Atualizada!' : 'Lançamento Concluído!', 'Ocorrência gravada com sucesso.', 'sucesso');
+        if (destinoAposSalvar === 'chamadosAbertos') switchPage('chamadosAbertos');
+        exibirMensagemTopo('✅ Ocorrência ' + chamado + ' registrada com sucesso!', 'Valor: ' + formatCurrency(valor) + ' · Forma Pgto: ' + (formaPgto || '-'));
+        setTimeout(fecharModalLoading, 1000);
+      }}, 500);
+    }}
+
+    // =========================================================================
+    // RENDERIZAÇÃO DAS TABELAS (COM FORMA DE PGTO)
+    // =========================================================================
+    function filtrarChamadosSAC() {{
+      const termo = (document.getElementById('searchSACChamados')?.value || '').trim().toLowerCase();
+      if (!termo) {{ renderizarTabelaChamadosSAC(listaChamadosSAC); return; }}
       const filtrados = listaChamadosSAC.filter(c => 
-        (c.chamado && c.chamado.toLowerCase().includes(termo)) ||
-        (c.cliente && c.cliente.toLowerCase().includes(termo)) ||
-        (c.nomeSobrenome && c.nomeSobrenome.toLowerCase().includes(termo)) ||
-        (c.localInterno && c.localInterno.toLowerCase().includes(termo)) ||
-        (c.cidade && c.cidade.toLowerCase().includes(termo)) ||
-        (c.problemas && c.problemas.toLowerCase().includes(termo)) ||
-        (c.observacao && c.observacao.toLowerCase().includes(termo)) ||
-        (c.financeiroResponsavel && c.financeiroResponsavel.toLowerCase().includes(termo)) ||
-        (c.reembolsoRealizado && c.reembolsoRealizado.toLowerCase().includes(termo))
+        Object.values(c).some(val => String(val || '').toLowerCase().includes(termo))
       );
       renderizarTabelaChamadosSAC(filtrados);
     }}
@@ -1812,12 +1907,11 @@ html_code = f"""
       const tbody = document.getElementById('tableSACChamadosBody');
       const badge = document.getElementById('badgeContadorSAC');
       if (badge) badge.innerText = lista.length + ' chamado(s)';
-
+      if (!tbody) return;
       if (!lista || lista.length === 0) {{
-        tbody.innerHTML = '<tr><td colspan="14" class="text-center py-6 text-slate-400 font-semibold">Nenhuma ocorrência encontrada.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="15" class="text-center py-6 text-slate-400 font-semibold">Nenhuma ocorrência encontrada.</td></tr>';
         return;
       }}
-
       tbody.innerHTML = lista.map(c => {{
         const rVal = (c.reembolsoRealizado || 'Não').toString().trim().toLowerCase();
         const pago = (rVal === 'sim' || rVal === 's' || rVal === 'true');
@@ -1843,8 +1937,9 @@ html_code = f"""
             <td class="text-slate-600 truncate" title="${{c.localInterno || ''}}">${{c.localInterno || '-'}}</td>
             <td class="text-slate-600 truncate" title="${{c.cidade || ''}}">${{c.cidade || '-'}}</td>
             <td class="font-medium text-slate-700 truncate" title="${{c.produto || '-'}}">${{c.produto || '-'}}</td>
-            <td class="text-right font-bold text-emerald-700 truncate" title="${{c.valor || ''}}">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
+            <td class="text-right font-bold text-emerald-700 truncate" title="${{c.valor || ''}}">${{formatCurrency(parseValorNumerico(c.valor))}}</td>
             <td class="font-medium text-slate-800 truncate" title="${{c.nomeSobrenome || ''}}">${{c.nomeSobrenome || '-'}}</td>
+            <td class="text-slate-700 font-medium truncate" title="${{c.formaPgto || ''}}">${{c.formaPgto || '-'}}</td>
             <td class="text-sky-900 font-semibold truncate" title="${{c.reembolso || ''}}">${{c.reembolso || '-'}}</td>
             <td class="text-center whitespace-nowrap">${{badgePago}}</td>
             <td class="font-semibold text-emerald-800 truncate" title="${{c.financeiroResponsavel || ''}}">${{c.financeiroResponsavel || '-'}}</td>
@@ -1853,25 +1948,27 @@ html_code = f"""
           </tr>
         `;
       }}).join('');
-
       lucide.createIcons();
     }}
 
-    // =========================================================================
-    // ROTINAS DA PÁGINA: CHAMADOS ABERTOS
-    // =========================================================================
+    function filtrarChamadosAbertos() {{
+      const termo = (document.getElementById('searchAbertos')?.value || '').trim().toLowerCase();
+      if (!termo) {{ renderizarTabelaChamadosAbertos(listaChamadosSAC); return; }}
+      const filtrados = listaChamadosSAC.filter(c => 
+        Object.values(c).some(val => String(val || '').toLowerCase().includes(termo))
+      );
+      renderizarTabelaChamadosAbertos(filtrados);
+    }}
+
     function renderizarTabelaChamadosAbertos(lista = listaChamadosSAC) {{
       const tbody = document.getElementById('tableChamadosAbertosBody');
       const badge = document.getElementById('badgeContadorAbertos');
       if (badge) badge.innerText = lista.length + ' chamado(s)';
-
       if (!tbody) return;
-
       if (!lista || lista.length === 0) {{
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado aberto encontrado.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado aberto encontrado.</td></tr>';
         return;
       }}
-
       tbody.innerHTML = lista.map(c => {{
         const rVal = (c.reembolsoRealizado || 'Não').toString().trim().toLowerCase();
         const pago = (rVal === 'sim' || rVal === 's' || rVal === 'true');
@@ -1884,8 +1981,9 @@ html_code = f"""
             <td class="font-mono font-bold text-sky-700 truncate" title="${{c.chamado}}">${{c.chamado}}</td>
             <td class="text-slate-700 truncate" title="${{c.data || '-'}}">${{c.data || '-'}}</td>
             <td class="font-semibold text-slate-800 truncate" title="${{c.cliente || ''}}">${{c.cliente || '-'}}</td>
-            <td class="text-right font-bold text-emerald-700 truncate" title="${{c.valor || ''}}">${{c.valor ? (String(c.valor).includes('R$') ? c.valor : 'R$ ' + c.valor) : 'R$ 0,00'}}</td>
+            <td class="text-right font-bold text-emerald-700 truncate" title="${{c.valor || ''}}">${{formatCurrency(parseValorNumerico(c.valor))}}</td>
             <td class="font-medium text-slate-800 truncate" title="${{c.nomeSobrenome || ''}}">${{c.nomeSobrenome || '-'}}</td>
+            <td class="text-slate-700 font-semibold truncate" title="${{c.formaPgto || ''}}">${{c.formaPgto || '-'}}</td>
             <td class="font-mono text-slate-600 truncate" title="${{c.pix || ''}}">${{c.pix || '-'}}</td>
             <td class="text-center whitespace-nowrap">${{badgePago}}</td>
             <td class="font-semibold text-emerald-800 truncate" title="${{c.financeiroResponsavel || ''}}">${{c.financeiroResponsavel || '-'}}</td>
@@ -1898,225 +1996,11 @@ html_code = f"""
           </tr>
         `;
       }}).join('');
-
       lucide.createIcons();
     }}
 
-    function filtrarChamadosAbertos() {{
-      const termo = (document.getElementById('searchAbertos')?.value || '').trim().toLowerCase();
-      if (!termo) {{
-        renderizarTabelaChamadosAbertos(listaChamadosSAC);
-        return;
-      }}
-      const filtrados = listaChamadosSAC.filter(c => 
-        (c.chamado && c.chamado.toLowerCase().includes(termo)) ||
-        (c.cliente && c.cliente.toLowerCase().includes(termo)) ||
-        (c.nomeSobrenome && c.nomeSobrenome.toLowerCase().includes(termo)) ||
-        (c.reembolso && c.reembolso.toLowerCase().includes(termo)) ||
-        (c.pix && c.pix.toLowerCase().includes(termo)) ||
-        (c.observacao && c.observacao.toLowerCase().includes(termo)) ||
-        (c.financeiroResponsavel && c.financeiroResponsavel.toLowerCase().includes(termo)) ||
-        (c.reembolsoRealizado && c.reembolsoRealizado.toLowerCase().includes(termo))
-      );
-      renderizarTabelaChamadosAbertos(filtrados);
-    }}
-
-    function handleSACSubmit(e) {{
-      e.preventDefault();
-
-      const cliValido = validarInputComLista('sacCliente', 'listaSACClientes', 'Cliente');
-      if (!cliValido) return;
-
-      const selectLocal = document.getElementById('sacLocalInterno');
-      if (!selectLocal.value) {{
-        alert('⛔ Bloqueio de Segurança:\\nPor favor, selecione um Local Interno vinculado ao cliente.');
-        selectLocal.focus();
-        return;
-      }}
-
-      const cidValida = validarInputComLista('sacCidade', 'listaSACCidades', 'Filial Responsável');
-      if (!cidValida) return;
-
-      const descValida = validarInputComLista('sacDescricao', 'listaSACDescricoes', 'Descrição');
-      if (!descValida) return;
-
-      const probValido = validarInputComLista('sacProblema', 'listaSACProblemas', 'Problemas');
-      if (!probValido) return;
-
-      const pgtoValido = validarInputComLista('sacFormaPgto', 'listaSACFormasPgto', 'Forma de Pagamento');
-      if (!pgtoValido) return;
-
-      const selectProduto = document.getElementById('sacProduto');
-      if (!selectProduto.value) {{
-        alert('⛔ Bloqueio de Segurança:\\nPor favor, selecione o Produto (Café ou Snaky).');
-        selectProduto.focus();
-        return;
-      }}
-
-      const ehEdicao = (chamadoEmEdicao !== null);
-      let chamado = document.getElementById('sacChamado').value.trim();
-      const anoAtual = new Date().getFullYear();
-
-      if (!ehEdicao) {{
-        chamado = calcularPreviaProximoChamado(anoAtual);
-      }}
-
-      const chamadoExiste = listaChamadosSAC.some(c => c.chamado.toUpperCase() === chamado.toUpperCase());
-      if (!ehEdicao && chamadoExiste) {{
-        alert('⛔ Chamado Duplicado! O número "' + chamado + '" já existe.');
-        document.getElementById('sacChamado').value = calcularPreviaProximoChamado(anoAtual);
-        return;
-      }}
-
-      abrirModalLoading(
-        ehEdicao ? 'Atualizando Ocorrência...' : 'Lançando no Sistema...',
-        ehEdicao ? 'Gravando alterações do chamado ' + chamado + ' na planilha Chamados.' : 'Registrando a ocorrência ' + chamado + ' na planilha oficial.',
-        'loading'
-      );
-
-      const data = document.getElementById('sacData').value;
-      const cliente = document.getElementById('sacCliente').value.trim();
-      const localInterno = document.getElementById('sacLocalInterno').value;
-      const cidade = document.getElementById('sacCidade').value.trim();
-      const descricao = document.getElementById('sacDescricao').value.trim();
-      const produto = document.getElementById('sacProduto').value;
-      const dataTransacao = document.getElementById('sacDataTransacao').value;
-      const horaTransacao = document.getElementById('sacHoraTransacao').value;
-      const valor = parseFloat(document.getElementById('sacValor').value) || 0;
-      const nomeSobrenome = converterParaPrimeirasMaiusculas(document.getElementById('sacNome').value.trim());
-      const celular = document.getElementById('sacCelular').value.trim();
-      const problemas = document.getElementById('sacProblema').value.trim();
-      const formaPgto = document.getElementById('sacFormaPgto').value.trim();
-      const reembolso = (document.getElementById('sacReembolso').value || '').trim();
-      const pix = document.getElementById('sacPix').value.trim();
-      const reembolsoRealizado = document.getElementById('sacReembolsoRealizado').value || "Não";
-      const observacao = document.getElementById('sacObservacao').value.trim();
-
-      // REGRA: Preserva atendente original e data/hora original se estiver em modo edição
-      let atendente = "";
-      let dataHoraLancamento = "";
-
-      if (ehEdicao && chamadoEmEdicao) {{
-        atendente = chamadoEmEdicao.atendente || document.getElementById('sacAtendente').value || atendenteSACLogado;
-        dataHoraLancamento = chamadoEmEdicao.dataHoraLancamento || "";
-      }} else {{
-        atendente = atendenteSACLogado || document.getElementById('sacAtendente').value;
-        const agora = new Date();
-        dataHoraLancamento = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR');
-      }}
-
-      // REGRA: Ao editar e marcar status Pagos / Reembolso Realizado como "Sim", grava Atendente logado no Financeiro Responsável
-      let financeiroResponsavel = "";
-      if (ehEdicao && chamadoEmEdicao) {{
-        financeiroResponsavel = chamadoEmEdicao.financeiroResponsavel || "";
-        if (reembolsoRealizado === "Sim") {{
-          financeiroResponsavel = atendenteSACLogado || financeiroResponsavel;
-        }}
-      }} else if (reembolsoRealizado === "Sim") {{
-        financeiroResponsavel = atendenteSACLogado;
-      }}
-
-      const payloadSAC = {{
-        "acao": ehEdicao ? "editar" : "inserir",
-        "action": ehEdicao ? "editar" : "inserir",
-        "linha": ehEdicao && chamadoEmEdicao.linha ? chamadoEmEdicao.linha : "",
-        "Chamado": chamado,
-        "Data": data,
-        "Cliente": cliente,
-        "Local Interno": localInterno,
-        "Cidade": cidade,
-        "Descrição": descricao,
-        "Produto": produto,
-        "Data da Transação": dataTransacao,
-        "Hora da Transação": horaTransacao,
-        "Valor": valor,
-        "Nome/Sobrenome": nomeSobrenome,
-        "Celular": celular,
-        "Problemas": problemas,
-        "Forma de Pagamento": formaPgto,
-        "Reembolso": reembolso,
-        "Pix - Reembolso": pix,
-        "Atendente": atendente,
-        "Data/Hora do lançamento": dataHoraLancamento,
-        "Reembolso Realizado": reembolsoRealizado,
-        "Financeiro Responsavel": financeiroResponsavel,
-        "financeiroResponsavel": financeiroResponsavel,
-        "Observação": observacao,
-        "Observacao": observacao,
-        "observacao": observacao,
-        "coluna_u": observacao
-      }};
-
-      enviarParaPlanilhaGarantido(payloadSAC);
-
-      const novoItem = {{
-        linha: ehEdicao && chamadoEmEdicao.linha ? chamadoEmEdicao.linha : listaChamadosSAC.length + 2,
-        chamado,
-        data,
-        cliente,
-        localInterno,
-        cidade,
-        descricao,
-        produto,
-        dataTransacao,
-        horaTransacao,
-        valor: formatCurrency(valor),
-        nomeSobrenome,
-        celular,
-        problemas,
-        formaPgto,
-        reembolso,
-        pix,
-        atendente,
-        dataHoraLancamento,
-        reembolsoRealizado,
-        financeiroResponsavel,
-        observacao
-      }};
-
-      if (ehEdicao) {{
-        listaChamadosSAC = listaChamadosSAC.map(c => c.chamado === chamado ? novoItem : c);
-      }} else {{
-        listaChamadosSAC.unshift(novoItem);
-      }}
-
-      const m = chamado.match(/SAC-(\d{{4}})-(\d+)/i);
-      if (m) {{
-        const ano = m[1];
-        const seq = parseInt(m[2], 10);
-        dadosSAC.maior_sac_ano[ano] = Math.max(dadosSAC.maior_sac_ano[ano] || 0, seq);
-      }}
-
-      const destinoAposSalvar = (ehEdicao && origemEdicaoSAC === 'chamadosAbertos') ? 'chamadosAbertos' : 'sac';
-
-      limparFormSAC();
-      renderizarTabelaChamadosSAC();
-      renderizarTabelaChamadosAbertos();
-      origemEdicaoSAC = 'sac';
-
-      setTimeout(() => {{
-        abrirModalLoading(
-          ehEdicao ? 'Ocorrência Atualizada!' : 'Lançamento Concluído!',
-          ehEdicao ? 'As alterações do chamado ' + chamado + ' foram salvas com sucesso.' : 'O chamado ' + chamado + ' foi registrado na planilha oficial com sucesso.',
-          'sucesso'
-        );
-
-        if (destinoAposSalvar === 'chamadosAbertos') {{
-          switchPage('chamadosAbertos');
-        }}
-
-        exibirMensagemTopo(
-          ehEdicao ? '✅ Ocorrência ' + chamado + ' atualizada com sucesso!' : '✅ Ocorrência ' + chamado + ' lançada com sucesso!',
-          'Cliente: ' + cliente + ' (' + localInterno + ') · Filial: ' + cidade + ' · Reemb. Pago: ' + reembolsoRealizado + ' · Resp: ' + (financeiroResponsavel || '-') + ' · Valor: ' + formatCurrency(valor),
-          ehEdicao ? 'editar' : 'sucesso'
-        );
-
-        setTimeout(fecharModalLoading, 1000);
-      }}, 500);
-    }}
-
     // =========================================================================
-    // ROTINAS DA PÁGINA: CADASTRO DE CLIENTES
+    // CADASTRO DE CLIENTES
     // =========================================================================
     function limparFormCliente() {{
       clienteEmEdicao = null;
@@ -2127,21 +2011,17 @@ html_code = f"""
       lucide.createIcons();
     }}
 
-    function cancelarEdicaoCliente() {{
-      limparFormCliente();
-    }}
+    function cancelarEdicaoCliente() {{ limparFormCliente(); }}
 
     function editarCliente(index) {{
       if ((nivelAcessoLogado || '').trim().toLowerCase() !== 'geral') {{
         alert('⛔ Operação não permitida: Apenas usuários com perfil Geral podem editar clientes.');
         return;
       }}
-
       const item = listaCadastroClientes[index];
       if (!item) return;
 
       clienteEmEdicao = {{ ...item, indexOriginal: index }};
-
       document.getElementById('cadCliCliente').value = converterParaPrimeirasMaiusculas(item.cliente || '');
       document.getElementById('cadCliLocal').value = converterParaPrimeirasMaiusculas(item.local || '');
       document.getElementById('cadCliLocalInterno').value = converterParaPrimeirasMaiusculas(item.localInterno || item.local || '');
@@ -2153,7 +2033,6 @@ html_code = f"""
       document.getElementById('labelCliEditNome').innerText = item.cliente + ' (' + (item.localInterno || item.local || '') + ')';
       document.getElementById('cliFormTitleText').innerText = 'Edição de Ponto: ' + item.cliente;
       document.getElementById('btnSalvarClienteText').innerText = 'Salvar Alterações';
-
       document.getElementById('clienteForm').scrollIntoView({{ behavior: 'smooth', block: 'start' }});
       lucide.createIcons();
     }}
@@ -2163,76 +2042,33 @@ html_code = f"""
         alert('⛔ Operação não permitida: Apenas usuários com perfil Geral podem excluir clientes.');
         return;
       }}
-
       const item = listaCadastroClientes[index];
       if (!item) return;
-
       const descr = item.cliente + ' - ' + (item.localInterno || item.local || '');
-      if (!confirm('Deseja realmente excluir o cadastro de "' + descr + '"?')) {{
-        return;
-      }}
+      if (!confirm('Deseja realmente excluir o cadastro de "' + descr + '"?')) return;
 
-      abrirModalLoading(
-        'Excluindo Cliente...',
-        'Removendo o ponto "' + descr + '" da aba Clientes.',
-        'loading'
-      );
-
-      const payloadExcluir = {{
-        "action": "excluir_cliente",
-        "acao": "excluir_cliente",
-        "tipo": "excluir_cliente",
-        "aba": "Clientes",
-        "sheet": "Clientes",
-        "linha": item.linha || "",
-        "Cliente": item.cliente,
-        "Local": item.local,
-        "Local interno": item.localInterno,
-        "Máquina": item.maquina,
-        "Modelo de máquina": item.modeloMaquina,
-        "Filial Responsavel": item.filialResponsavel
-      }};
-
-      enviarParaPlanilhaGarantido(payloadExcluir);
+      abrirModalLoading('Excluindo Cliente...', 'Removendo o ponto "' + descr + '" da aba Clientes.', 'loading');
+      enviarParaPlanilhaGarantido({{
+        "action": "excluir_cliente", "acao": "excluir_cliente", "tipo": "excluir_cliente",
+        "aba": "Clientes", "sheet": "Clientes", "linha": item.linha || "",
+        "Cliente": item.cliente, "Local": item.local, "Local interno": item.localInterno,
+        "Máquina": item.maquina, "Modelo de máquina": item.modeloMaquina, "Filial Responsavel": item.filialResponsavel
+      }});
 
       listaCadastroClientes.splice(index, 1);
       renderizarTabelaClientes();
-
-      if (clienteEmEdicao && clienteEmEdicao.indexOriginal === index) {{
-        limparFormCliente();
-      }}
+      if (clienteEmEdicao && clienteEmEdicao.indexOriginal === index) limparFormCliente();
 
       setTimeout(() => {{
-        abrirModalLoading(
-          'Cliente Excluído!',
-          'O cadastro foi removido da aba Clientes com sucesso.',
-          'excluir'
-        );
-
-        exibirMensagemTopoCliente(
-          '🗑️ Ponto "' + descr + '" excluído!',
-          'O registro foi removido com sucesso da aba Clientes.',
-          'excluir'
-        );
-
+        abrirModalLoading('Cliente Excluído!', 'O cadastro foi removido com sucesso.', 'excluir');
         setTimeout(fecharModalLoading, 1000);
       }}, 500);
     }}
 
     function filtrarClientesCadastrados() {{
       const termo = (document.getElementById('searchClientesCadastrados')?.value || '').trim().toLowerCase();
-      if (!termo) {{
-        renderizarTabelaClientes(listaCadastroClientes);
-        return;
-      }}
-      const filtrados = listaCadastroClientes.filter(c => 
-        (c.cliente && c.cliente.toLowerCase().includes(termo)) ||
-        (c.local && c.local.toLowerCase().includes(termo)) ||
-        (c.localInterno && c.localInterno.toLowerCase().includes(termo)) ||
-        (c.maquina && c.maquina.toLowerCase().includes(termo)) ||
-        (c.modeloMaquina && c.modeloMaquina.toLowerCase().includes(termo)) ||
-        (c.filialResponsavel && c.filialResponsavel.toLowerCase().includes(termo))
-      );
+      if (!termo) {{ renderizarTabelaClientes(listaCadastroClientes); return; }}
+      const filtrados = listaCadastroClientes.filter(c => Object.values(c).some(val => String(val || '').toLowerCase().includes(termo)));
       renderizarTabelaClientes(filtrados);
     }}
 
@@ -2240,12 +2076,11 @@ html_code = f"""
       const tbody = document.getElementById('tableClientesBody');
       const badge = document.getElementById('badgeContadorClientes');
       if (badge) badge.innerText = lista.length + ' cliente(s)';
-
+      if (!tbody) return;
       if (!lista || lista.length === 0) {{
         tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-slate-400 font-semibold">Nenhum cliente encontrado.</td></tr>';
         return;
       }}
-
       tbody.innerHTML = lista.map((c, idx) => `
         <tr class="hover:bg-slate-50 transition border-b border-slate-100">
           <td class="text-center whitespace-nowrap">
@@ -2266,99 +2101,54 @@ html_code = f"""
           <td class="font-semibold text-sky-800 truncate" title="${{c.filialResponsavel || ''}}">${{c.filialResponsavel || '-'}}</td>
         </tr>
       `).join('');
-
       lucide.createIcons();
     }}
 
     function handleClienteSubmit(e) {{
       e.preventDefault();
-
       if ((nivelAcessoLogado || '').trim().toLowerCase() !== 'geral') {{
-        alert('⛔ Operação não permitida: Apenas usuários com perfil Geral podem cadastrar clientes.');
-        return;
+        alert('⛔ Apenas perfil Geral pode cadastrar clientes.'); return;
       }}
-
       const cliente = converterParaPrimeirasMaiusculas(document.getElementById('cadCliCliente').value.trim());
       const local = converterParaPrimeirasMaiusculas(document.getElementById('cadCliLocal').value.trim());
       const localInterno = converterParaPrimeirasMaiusculas(document.getElementById('cadCliLocalInterno').value.trim());
       const maquina = converterParaPrimeirasMaiusculas(document.getElementById('cadCliMaquina').value.trim());
       const modeloMaquina = converterParaPrimeirasMaiusculas(document.getElementById('cadCliModeloMaquina').value.trim());
       const filialResponsavel = converterParaPrimeirasMaiusculas(document.getElementById('cadCliFilial').value.trim());
-
       if (!cliente || !local || !localInterno || !maquina || !modeloMaquina || !filialResponsavel) {{
-        alert('Por favor, preencha todos os campos obrigatórios do formulário.');
-        return;
+        alert('Preencha todos os campos obrigatórios.'); return;
       }}
 
       const ehEdicao = (clienteEmEdicao !== null);
+      abrirModalLoading(ehEdicao ? 'Atualizando Cliente...' : 'Cadastrando Cliente...', 'Gravando na aba Clientes...', 'loading');
 
-      abrirModalLoading(
-        ehEdicao ? 'Atualizando Cliente...' : 'Cadastrando Cliente...',
-        ehEdicao ? 'Salvando alterações na aba Clientes...' : 'Enviando registro para a aba Clientes...',
-        'loading'
-      );
-
-      const payloadCliente = {{
+      enviarParaPlanilhaGarantido({{
         "acao": ehEdicao ? "editar_cliente" : "inserir_cliente",
         "action": ehEdicao ? "editar_cliente" : "inserir_cliente",
-        "tipo": "cadastro_cliente",
-        "aba": "Clientes",
-        "sheet": "Clientes",
+        "tipo": "cadastro_cliente", "aba": "Clientes", "sheet": "Clientes",
         "linha": ehEdicao && clienteEmEdicao.linha ? clienteEmEdicao.linha : "",
-        "Cliente": cliente,
-        "Local": local,
-        "Local interno": localInterno,
-        "Máquina": maquina,
-        "Modelo de máquina": modeloMaquina,
-        "Filial Responsavel": filialResponsavel
-      }};
-
-      enviarParaPlanilhaGarantido(payloadCliente);
+        "Cliente": cliente, "Local": local, "Local interno": localInterno,
+        "Máquina": maquina, "Modelo de máquina": modeloMaquina, "Filial Responsavel": filialResponsavel
+      }});
 
       const novoItem = {{
         linha: ehEdicao && clienteEmEdicao.linha ? clienteEmEdicao.linha : listaCadastroClientes.length + 2,
-        cliente,
-        local,
-        localInterno,
-        maquina,
-        modeloMaquina,
-        filialResponsavel
+        cliente, local, localInterno, maquina, modeloMaquina, filialResponsavel
       }};
+      if (ehEdicao) listaCadastroClientes[clienteEmEdicao.indexOriginal] = novoItem;
+      else listaCadastroClientes.unshift(novoItem);
 
-      if (ehEdicao) {{
-        listaCadastroClientes[clienteEmEdicao.indexOriginal] = novoItem;
-      }} else {{
-        listaCadastroClientes.unshift(novoItem);
-      }}
-
-      dadosSAC.clientes.push({{
-        cliente: cliente,
-        local: localInterno,
-        cidade: filialResponsavel
-      }});
-
+      dadosSAC.clientes.push({{ cliente, local: localInterno, cidade: filialResponsavel }});
       limparFormCliente();
       renderizarTabelaClientes();
-
       setTimeout(() => {{
-        abrirModalLoading(
-          ehEdicao ? 'Cliente Atualizado!' : 'Cadastro Concluído!',
-          'Os dados de ' + cliente + ' foram registrados na aba Clientes com sucesso.',
-          'sucesso'
-        );
-
-        exibirMensagemTopoCliente(
-          ehEdicao ? '✅ Cadastro de ' + cliente + ' atualizado!' : '✅ Cliente ' + cliente + ' cadastrado com sucesso!',
-          'Local: ' + localInterno + ' · Máquina: ' + maquina + ' · Filial: ' + filialResponsavel,
-          ehEdicao ? 'editar' : 'sucesso'
-        );
-
+        abrirModalLoading('Cliente Salvo!', 'Registro gravado com sucesso.', 'sucesso');
         setTimeout(fecharModalLoading, 1000);
       }}, 500);
     }}
 
     // =========================================================================
-    // DASHBOARD SAC
+    // GRÁFICOS DO DASHBOARD SAC (CONFIGURAÇÕES & INSTÂNCIAS COM DATALABELS)
     // =========================================================================
     const filterSACCliente = document.getElementById('filterSACCliente');
     const filterSACProduto = document.getElementById('filterSACProduto');
@@ -2375,35 +2165,19 @@ html_code = f"""
         plugins: {{
           legend: {{ display: false }},
           tooltip: {{
-            backgroundColor: '#ffffff',
-            titleColor: '#0f172a',
-            bodyColor: '#334155',
-            borderColor: '#e2e8f0',
-            borderWidth: 1,
-            padding: 10,
-            callbacks: {{
-              label: (context) => 'Ocorrências: ' + context.raw.toLocaleString('pt-BR')
-            }}
+            backgroundColor: '#ffffff', titleColor: '#0f172a', bodyColor: '#334155',
+            borderColor: '#e2e8f0', borderWidth: 1, padding: 10,
+            callbacks: {{ label: (c) => 'Ocorrências: ' + c.raw.toLocaleString('pt-BR') }}
           }},
           datalabels: {{
-            anchor: 'end',
-            align: 'right',
-            offset: 4,
-            color: '#0f172a',
+            anchor: 'end', align: 'right', offset: 4, color: '#0f172a',
             font: {{ family: 'Inter', weight: 'bold', size: 10 }},
             formatter: (v) => v ? v.toLocaleString('pt-BR') : ''
           }}
         }},
         scales: {{
-          x: {{
-            grid: {{ color: gridColor }},
-            ticks: {{ color: textColor, font: {{ size: 10 }} }},
-            beginAtZero: true
-          }},
-          y: {{
-            grid: {{ display: false }},
-            ticks: {{ color: textColor, font: {{ size: 10, weight: '600' }} }}
-          }}
+          x: {{ grid: {{ color: gridColor }}, ticks: {{ color: textColor, font: {{ size: 10 }} }}, beginAtZero: true }},
+          y: {{ grid: {{ display: false }}, ticks: {{ color: textColor, font: {{ size: 10, weight: '600' }} }} }}
         }}
       }};
     }}
@@ -2420,33 +2194,417 @@ html_code = f"""
       options: getHorizontalSACBarOptions()
     }});
 
+    // 1. Gráficos Divididos de Top 5 Locais (Mês Anterior & Mês Atual)
+    const chartLocaisAnterior = new Chart(document.getElementById('chartLocaisAnterior').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(100, 116, 139, 0.85)', borderRadius: 6 }}] }},
+      options: getHorizontalSACBarOptions()
+    }});
+
+    const chartLocaisAtual = new Chart(document.getElementById('chartLocaisAtual').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(79, 70, 229, 0.85)', borderRadius: 6 }}] }},
+      options: getHorizontalSACBarOptions()
+    }});
+
+    // 2. Gráficos Divididos de Chamados por Mês (Qtd & Valores R$) - AMBOS EM BARRAS
+    const chartMesesQtd = new Chart(document.getElementById('chartMesesQtd').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ label: 'Quantidade', data: [], backgroundColor: 'rgba(2, 132, 199, 0.85)', borderRadius: 6 }}] }},
+      options: {{
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {{ padding: {{ top: 20 }} }},
+        plugins: {{
+          legend: {{ display: false }},
+          tooltip: {{ callbacks: {{ label: (c) => 'Chamados: ' + c.raw.toLocaleString('pt-BR') }} }},
+          datalabels: {{
+            anchor: 'end', align: 'top', offset: 2, color: '#0284c7',
+            font: {{ family: 'Inter', weight: 'bold', size: 10 }},
+            formatter: (v) => v ? v.toLocaleString('pt-BR') : ''
+          }}
+        }},
+        scales: {{
+          x: {{ ticks: {{ font: {{ size: 10 }} }} }},
+          y: {{ beginAtZero: true, ticks: {{ font: {{ size: 10 }} }} }}
+        }}
+      }}
+    }});
+
+    const chartMesesVal = new Chart(document.getElementById('chartMesesVal').getContext('2d'), {{
+      type: 'bar',
+      data: {{
+        labels: [],
+        datasets: [{{
+          label: 'Valor Ressarcido',
+          data: [],
+          backgroundColor: 'rgba(16, 185, 129, 0.85)',
+          borderRadius: 6
+        }}]
+      }},
+      options: {{
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {{ padding: {{ top: 22 }} }},
+        plugins: {{
+          legend: {{ display: false }},
+          tooltip: {{ callbacks: {{ label: (c) => 'Ressarcido: ' + formatCurrency(c.raw) }} }},
+          datalabels: {{
+            anchor: 'end', align: 'top', offset: 2, color: '#047857',
+            font: {{ family: 'Inter', weight: 'bold', size: 9 }},
+            formatter: (v) => v ? 'R$' + Number(v).toLocaleString('pt-BR', {{ maximumFractionDigits: 0 }}) : ''
+          }}
+        }},
+        scales: {{
+          x: {{ ticks: {{ font: {{ size: 10 }} }} }},
+          y: {{ beginAtZero: true, ticks: {{ font: {{ size: 10 }}, callback: (v) => 'R$ ' + v.toLocaleString('pt-BR') }} }}
+        }}
+      }}
+    }});
+
+    // 3. Gráficos Divididos de Chamados por Dia (Qtd & Valores R$) - AMBOS EM BARRAS & DIAS PREENCHIDOS
+    const chartDiasQtd = new Chart(document.getElementById('chartDiasQtd').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ label: 'Quantidade', data: [], backgroundColor: 'rgba(14, 165, 233, 0.85)', borderRadius: 4 }}] }},
+      options: {{
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {{ padding: {{ top: 20 }} }},
+        plugins: {{
+          legend: {{ display: false }},
+          tooltip: {{ callbacks: {{ label: (c) => 'Chamados: ' + c.raw }} }},
+          datalabels: {{
+            anchor: 'end', align: 'top', offset: 2, color: '#0369a1',
+            font: {{ family: 'Inter', weight: 'bold', size: 10 }},
+            formatter: (v) => v ? v : ''
+          }}
+        }},
+        scales: {{
+          x: {{ ticks: {{ font: {{ size: 10 }} }} }},
+          y: {{ beginAtZero: true, ticks: {{ font: {{ size: 10 }} }} }}
+        }}
+      }}
+    }});
+
+    const chartDiasVal = new Chart(document.getElementById('chartDiasVal').getContext('2d'), {{
+      type: 'bar',
+      data: {{
+        labels: [],
+        datasets: [{{
+          label: 'Valor (R$)',
+          data: [],
+          backgroundColor: 'rgba(245, 158, 11, 0.85)',
+          borderRadius: 4
+        }}]
+      }},
+      options: {{
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {{ padding: {{ top: 22 }} }},
+        plugins: {{
+          legend: {{ display: false }},
+          tooltip: {{ callbacks: {{ label: (c) => 'Valor: ' + formatCurrency(c.raw) }} }},
+          datalabels: {{
+            anchor: 'end', align: 'top', offset: 2, color: '#b45309',
+            font: {{ family: 'Inter', weight: 'bold', size: 9 }},
+            formatter: (v) => v ? 'R$' + Number(v).toLocaleString('pt-BR', {{ maximumFractionDigits: 0 }}) : ''
+          }}
+        }},
+        scales: {{
+          x: {{ ticks: {{ font: {{ size: 10 }} }} }},
+          y: {{ beginAtZero: true, ticks: {{ font: {{ size: 10 }}, callback: (v) => 'R$' + v.toLocaleString('pt-BR') }} }}
+        }}
+      }}
+    }});
+
+    // 4. Gráfico Top 10 Locais na Semana / Período
+    const chartTop10Semana = new Chart(document.getElementById('chartTop10Semana').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(225, 29, 72, 0.85)', borderRadius: 6 }}] }},
+      options: getHorizontalSACBarOptions()
+    }});
+
+    // 5. Gráfico Top 3 Locais por Filial
+    const chartTop3Filial = new Chart(document.getElementById('chartTop3Filial').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(217, 119, 6, 0.85)', borderRadius: 6 }}] }},
+      options: getHorizontalSACBarOptions()
+    }});
+
+    // =========================================================================
+    // ATUALIZAÇÃO DOS GRÁFICOS DINÂMICOS
+    // =========================================================================
+    function parseDateToYMD(dStr) {{
+      if (!dStr) return '';
+      dStr = dStr.trim();
+      if (/^\\d{{4}}-\\d{{2}}-\\d{{2}}/.test(dStr)) return dStr.substring(0, 10);
+      const parts = dStr.split(/[/ -]/);
+      if (parts.length === 3) {{
+        if (parts[2].length === 4) return parts[2] + '-' + parts[1].padStart(2, '0') + '-' + parts[0].padStart(2, '0');
+        if (parts[0].length === 4) return parts[0] + '-' + parts[1].padStart(2, '0') + '-' + parts[2].padStart(2, '0');
+      }}
+      return '';
+    }}
+
+    function atualizarGraficoLocaisAnterior() {{
+      const mesAntInput = document.getElementById('filterMesLocaisAnterior')?.value;
+      if (!mesAntInput) return;
+      const cont = {{}};
+      listaChamadosSAC.forEach(c => {{
+        const ymd = parseDateToYMD(c.data);
+        if (ymd && ymd.startsWith(mesAntInput)) {{
+          const loc = (c.localInterno || c.cliente || 'Outros').trim();
+          cont[loc] = (cont[loc] || 0) + 1;
+        }}
+      }});
+      const truncar = (t, max = 22) => t.length > max ? t.substring(0, max) + '...' : t;
+      const top5 = Object.entries(cont).map(([nome, qt]) => ({{ nome, qt }})).sort((a,b) => b.qt - a.qt).slice(0, 5);
+      chartLocaisAnterior.data.labels = top5.map(t => truncar(t.nome));
+      chartLocaisAnterior.data.datasets[0].data = top5.map(t => t.qt);
+      chartLocaisAnterior.update();
+    }}
+
+    function atualizarGraficoLocaisAtual() {{
+      const mesAtualInput = document.getElementById('filterMesLocaisAtual')?.value;
+      if (!mesAtualInput) return;
+      const cont = {{}};
+      listaChamadosSAC.forEach(c => {{
+        const ymd = parseDateToYMD(c.data);
+        if (ymd && ymd.startsWith(mesAtualInput)) {{
+          const loc = (c.localInterno || c.cliente || 'Outros').trim();
+          cont[loc] = (cont[loc] || 0) + 1;
+        }}
+      }});
+      const truncar = (t, max = 22) => t.length > max ? t.substring(0, max) + '...' : t;
+      const top5 = Object.entries(cont).map(([nome, qt]) => ({{ nome, qt }})).sort((a,b) => b.qt - a.qt).slice(0, 5);
+      chartLocaisAtual.data.labels = top5.map(t => truncar(t.nome));
+      chartLocaisAtual.data.datasets[0].data = top5.map(t => t.qt);
+      chartLocaisAtual.update();
+    }}
+
+    function atualizarGraficoMesesQtd() {{
+      const selAno = document.getElementById('filterAnoMesesQtd')?.value || new Date().getFullYear();
+      const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      const contQtd = Array(12).fill(0);
+      listaChamadosSAC.forEach(c => {{
+        const ymd = parseDateToYMD(c.data);
+        if (ymd && ymd.startsWith(String(selAno))) {{
+          const mIdx = parseInt(ymd.substring(5, 7), 10) - 1;
+          if (mIdx >= 0 && mIdx < 12) contQtd[mIdx]++;
+        }}
+      }});
+      chartMesesQtd.data.labels = mesesNomes;
+      chartMesesQtd.data.datasets[0].data = contQtd;
+      chartMesesQtd.update();
+    }}
+
+    function atualizarGraficoMesesVal() {{
+      const selAno = document.getElementById('filterAnoMesesVal')?.value || new Date().getFullYear();
+      const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      const somaVal = Array(12).fill(0);
+      listaChamadosSAC.forEach(c => {{
+        const ymd = parseDateToYMD(c.data);
+        if (ymd && ymd.startsWith(String(selAno))) {{
+          const mIdx = parseInt(ymd.substring(5, 7), 10) - 1;
+          if (mIdx >= 0 && mIdx < 12) somaVal[mIdx] += parseValorNumerico(c.valor);
+        }}
+      }});
+      chartMesesVal.data.labels = mesesNomes;
+      chartMesesVal.data.datasets[0].data = somaVal;
+      chartMesesVal.update();
+    }}
+
+    // Pega exatamente os dias com dados preenchidos no mês selecionado
+    function atualizarGraficoDiasQtd() {{
+      const mesDiasInput = document.getElementById('filterMesDiasQtd')?.value;
+      let anoRef, mesRef;
+      if (mesDiasInput) {{
+        const parts = mesDiasInput.split('-');
+        anoRef = parseInt(parts[0], 10);
+        mesRef = parseInt(parts[1], 10);
+      }} else {{
+        const hoje = new Date();
+        anoRef = hoje.getFullYear();
+        mesRef = hoje.getMonth() + 1;
+      }}
+      const pad = (n) => String(n).padStart(2, '0');
+      const strAnoMes = anoRef + '-' + pad(mesRef);
+      const contagemPorDia = {{}};
+
+      listaChamadosSAC.forEach(c => {{
+        const ymd = parseDateToYMD(c.data);
+        if (ymd && ymd.startsWith(strAnoMes)) {{
+          const dia = ymd.substring(8, 10);
+          contagemPorDia[dia] = (contagemPorDia[dia] || 0) + 1;
+        }}
+      }});
+
+      // Ordena cronologicamente apenas os dias existentes
+      const diasPreenchidos = Object.keys(contagemPorDia).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+      chartDiasQtd.data.labels = diasPreenchidos.map(d => 'Dia ' + d);
+      chartDiasQtd.data.datasets[0].data = diasPreenchidos.map(d => contagemPorDia[d]);
+      chartDiasQtd.update();
+    }}
+
+    // Pega exatamente os dias com valores preenchidos no mês selecionado
+    function atualizarGraficoDiasVal() {{
+      const mesDiasInput = document.getElementById('filterMesDiasVal')?.value;
+      let anoRef, mesRef;
+      if (mesDiasInput) {{
+        const parts = mesDiasInput.split('-');
+        anoRef = parseInt(parts[0], 10);
+        mesRef = parseInt(parts[1], 10);
+      }} else {{
+        const hoje = new Date();
+        anoRef = hoje.getFullYear();
+        mesRef = hoje.getMonth() + 1;
+      }}
+      const pad = (n) => String(n).padStart(2, '0');
+      const strAnoMes = anoRef + '-' + pad(mesRef);
+      const somaPorDia = {{}};
+
+      listaChamadosSAC.forEach(c => {{
+        const ymd = parseDateToYMD(c.data);
+        if (ymd && ymd.startsWith(strAnoMes)) {{
+          const dia = ymd.substring(8, 10);
+          const v = parseValorNumerico(c.valor);
+          if (v > 0 || !(dia in somaPorDia)) {{
+            somaPorDia[dia] = (somaPorDia[dia] || 0) + v;
+          }}
+        }}
+      }});
+
+      // Ordena cronologicamente apenas os dias existentes
+      const diasPreenchidos = Object.keys(somaPorDia).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+      chartDiasVal.data.labels = diasPreenchidos.map(d => 'Dia ' + d);
+      chartDiasVal.data.datasets[0].data = diasPreenchidos.map(d => somaPorDia[d]);
+      chartDiasVal.update();
+    }}
+
+    function atualizarGraficoTopSemana() {{
+      const dtIni = document.getElementById('filterTopSemanaDtIni')?.value;
+      const dtFim = document.getElementById('filterTopSemanaDtFim')?.value;
+      const cont = {{}};
+
+      listaChamadosSAC.forEach(c => {{
+        const ymd = parseDateToYMD(c.data);
+        if (!ymd) return;
+        if (dtIni && ymd < dtIni) return;
+        if (dtFim && ymd > dtFim) return;
+        const loc = (c.localInterno || c.cliente || 'Outros').trim();
+        cont[loc] = (cont[loc] || 0) + 1;
+      }});
+
+      const truncar = (t, max = 26) => t.length > max ? t.substring(0, max) + '...' : t;
+      const top10 = Object.entries(cont).map(([nome, qt]) => ({{ nome, qt }})).sort((a,b) => b.qt - a.qt).slice(0, 10);
+      chartTop10Semana.data.labels = top10.map(t => truncar(t.nome));
+      chartTop10Semana.data.datasets[0].data = top10.map(t => t.qt);
+      chartTop10Semana.update();
+    }}
+
+    function atualizarGraficoTopFilial() {{
+      const filial = document.getElementById('filterTopFilialSelect')?.value || 'ALL';
+      const dtIni = document.getElementById('filterTopFilialDtIni')?.value;
+      const dtFim = document.getElementById('filterTopFilialDtFim')?.value;
+      const cont = {{}};
+
+      listaChamadosSAC.forEach(c => {{
+        const ymd = parseDateToYMD(c.data);
+        if (!ymd) return;
+        if (dtIni && ymd < dtIni) return;
+        if (dtFim && ymd > dtFim) return;
+        if (filial !== 'ALL' && (c.cidade || '').toLowerCase() !== filial.toLowerCase()) return;
+        const loc = (c.localInterno || c.cliente || 'Outros').trim();
+        cont[loc] = (cont[loc] || 0) + 1;
+      }});
+
+      const truncar = (t, max = 26) => t.length > max ? t.substring(0, max) + '...' : t;
+      const top3 = Object.entries(cont).map(([nome, qt]) => ({{ nome, qt }})).sort((a,b) => b.qt - a.qt).slice(0, 3);
+      chartTop3Filial.data.labels = top3.map(t => truncar(t.nome));
+      chartTop3Filial.data.datasets[0].data = top3.map(t => t.qt);
+      chartTop3Filial.update();
+    }}
+
     function inicializarFiltrosDashboardSAC() {{
       const clientesUnicos = [...new Set(listaChamadosSAC.map(c => c.cliente).filter(Boolean))].sort();
       filterSACCliente.innerHTML = '<option value="ALL">Todos os Clientes</option>';
       clientesUnicos.forEach(cli => {{
-        const opt = document.createElement('option');
-        opt.value = cli;
-        opt.textContent = cli;
+        const opt = document.createElement('option'); opt.value = cli; opt.textContent = cli;
         filterSACCliente.appendChild(opt);
       }});
 
       const atendentesUnicos = [...new Set(listaChamadosSAC.map(c => c.atendente).filter(Boolean))].sort();
       filterSACAtendente.innerHTML = '<option value="ALL">Todos os Atendentes</option>';
       atendentesUnicos.forEach(a => {{
-        const opt = document.createElement('option');
-        opt.value = a;
-        opt.textContent = a;
+        const opt = document.createElement('option'); opt.value = a; opt.textContent = a;
         filterSACAtendente.appendChild(opt);
+      }});
+
+      const anosUnicos = [...new Set(listaChamadosSAC.map(c => {{
+        const ymd = parseDateToYMD(c.data);
+        return ymd ? ymd.substring(0, 4) : '';
+      }}).filter(Boolean))].sort().reverse();
+      const anoAtual = String(new Date().getFullYear());
+      if (!anosUnicos.length) anosUnicos.push(anoAtual);
+
+      const selAnoQtd = document.getElementById('filterAnoMesesQtd');
+      const selAnoVal = document.getElementById('filterAnoMesesVal');
+      selAnoQtd.innerHTML = '';
+      selAnoVal.innerHTML = '';
+      anosUnicos.forEach(a => {{
+        const opt1 = document.createElement('option'); opt1.value = a; opt1.textContent = a; selAnoQtd.appendChild(opt1);
+        const opt2 = document.createElement('option'); opt2.value = a; opt2.textContent = a; selAnoVal.appendChild(opt2);
+      }});
+      selAnoQtd.value = anosUnicos.includes(anoAtual) ? anoAtual : anosUnicos[0];
+      selAnoVal.value = anosUnicos.includes(anoAtual) ? anoAtual : anosUnicos[0];
+
+      const hoje = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const anoHoje = hoje.getFullYear();
+      const mesHoje = hoje.getMonth() + 1;
+      const strMesAtual = anoHoje + '-' + pad(mesHoje);
+
+      let mesAnt = mesHoje - 1;
+      let anoAnt = anoHoje;
+      if (mesAnt === 0) {{ mesAnt = 12; anoAnt--; }}
+      const strMesAnt = anoAnt + '-' + pad(mesAnt);
+
+      const elLocAnt = document.getElementById('filterMesLocaisAnterior');
+      if (elLocAnt) elLocAnt.value = strMesAnt;
+
+      const elLocAtu = document.getElementById('filterMesLocaisAtual');
+      if (elLocAtu) elLocAtu.value = strMesAtual;
+
+      const elDiasQtd = document.getElementById('filterMesDiasQtd');
+      if (elDiasQtd) elDiasQtd.value = strMesAtual;
+
+      const elDiasVal = document.getElementById('filterMesDiasVal');
+      if (elDiasVal) elDiasVal.value = strMesAtual;
+
+      const dFim = hoje.toISOString().split('T')[0];
+      const dIniDate = new Date();
+      dIniDate.setDate(dIniDate.getDate() - 7);
+      const dIni = dIniDate.toISOString().split('T')[0];
+
+      const sDtIni = document.getElementById('filterTopSemanaDtIni');
+      const sDtFim = document.getElementById('filterTopSemanaDtFim');
+      if (sDtIni) sDtIni.value = dIni;
+      if (sDtFim) sDtFim.value = dFim;
+
+      const fDtIni = document.getElementById('filterTopFilialDtIni');
+      const fDtFim = document.getElementById('filterTopFilialDtFim');
+      if (fDtIni) fDtIni.value = dIni;
+      if (fDtFim) fDtFim.value = dFim;
+
+      const selFilial = document.getElementById('filterTopFilialSelect');
+      selFilial.innerHTML = '<option value="ALL">Todas as Filiais</option>';
+      const filiais = [...new Set(listaChamadosSAC.map(c => c.cidade).filter(Boolean))].sort();
+      filiais.forEach(f => {{
+        const opt = document.createElement('option'); opt.value = f; opt.textContent = f;
+        selFilial.appendChild(opt);
       }});
     }}
     inicializarFiltrosDashboardSAC();
-
-    function parseValorNumerico(v) {{
-      if (!v) return 0;
-      const s = String(v).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.');
-      const n = parseFloat(s);
-      return isNaN(n) ? 0 : n;
-    }}
 
     function atualizarDashboardSAC() {{
       const cliVal = filterSACCliente.value;
@@ -2480,7 +2638,6 @@ html_code = f"""
 
       document.getElementById('kpiSACTotal').innerText = totalChamados.toLocaleString('pt-BR');
       document.getElementById('kpiSACTotalSub').innerText = totalChamados + ' ocorrências registradas';
-
       document.getElementById('kpiSACValorTotal').innerText = formatCurrency(somaValor);
       document.getElementById('kpiSACCafé').innerText = chamadosCafe.toLocaleString('pt-BR');
       document.getElementById('kpiSACCaféPct').innerText = pctCafe + '%';
@@ -2489,7 +2646,7 @@ html_code = f"""
       document.getElementById('kpiSACClientes').innerText = new Set(filtrados.map(c => c.cliente)).size;
       document.getElementById('kpiSACTicketMedio').innerText = formatCurrency(ticketMedio);
 
-      // Gráfico de Problemas
+      // Atualiza Top Problemas
       const probContagem = {{}};
       filtrados.forEach(c => {{
         const p = (c.problemas || 'Outros').trim();
@@ -2501,7 +2658,7 @@ html_code = f"""
       chartTopProblemasSAC.data.datasets[0].data = top10Problemas.map(p => p.qt);
       chartTopProblemasSAC.update();
 
-      // Gráfico de Atendentes
+      // Atualiza Chamados por Atendente
       const atendContagem = {{}};
       filtrados.forEach(c => {{
         const a = (c.atendente || 'Não Informado').trim();
@@ -2511,6 +2668,16 @@ html_code = f"""
       chartAtendentesSAC.data.labels = topAtendentes.map(a => truncar(a.nome));
       chartAtendentesSAC.data.datasets[0].data = topAtendentes.map(a => a.qt);
       chartAtendentesSAC.update();
+
+      // Dispara renderização dos gráficos divididos com filtros dinâmicos
+      atualizarGraficoLocaisAnterior();
+      atualizarGraficoLocaisAtual();
+      atualizarGraficoMesesQtd();
+      atualizarGraficoMesesVal();
+      atualizarGraficoDiasQtd();
+      atualizarGraficoDiasVal();
+      atualizarGraficoTopSemana();
+      atualizarGraficoTopFilial();
     }}
 
     [filterSACCliente, filterSACProduto, filterSACAtendente].forEach(el => el.addEventListener('change', atualizarDashboardSAC));
@@ -2521,13 +2688,10 @@ html_code = f"""
       atualizarDashboardSAC();
     }});
 
-    // =========================================================================
-    // DISPARO INICIAL
-    // =========================================================================
     verificarEstadoAutenticacao();
   </script>
 </body>
 </html>
 """
 
-components.html(html_code, height=2700, scrolling=True)
+components.html(html_code, height=4200, scrolling=True)
