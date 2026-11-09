@@ -421,7 +421,7 @@ html_code = f"""
   <!-- CONTAINER DO SISTEMA LOGADO -->
   <div id="systemAppContainer" class="hidden">
 
-    <!-- Header Superior -->
+    <!-- Cabeçalho Superior -->
     <header class="sticky top-0 z-40 bg-white/95 border-b border-slate-200 backdrop-blur-md px-6 py-3">
       <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
         <div class="flex items-center gap-4">
@@ -794,13 +794,14 @@ html_code = f"""
                   <datalist id="listaSACFormasPgto"></datalist>
                 </div>
 
-                <!-- Reembolso (Começa limpo com opção de seleção) -->
+                <!-- Reembolso (Começa limpo com pré-lista atualizada) -->
                 <div class="md:col-span-2">
                   <label class="block text-xs font-bold text-sky-900 mb-1">Reembolso</label>
                   <select id="sacReembolso" class="w-full text-sm font-semibold rounded-xl border border-sky-300 bg-white px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                     <option value="" selected>Selecione o reembolso...</option>
                     <option value="Devolução Stone">Devolução Stone</option>
                     <option value="Pendente">Pendente</option>
+                    <option value="Crédito Remoto">Crédito Remoto</option>
                   </select>
                 </div>
 
@@ -1057,9 +1058,9 @@ html_code = f"""
                   <input type="text" id="cadCliModeloMaquina" placeholder="Ex: Lei Saeco, Krea, Snaky..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
 
-                <!-- Filial Responsavel -->
+                <!-- Filial Responsável -->
                 <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1">Filial Responsavel *</label>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Filial Responsável *</label>
                   <input list="listaSACCidades" id="cadCliFilial" placeholder="Ex: Ribeirão Preto, São Carlos..." required onblur="formatarNomeProprio(this)" class="w-full text-sm rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
 
@@ -1699,7 +1700,9 @@ html_code = f"""
 
       // Ajusta o select de Reembolso para as opções válidas
       const rmbVal = (item.reembolso || '').trim().toLowerCase();
-      if (rmbVal.includes('pendente')) {{
+      if (rmbVal.includes('remoto') || rmbVal.includes('crédito') || rmbVal.includes('credito')) {{
+        document.getElementById('sacReembolso').value = 'Crédito Remoto';
+      }} else if (rmbVal.includes('pendente')) {{
         document.getElementById('sacReembolso').value = 'Pendente';
       }} else if (rmbVal.includes('stone') || rmbVal.includes('devolução') || rmbVal.includes('devolucao')) {{
         document.getElementById('sacReembolso').value = 'Devolução Stone';
@@ -2002,7 +2005,7 @@ html_code = f"""
         dataHoraLancamento = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR');
       }}
 
-      // REGRA: Ao editar e marcar status Pagos / Reembolso Realizado como "Sim", grava Atendente logado no Financeiro Responsavel
+      // REGRA: Ao editar e marcar status Pagos / Reembolso Realizado como "Sim", grava Atendente logado no Financeiro Responsável
       let financeiroResponsavel = "";
       if (ehEdicao && chamadoEmEdicao) {{
         financeiroResponsavel = chamadoEmEdicao.financeiroResponsavel || "";
