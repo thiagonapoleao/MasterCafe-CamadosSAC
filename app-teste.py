@@ -673,7 +673,7 @@ html_code = f"""
             <div class="relative h-80"><canvas id="chartMesesQtd"></canvas></div>
           </div>
 
-          <!-- Valores de Chamados por Mês (R$) -->
+          <!-- Valores de Chamados por Mês (R$) - AGORA EM BARRAS -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
               <div>
@@ -694,7 +694,7 @@ html_code = f"""
 
         <!-- SEPARADOS: CHAMADOS POR DIA (QUANTIDADE) & CHAMADOS POR DIA (VALORES R$) -->
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <!-- Quantidade de Chamados por Dia -->
+          <!-- Quantidade de Chamados por Dia (Dias Preenchidos) -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
               <div>
@@ -702,7 +702,7 @@ html_code = f"""
                   <i data-lucide="calendar-days" class="w-4 h-4 text-sky-600"></i>
                   Chamados por Dia (Quantidade)
                 </h3>
-                <p class="text-xs text-slate-400">Evolução diária de atendimentos no mês</p>
+                <p class="text-xs text-slate-400">Dias com atendimentos registrados no mês</p>
               </div>
               <div class="flex items-center gap-2">
                 <label class="text-[11px] font-bold text-slate-500">Mês:</label>
@@ -712,7 +712,7 @@ html_code = f"""
             <div class="relative h-80"><canvas id="chartDiasQtd"></canvas></div>
           </div>
 
-          <!-- Valores de Chamados por Dia (R$) -->
+          <!-- Valores de Chamados por Dia (R$) - AGORA EM BARRAS & DIAS PREENCHIDOS -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
               <div>
@@ -720,7 +720,7 @@ html_code = f"""
                   <i data-lucide="trending-up" class="w-4 h-4 text-amber-600"></i>
                   Valores por Dia (R$)
                 </h3>
-                <p class="text-xs text-slate-400">Soma diária de reembolsos no mês</p>
+                <p class="text-xs text-slate-400">Dias com reembolsos registrados no mês</p>
               </div>
               <div class="flex items-center gap-2">
                 <label class="text-[11px] font-bold text-slate-500">Mês:</label>
@@ -1225,6 +1225,32 @@ html_code = f"""
       nivelAcessoLogado = sessionStorage.getItem('sac_nivel_acesso') || "";
     }} catch(e) {{}}
 
+    // CONVERSORES DE DATAS ENTRE ISO (YYYY-MM-DD) E PT-BR (DD/MM/AAAA)
+    function dataIsoParaPtBr(isoStr) {{
+      if (!isoStr) return '';
+      const s = String(isoStr).trim();
+      if (/^\\d{{4}}-\\d{{2}}-\\d{{2}}/.test(s)) {{
+        const [a, m, d] = s.substring(0, 10).split('-');
+        return `${{d}}/${{m}}/${{a}}`;
+      }}
+      return s;
+    }}
+
+    function dataPtBrParaIso(ptBrStr) {{
+      if (!ptBrStr) return '';
+      const s = String(ptBrStr).trim();
+      const parts = s.split(/[/ -]/);
+      if (parts.length === 3) {{
+        if (parts[2].length === 4) {{
+          return `${{parts[2]}}-${{parts[1].padStart(2, '0')}}-${{parts[0].padStart(2, '0')}}`;
+        }}
+        if (parts[0].length === 4) {{
+          return `${{parts[0]}}-${{parts[1].padStart(2, '0')}}-${{parts[2].padStart(2, '0')}}`;
+        }}
+      }}
+      return '';
+    }}
+
     // PARSER RIGOROSO DE VALORES NUMÉRICOS (COLUNA J)
     function parseValorNumerico(v) {{
       if (v === null || v === undefined) return 0;
@@ -1690,14 +1716,14 @@ html_code = f"""
       switchPage('sac');
       chamadoEmEdicao = item;
       document.getElementById('sacChamado').value = item.chamado;
-      document.getElementById('sacData').value = item.data;
+      document.getElementById('sacData').value = dataPtBrParaIso(item.data);
       document.getElementById('sacCliente').value = item.cliente;
       aoMudarClienteSAC();
       document.getElementById('sacLocalInterno').value = item.localInterno;
       document.getElementById('sacCidade').value = item.cidade;
       document.getElementById('sacDescricao').value = item.descricao;
       document.getElementById('sacProduto').value = item.produto || '';
-      document.getElementById('sacDataTransacao').value = item.dataTransacao || '';
+      document.getElementById('sacDataTransacao').value = dataPtBrParaIso(item.dataTransacao) || '';
       document.getElementById('sacHoraTransacao').value = item.horaTransacao || '';
       document.getElementById('sacValor').value = parseValorNumerico(item.valor) || '';
       document.getElementById('sacNome').value = item.nomeSobrenome;
@@ -1792,13 +1818,17 @@ html_code = f"""
         'loading'
       );
 
-      const data = document.getElementById('sacData').value;
+      // Data dos chamados no padrão oficial PT-BR DD/MM/AAAA
+      const dataIso = document.getElementById('sacData').value;
+      const data = dataIsoParaPtBr(dataIso);
+
       const cliente = document.getElementById('sacCliente').value.trim();
       const localInterno = document.getElementById('sacLocalInterno').value;
       const cidade = document.getElementById('sacCidade').value.trim();
       const descricao = document.getElementById('sacDescricao').value.trim();
       const produto = document.getElementById('sacProduto').value;
-      const dataTransacao = document.getElementById('sacDataTransacao').value;
+      const dataTransacaoIso = document.getElementById('sacDataTransacao').value;
+      const dataTransacao = dataIsoParaPtBr(dataTransacaoIso);
       const horaTransacao = document.getElementById('sacHoraTransacao').value;
       const valor = parseFloat(document.getElementById('sacValor').value) || 0;
       const nomeSobrenome = converterParaPrimeirasMaiusculas(document.getElementById('sacNome').value.trim());
@@ -2118,7 +2148,7 @@ html_code = f"""
     }}
 
     // =========================================================================
-    // GRÁFICOS DO DASHBOARD SAC (CONFIGURAÇÕES & INSTÂNCIAS)
+    // GRÁFICOS DO DASHBOARD SAC (CONFIGURAÇÕES & INSTÂNCIAS COM DATALABELS)
     // =========================================================================
     const filterSACCliente = document.getElementById('filterSACCliente');
     const filterSACProduto = document.getElementById('filterSACProduto');
@@ -2131,7 +2161,7 @@ html_code = f"""
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
-        layout: {{ padding: {{ right: 35, left: 10, top: 10, bottom: 10 }} }},
+        layout: {{ padding: {{ right: 40, left: 10, top: 10, bottom: 10 }} }},
         plugins: {{
           legend: {{ display: false }},
           tooltip: {{
@@ -2177,20 +2207,21 @@ html_code = f"""
       options: getHorizontalSACBarOptions()
     }});
 
-    // 2. Gráficos Divididos de Chamados por Mês (Qtd & Valores R$)
+    // 2. Gráficos Divididos de Chamados por Mês (Qtd & Valores R$) - AMBOS EM BARRAS
     const chartMesesQtd = new Chart(document.getElementById('chartMesesQtd').getContext('2d'), {{
       type: 'bar',
       data: {{ labels: [], datasets: [{{ label: 'Quantidade', data: [], backgroundColor: 'rgba(2, 132, 199, 0.85)', borderRadius: 6 }}] }},
       options: {{
         responsive: true,
         maintainAspectRatio: false,
+        layout: {{ padding: {{ top: 20 }} }},
         plugins: {{
           legend: {{ display: false }},
           tooltip: {{ callbacks: {{ label: (c) => 'Chamados: ' + c.raw.toLocaleString('pt-BR') }} }},
           datalabels: {{
             anchor: 'end', align: 'top', offset: 2, color: '#0284c7',
             font: {{ family: 'Inter', weight: 'bold', size: 10 }},
-            formatter: (v) => v || ''
+            formatter: (v) => v ? v.toLocaleString('pt-BR') : ''
           }}
         }},
         scales: {{
@@ -2201,27 +2232,28 @@ html_code = f"""
     }});
 
     const chartMesesVal = new Chart(document.getElementById('chartMesesVal').getContext('2d'), {{
-      type: 'line',
+      type: 'bar',
       data: {{
         labels: [],
         datasets: [{{
           label: 'Valor Ressarcido',
           data: [],
-          borderColor: 'rgba(16, 185, 129, 1)',
-          backgroundColor: 'rgba(16, 185, 129, 0.15)',
-          fill: true,
-          borderWidth: 2.5,
-          tension: 0.25,
-          pointRadius: 3.5
+          backgroundColor: 'rgba(16, 185, 129, 0.85)',
+          borderRadius: 6
         }}]
       }},
       options: {{
         responsive: true,
         maintainAspectRatio: false,
+        layout: {{ padding: {{ top: 22 }} }},
         plugins: {{
           legend: {{ display: false }},
           tooltip: {{ callbacks: {{ label: (c) => 'Ressarcido: ' + formatCurrency(c.raw) }} }},
-          datalabels: {{ display: false }}
+          datalabels: {{
+            anchor: 'end', align: 'top', offset: 2, color: '#047857',
+            font: {{ family: 'Inter', weight: 'bold', size: 9 }},
+            formatter: (v) => v ? 'R$' + Number(v).toLocaleString('pt-BR', {{ maximumFractionDigits: 0 }}) : ''
+          }}
         }},
         scales: {{
           x: {{ ticks: {{ font: {{ size: 10 }} }} }},
@@ -2230,51 +2262,57 @@ html_code = f"""
       }}
     }});
 
-    // 3. Gráficos Divididos de Chamados por Dia (Qtd & Valores R$)
+    // 3. Gráficos Divididos de Chamados por Dia (Qtd & Valores R$) - AMBOS EM BARRAS & DIAS PREENCHIDOS
     const chartDiasQtd = new Chart(document.getElementById('chartDiasQtd').getContext('2d'), {{
       type: 'bar',
       data: {{ labels: [], datasets: [{{ label: 'Quantidade', data: [], backgroundColor: 'rgba(14, 165, 233, 0.85)', borderRadius: 4 }}] }},
       options: {{
         responsive: true,
         maintainAspectRatio: false,
+        layout: {{ padding: {{ top: 20 }} }},
         plugins: {{
           legend: {{ display: false }},
           tooltip: {{ callbacks: {{ label: (c) => 'Chamados: ' + c.raw }} }},
-          datalabels: {{ display: false }}
+          datalabels: {{
+            anchor: 'end', align: 'top', offset: 2, color: '#0369a1',
+            font: {{ family: 'Inter', weight: 'bold', size: 10 }},
+            formatter: (v) => v ? v : ''
+          }}
         }},
         scales: {{
-          x: {{ ticks: {{ font: {{ size: 9 }} }} }},
-          y: {{ beginAtZero: true, ticks: {{ font: {{ size: 9 }} }} }}
+          x: {{ ticks: {{ font: {{ size: 10 }} }} }},
+          y: {{ beginAtZero: true, ticks: {{ font: {{ size: 10 }} }} }}
         }}
       }}
     }});
 
     const chartDiasVal = new Chart(document.getElementById('chartDiasVal').getContext('2d'), {{
-      type: 'line',
+      type: 'bar',
       data: {{
         labels: [],
         datasets: [{{
           label: 'Valor (R$)',
           data: [],
-          borderColor: 'rgba(245, 158, 11, 1)',
-          backgroundColor: 'rgba(245, 158, 11, 0.15)',
-          fill: true,
-          borderWidth: 2,
-          pointRadius: 2.5,
-          tension: 0.2
+          backgroundColor: 'rgba(245, 158, 11, 0.85)',
+          borderRadius: 4
         }}]
       }},
       options: {{
         responsive: true,
         maintainAspectRatio: false,
+        layout: {{ padding: {{ top: 22 }} }},
         plugins: {{
           legend: {{ display: false }},
           tooltip: {{ callbacks: {{ label: (c) => 'Valor: ' + formatCurrency(c.raw) }} }},
-          datalabels: {{ display: false }}
+          datalabels: {{
+            anchor: 'end', align: 'top', offset: 2, color: '#b45309',
+            font: {{ family: 'Inter', weight: 'bold', size: 9 }},
+            formatter: (v) => v ? 'R$' + Number(v).toLocaleString('pt-BR', {{ maximumFractionDigits: 0 }}) : ''
+          }}
         }},
         scales: {{
-          x: {{ ticks: {{ font: {{ size: 9 }} }} }},
-          y: {{ beginAtZero: true, ticks: {{ font: {{ size: 9 }}, callback: (v) => 'R$' + v.toLocaleString('pt-BR') }} }}
+          x: {{ ticks: {{ font: {{ size: 10 }} }} }},
+          y: {{ beginAtZero: true, ticks: {{ font: {{ size: 10 }}, callback: (v) => 'R$' + v.toLocaleString('pt-BR') }} }}
         }}
       }}
     }});
@@ -2376,6 +2414,7 @@ html_code = f"""
       chartMesesVal.update();
     }}
 
+    // Pega exatamente os dias com dados preenchidos no mês selecionado
     function atualizarGraficoDiasQtd() {{
       const mesDiasInput = document.getElementById('filterMesDiasQtd')?.value;
       let anoRef, mesRef;
@@ -2390,23 +2429,24 @@ html_code = f"""
       }}
       const pad = (n) => String(n).padStart(2, '0');
       const strAnoMes = anoRef + '-' + pad(mesRef);
-      const totalDias = new Date(anoRef, mesRef, 0).getDate();
-      const labels = [];
-      const dataQtd = Array(totalDias).fill(0);
-      for (let i = 1; i <= totalDias; i++) labels.push(pad(i));
+      const contagemPorDia = {{}};
 
       listaChamadosSAC.forEach(c => {{
         const ymd = parseDateToYMD(c.data);
         if (ymd && ymd.startsWith(strAnoMes)) {{
-          const dia = parseInt(ymd.substring(8, 10), 10);
-          if (dia >= 1 && dia <= totalDias) dataQtd[dia - 1]++;
+          const dia = ymd.substring(8, 10);
+          contagemPorDia[dia] = (contagemPorDia[dia] || 0) + 1;
         }}
       }});
-      chartDiasQtd.data.labels = labels;
-      chartDiasQtd.data.datasets[0].data = dataQtd;
+
+      // Ordena cronologicamente apenas os dias existentes
+      const diasPreenchidos = Object.keys(contagemPorDia).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+      chartDiasQtd.data.labels = diasPreenchidos.map(d => 'Dia ' + d);
+      chartDiasQtd.data.datasets[0].data = diasPreenchidos.map(d => contagemPorDia[d]);
       chartDiasQtd.update();
     }}
 
+    // Pega exatamente os dias com valores preenchidos no mês selecionado
     function atualizarGraficoDiasVal() {{
       const mesDiasInput = document.getElementById('filterMesDiasVal')?.value;
       let anoRef, mesRef;
@@ -2421,20 +2461,23 @@ html_code = f"""
       }}
       const pad = (n) => String(n).padStart(2, '0');
       const strAnoMes = anoRef + '-' + pad(mesRef);
-      const totalDias = new Date(anoRef, mesRef, 0).getDate();
-      const labels = [];
-      const dataVal = Array(totalDias).fill(0);
-      for (let i = 1; i <= totalDias; i++) labels.push(pad(i));
+      const somaPorDia = {{}};
 
       listaChamadosSAC.forEach(c => {{
         const ymd = parseDateToYMD(c.data);
         if (ymd && ymd.startsWith(strAnoMes)) {{
-          const dia = parseInt(ymd.substring(8, 10), 10);
-          if (dia >= 1 && dia <= totalDias) dataVal[dia - 1] += parseValorNumerico(c.valor);
+          const dia = ymd.substring(8, 10);
+          const v = parseValorNumerico(c.valor);
+          if (v > 0 || !(dia in somaPorDia)) {{
+            somaPorDia[dia] = (somaPorDia[dia] || 0) + v;
+          }}
         }}
       }});
-      chartDiasVal.data.labels = labels;
-      chartDiasVal.data.datasets[0].data = dataVal;
+
+      // Ordena cronologicamente apenas os dias existentes
+      const diasPreenchidos = Object.keys(somaPorDia).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+      chartDiasVal.data.labels = diasPreenchidos.map(d => 'Dia ' + d);
+      chartDiasVal.data.datasets[0].data = diasPreenchidos.map(d => somaPorDia[d]);
       chartDiasVal.update();
     }}
 
