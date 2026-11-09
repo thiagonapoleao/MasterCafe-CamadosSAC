@@ -597,7 +597,7 @@ html_code = f"""
               <div class="p-2 bg-amber-500 text-white rounded-xl"><i data-lucide="edit-3" class="w-5 h-5"></i></div>
               <div>
                 <p class="text-sm font-bold">Modo de Edição de Chamado: <span id="labelSACEditChamado" class="font-mono text-amber-800">SAC-0000-0000</span></p>
-                <p class="text-xs text-amber-700">Você está alterando este chamado do SAC. Ao salvar, os dados serão atualizados na planilha.</p>
+                <p class="text-xs text-amber-700">Você está alterando este chamado do SAC. O atendente criador e a data/hora original de abertura serão mantidos.</p>
               </div>
             </div>
             <button type="button" onclick="cancelarEdicaoSAC()" class="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 rounded-xl text-xs font-bold text-amber-900 transition cursor-pointer">
@@ -1065,6 +1065,7 @@ html_code = f"""
     let listaCadastroClientes = Array.isArray(dadosSAC.cadastro_clientes) ? dadosSAC.cadastro_clientes : [];
     let chamadoEmEdicao = null;
     let clienteEmEdicao = null;
+    let origemEdicaoSAC = 'sac';
     
     // VARIÁVEIS GLOBAIS DE SESSÃO
     let atendenteSACLogado = "";
@@ -1588,14 +1589,16 @@ html_code = f"""
       document.getElementById('sacChamado').value = calcularPreviaProximoChamado(anoAtual);
       document.getElementById('sacData').value = new Date().toISOString().split('T')[0];
       document.getElementById('sacAtendente').value = atendenteSACLogado;
+      document.getElementById('sacDataHoraAuto').value = "Automático no Envio";
 
       lucide.createIcons();
     }}
 
-    function editarChamadoSAC(numeroChamado) {{
+    function editarChamadoSAC(numeroChamado, origem = 'sac') {{
       const item = listaChamadosSAC.find(c => c.chamado === numeroChamado);
       if (!item) return;
 
+      origemEdicaoSAC = origem;
       switchPage('sac');
       chamadoEmEdicao = item;
       document.getElementById('sacChamado').value = item.chamado;
@@ -1617,7 +1620,10 @@ html_code = f"""
       document.getElementById('sacFormaPgto').value = item.formaPgto;
       document.getElementById('sacReembolso').value = item.reembolso || '';
       document.getElementById('sacPix').value = item.pix || '';
+      
+      // Preserva e exibe o atendente e a data/hora originais
       document.getElementById('sacAtendente').value = item.atendente || atendenteSACLogado;
+      document.getElementById('sacDataHoraAuto').value = item.dataHoraLancamento || 'Original Preservado';
 
       document.getElementById('alertSACEditMode').classList.remove('hidden');
       document.getElementById('labelSACEditChamado').innerText = item.chamado;
@@ -1629,7 +1635,12 @@ html_code = f"""
     }}
 
     function cancelarEdicaoSAC() {{
+      const origemAnterior = origemEdicaoSAC;
       limparFormSAC();
+      if (origemAnterior === 'chamadosAbertos') {{
+        switchPage('chamadosAbertos');
+      }}
+      origemEdicaoSAC = 'sac';
     }}
 
     function excluirChamadoSAC(numeroChamado) {{
@@ -1712,7 +1723,7 @@ html_code = f"""
         <tr class="hover:bg-slate-50 transition">
           <td class="py-2 px-3 whitespace-nowrap">
             <div class="flex items-center gap-1.5">
-              <button type="button" onclick="editarChamadoSAC('${{c.chamado}}')" title="Editar chamado ${{c.chamado}}" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
+              <button type="button" onclick="editarChamadoSAC('${{c.chamado}}', 'sac')" title="Editar chamado ${{c.chamado}}" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
                 <i data-lucide="edit-2" class="w-3 h-3"></i>
                 Editar
               </button>
@@ -1764,7 +1775,7 @@ html_code = f"""
           <td class="py-2.5 px-3 text-sky-900 font-semibold">${{c.reembolso || '-'}}</td>
           <td class="py-2.5 px-3 font-mono text-slate-600">${{c.pix || '-'}}</td>
           <td class="py-2.5 px-3 text-center whitespace-nowrap">
-            <button type="button" onclick="editarChamadoSAC('${{c.chamado}}')" title="Editar chamado ${{c.chamado}}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
+            <button type="button" onclick="editarChamadoSAC('${{c.chamado}}', 'chamadosAbertos')" title="Editar chamado ${{c.chamado}}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 transition cursor-pointer">
               <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
               Editar
             </button>
@@ -1859,10 +1870,19 @@ html_code = f"""
       const formaPgto = document.getElementById('sacFormaPgto').value.trim();
       const reembolso = converterParaPrimeirasMaiusculas(document.getElementById('sacReembolso').value.trim());
       const pix = document.getElementById('sacPix').value.trim();
-      const atendente = atendenteSACLogado || document.getElementById('sacAtendente').value;
-      
-      const agora = new Date();
-      const dataHoraLancamento = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR');
+
+      // REGRA: Preserva atendente original e data/hora original se estiver em modo edição
+      let atendente = "";
+      let dataHoraLancamento = "";
+
+      if (ehEdicao && chamadoEmEdicao) {{
+        atendente = chamadoEmEdicao.atendente || document.getElementById('sacAtendente').value || atendenteSACLogado;
+        dataHoraLancamento = chamadoEmEdicao.dataHoraLancamento || "";
+      }} else {{
+        atendente = atendenteSACLogado || document.getElementById('sacAtendente').value;
+        const agora = new Date();
+        dataHoraLancamento = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR');
+      }}
 
       const payloadSAC = {{
         "acao": ehEdicao ? "editar" : "inserir",
@@ -1925,9 +1945,13 @@ html_code = f"""
         dadosSAC.maior_sac_ano[ano] = Math.max(dadosSAC.maior_sac_ano[ano] || 0, seq);
       }}
 
+      // Memoriza para onde redirecionar antes de limpar o formulário
+      const destinoAposSalvar = (ehEdicao && origemEdicaoSAC === 'chamadosAbertos') ? 'chamadosAbertos' : 'sac';
+
       limparFormSAC();
       renderizarTabelaChamadosSAC();
       renderizarTabelaChamadosAbertos();
+      origemEdicaoSAC = 'sac';
 
       setTimeout(() => {{
         abrirModalLoading(
@@ -1936,9 +1960,13 @@ html_code = f"""
           'sucesso'
         );
 
+        if (destinoAposSalvar === 'chamadosAbertos') {{
+          switchPage('chamadosAbertos');
+        }}
+
         exibirMensagemTopo(
           ehEdicao ? '✅ Ocorrência ' + chamado + ' atualizada com sucesso!' : '✅ Ocorrência ' + chamado + ' lançada com sucesso!',
-          'Cliente: ' + cliente + ' (' + localInterno + ') · Filial: ' + cidade + ' · Atendente: ' + atendente + ' · Valor: ' + formatCurrency(valor),
+          'Cliente: ' + cliente + ' (' + localInterno + ') · Filial: ' + cidade + ' · Atendente Original: ' + atendente + ' · Valor: ' + formatCurrency(valor),
           ehEdicao ? 'editar' : 'sucesso'
         );
 
