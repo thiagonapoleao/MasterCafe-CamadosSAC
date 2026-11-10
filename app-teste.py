@@ -63,7 +63,6 @@ logo_base64_src = obter_logo_base64()
 # IDs e GIDs de Planilhas
 SPREADSHEET_SAC_ID = "1YUS9AwQti0Gl79X-TGCIqZSkOfF0bE0BX5gyDClo3rc"
 GID_SAC_CHAMADOS = "0"                 # Histórico completo
-GID_SAC_CHAMADOS_MENSAL = "11223344"   # GID da aba 'Chamado Mensal' (ou export por sheet)
 GID_SAC_CLIENTES = "1332839106"
 GID_SAC_USUARIOS = "437161325"
 
@@ -71,7 +70,7 @@ SPREADSHEET_SAC_CONFIG_ID = "1vOa6QpGPZ6rZ1doT2RRU1SAXWR5usPzv"
 GID_SAC_CONFIGS = "1833376686"
 
 URL_CSV_SAC_CHAMADOS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_CHAMADOS}"
-URL_CSV_SAC_CHAMADOS_MENSAL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/gviz/tq?tqx=out:csv&sheet=Chamado%20Mensal"
+URL_CSV_SAC_CHAMADOS_MENSAL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/gviz/tq?tqx=out:csv&sheet=Chamados%20Mensal"
 URL_CSV_SAC_CLIENTES = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_CLIENTES}"
 URL_CSV_SAC_CONFIGS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_CONFIG_ID}/export?format=csv&gid={GID_SAC_CONFIGS}"
 URL_CSV_SAC_USUARIOS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_USUARIOS}"
@@ -296,11 +295,11 @@ def carregar_dados_sac():
     except Exception:
         pass
 
-    # 5. CHAMADOS - ABA 'Chamado Mensal' (Mês Atual Dinâmico)
+    # 5. CHAMADOS - ABA 'Chamados Mensal' (Mês Atual Dinâmico)
     chamados_mensal = []
     try:
         df_ch_m = carregar_csv_com_timeout(URL_CSV_SAC_CHAMADOS_MENSAL)
-        chamados_mensal, m_ano_m = parse_df_chamados(df_ch_m, aba_origem="Chamado Mensal")
+        chamados_mensal, m_ano_m = parse_df_chamados(df_ch_m, aba_origem="Chamados Mensal")
         for ano, seq in m_ano_m.items():
             if seq > maior_sac_ano.get(ano, 0):
                 maior_sac_ano[ano] = seq
@@ -472,7 +471,7 @@ html_code = f"""
             </p>
           </div>
         </div>
-        
+
         <div class="flex items-center gap-3 flex-wrap">
           <div class="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 flex-wrap">
             <button id="navDashboardSAC" type="button" class="nav-btn active flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('dashboardSAC')">
@@ -514,9 +513,8 @@ html_code = f"""
 
     <main class="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 space-y-6">
 
-      <!-- PÁGINA 1: DASHBOARD SAC (ALIMENTADO POR AMBAS AS ABAS) -->
+      <!-- PÁGINA 1: DASHBOARD SAC -->
       <div id="pageDashboardSAC" class="space-y-6">
-        <!-- FILTROS GERAIS -->
         <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
@@ -556,7 +554,6 @@ html_code = f"""
           </div>
         </section>
 
-        <!-- CARDS KPIS DO SAC -->
         <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between">
             <div class="flex items-center justify-between">
@@ -662,7 +659,7 @@ html_code = f"""
           </div>
         </section>
 
-        <!-- GRÁFICOS DO DIA COM TOP 5 (QUANTIDADE & VALORES R$) -->
+        <!-- TOP 5 LOCAIS DO DIA -->
         <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
             <div>
@@ -694,7 +691,7 @@ html_code = f"""
           </div>
         </section>
 
-        <!-- LISTAS TOP 3 LOCAIS INTERNOS RESUMIDOS POR PROBLEMA (MÊS, DIA, ÚLTIMOS 7 DIAS) -->
+        <!-- RESUMO TOP 3 LOCAIS (MÊS, DIA, 7 DIAS) -->
         <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div>
@@ -753,7 +750,7 @@ html_code = f"""
           </div>
         </section>
 
-        <!-- SEPARADOS: TOP 5 LOCAIS NO MÊS ANTERIOR & TOP 5 LOCAIS NO MÊS ATUAL -->
+        <!-- TOP 5 MÊS ANTERIOR & MÊS ATUAL -->
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
@@ -790,7 +787,7 @@ html_code = f"""
           </div>
         </section>
 
-        <!-- CHAMADOS POR MÊS (QUANTIDADE & VALORES R$) -->
+        <!-- CHAMADOS POR MÊS -->
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
@@ -827,7 +824,7 @@ html_code = f"""
           </div>
         </section>
 
-        <!-- CHAMADOS POR DIA (QUANTIDADE & VALORES R$) -->
+        <!-- CHAMADOS POR DIA -->
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
@@ -864,7 +861,7 @@ html_code = f"""
           </div>
         </section>
 
-        <!-- TOP 10 LOCAIS NA SEMANA/PERÍODO & TOP 3 LOCAIS POR FILIAL -->
+        <!-- TOP 10 LOCAIS E TOP 3 FILIAL -->
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
@@ -905,7 +902,7 @@ html_code = f"""
         </section>
       </div>
 
-      <!-- PÁGINA 2: LANÇAMENTO SAC (SALVA EM 'Chamado Mensal' E LISTA SÓ O MÊS) -->
+      <!-- PÁGINA 2: LANÇAMENTO SAC (SALVA EM 'Chamados Mensal' E LISTA SÓ O MÊS) -->
       <div id="pageSAC" class="hidden space-y-4">
         <div id="sacMainPanel" class="space-y-4">
           <div id="alertSACEditMode" class="hidden p-3 sm:p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex justify-between items-center shadow-sm">
@@ -913,7 +910,7 @@ html_code = f"""
               <div class="p-2 bg-amber-500 text-white rounded-xl"><i data-lucide="edit-3" class="w-5 h-5"></i></div>
               <div>
                 <p class="text-sm font-bold">Modo de Edição de Chamado: <span id="labelSACEditChamado" class="font-mono text-amber-800">SAC-0000-0000</span></p>
-                <p class="text-xs text-amber-700">Você está alterando este chamado. O atendente original e a data/hora original de abertura serão mantidos.</p>
+                <p class="text-xs text-amber-700">Você está alterando este chamado na aba de origem correspondente.</p>
               </div>
             </div>
             <button type="button" onclick="cancelarEdicaoSAC()" class="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 rounded-xl text-xs font-bold text-amber-900 transition cursor-pointer">
@@ -928,7 +925,7 @@ html_code = f"""
               </div>
               <div>
                 <p id="alertSACSuccessTitle" class="text-sm font-bold">Ação realizada com sucesso!</p>
-                <p id="alertSACSuccessSub" class="text-xs text-emerald-700">A aba Chamado Mensal foi atualizada em tempo real.</p>
+                <p id="alertSACSuccessSub" class="text-xs text-emerald-700">A aba Chamados Mensal foi atualizada em tempo real.</p>
               </div>
             </div>
             <button type="button" onclick="document.getElementById('alertSACSuccess').classList.add('hidden')" class="px-3 py-2 rounded-xl hover:bg-emerald-100 text-xs font-semibold text-emerald-800 transition cursor-pointer">
@@ -944,7 +941,7 @@ html_code = f"""
                 </div>
                 <div>
                   <h2 id="sacFormTitleText" class="text-base font-bold text-slate-900">Lançamento de Ocorrências do SAC</h2>
-                  <p class="text-xs text-slate-500">Lançamento dinâmico direto na aba: <strong class="text-sky-700">Chamado Mensal</strong></p>
+                  <p class="text-xs text-slate-500">Lançamento dinâmico direto na aba: <strong class="text-sky-700">Chamados Mensal</strong></p>
                 </div>
               </div>
               <div class="flex items-center gap-3">
@@ -1071,13 +1068,13 @@ html_code = f"""
                 </button>
                 <button type="submit" id="btnSalvarSAC" class="flex items-center gap-2 px-5 py-2 rounded-xl bg-sky-600 text-white text-xs font-bold shadow-lg shadow-sky-500/25 hover:bg-sky-700 transition cursor-pointer">
                   <i data-lucide="send" class="w-4 h-4"></i>
-                  <span id="btnSalvarSACText">Lançar no Chamado Mensal</span>
+                  <span id="btnSalvarSACText">Lançar no Chamados Mensal</span>
                 </button>
               </div>
             </form>
           </section>
 
-          <!-- LISTA EXCLUSIVA DOS CHAMADOS DO MÊS (ABA: Chamado Mensal) -->
+          <!-- LISTA EXCLUSIVA DOS CHAMADOS DO MÊS (ABA: Chamados Mensal) -->
           <section class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 overflow-hidden">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
               <div>
@@ -1085,7 +1082,7 @@ html_code = f"""
                   <i data-lucide="list-checks" class="w-4 h-4 text-sky-600"></i>
                   Chamados Deste Mês
                 </h2>
-                <p class="text-xs text-slate-500">Exibição rápida e ágil · Registrados exclusivamente na aba: <strong class="text-sky-700">Chamado Mensal</strong></p>
+                <p class="text-xs text-slate-500">Exibição rápida e ágil · Registrados exclusivamente na aba: <strong class="text-sky-700">Chamados Mensal</strong></p>
               </div>
               <div class="flex items-center gap-3">
                 <div class="relative">
@@ -1130,7 +1127,7 @@ html_code = f"""
         </div>
       </div>
 
-      <!-- PÁGINA 3: TODOS OS CHAMADOS ABERTOS (CARREGA TODAS AS ABAS) -->
+      <!-- PÁGINA 3: TODOS OS CHAMADOS ABERTOS -->
       <div id="pageChamadosAbertos" class="space-y-6 hidden">
         <section class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 overflow-hidden">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
@@ -1142,7 +1139,7 @@ html_code = f"""
                 <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
                   Todos os Chamados Abertos
                 </h2>
-                <p class="text-xs text-slate-500">Exibição global consolidada (Aba 'Chamado Mensal' + Aba 'Chamados')</p>
+                <p class="text-xs text-slate-500">Exibição global consolidada (Aba 'Chamados Mensal' + Aba 'Chamados')</p>
               </div>
             </div>
 
@@ -1341,16 +1338,15 @@ html_code = f"""
 
     const APPS_SCRIPT_SAC_URL = "{APPS_SCRIPT_SAC_WEBAPP_URL}";
     const dadosSAC = {dados_sac_json};
-    
-    // Separação das bases conforme solicitado:
+
     let listaChamadosMensal = Array.isArray(dadosSAC.chamados_mensal) ? dadosSAC.chamados_mensal : [];
     let listaChamadosHistorico = Array.isArray(dadosSAC.chamados_historico) ? dadosSAC.chamados_historico : [];
     let listaCadastroClientes = Array.isArray(dadosSAC.cadastro_clientes) ? dadosSAC.cadastro_clientes : [];
-    
+
     let chamadoEmEdicao = null;
     let clienteEmEdicao = null;
     let origemEdicaoSAC = 'sac';
-    
+
     let atendenteSACLogado = "";
     let loginUsuarioConectado = "";
     let nivelAcessoLogado = "";
@@ -1361,11 +1357,10 @@ html_code = f"""
       nivelAcessoLogado = sessionStorage.getItem('sac_nivel_acesso') || "";
     }} catch(e) {{}}
 
-    // Combina todas as abas sem duplicações para alimentar o Dashboard e Chamados Abertos
     function obterChamadosConsolidados() {{
       const mapa = new Map();
       listaChamadosHistorico.forEach(c => mapa.set(c.chamado, c));
-      listaChamadosMensal.forEach(c => mapa.set(c.chamado, c)); // Mês prevalece se houver conflito
+      listaChamadosMensal.forEach(c => mapa.set(c.chamado, c));
       return Array.from(mapa.values());
     }}
 
@@ -1669,17 +1664,16 @@ html_code = f"""
       window.parent.location.reload();
     }}
 
-    // FECHAMENTO MENSAL: Migra chamados da aba 'Chamado Mensal' para a aba 'Chamados'
     function executarFechamentoMensal() {{
       if ((nivelAcessoLogado || '').trim().toLowerCase() !== 'geral') {{
         alert('⛔ Apenas usuários com perfil Geral podem realizar o Fechamento Mensal.');
         return;
       }}
       if (!listaChamadosMensal.length) {{
-        alert('ℹ️ Não há chamados registrados na aba "Chamado Mensal" para realizar o fechamento.');
+        alert('ℹ️ Não há chamados registrados na aba "Chamados Mensal" para realizar o fechamento.');
         return;
       }}
-      const confirmacao = confirm('⚠️ Atenção: Deseja realizar o Fechamento Mensal?\\n\\nIsso transferirá todos os ' + listaChamadosMensal.length + ' chamados da aba "Chamado Mensal" para a base permanente "Chamados".');
+      const confirmacao = confirm('⚠️ Atenção: Deseja realizar o Fechamento Mensal?\\n\\nIsso transferirá todos os ' + listaChamadosMensal.length + ' chamados da aba "Chamados Mensal" para a base permanente "Chamados".');
       if (!confirmacao) return;
 
       abrirModalLoading('Processando Fechamento Mensal...', 'Transferindo chamados do mês para a base consolidada "Chamados".', 'loading');
@@ -1688,12 +1682,11 @@ html_code = f"""
         "action": "fechamento_mensal",
         "acao": "fechamento_mensal",
         "tipo": "fechamento_mensal",
-        "abaOrigem": "Chamado Mensal",
+        "abaOrigem": "Chamados Mensal",
         "abaDestino": "Chamados",
         "usuario": atendenteSACLogado
       }});
 
-      // Atualiza estado local instantaneamente
       listaChamadosHistorico = [...listaChamadosMensal, ...listaChamadosHistorico];
       listaChamadosMensal = [];
 
@@ -1757,7 +1750,7 @@ html_code = f"""
     }}
 
     // =========================================================================
-    // INICIALIZAÇÃO & FORMULÁRIO SAC (ABA 'Chamado Mensal')
+    // INICIALIZAÇÃO & FORMULÁRIO SAC
     // =========================================================================
     function calcularPreviaProximoChamado(ano) {{
       let maior = dadosSAC.maior_sac_ano[ano] || 0;
@@ -1872,8 +1865,8 @@ html_code = f"""
 
       document.getElementById('alertSACEditMode').classList.add('hidden');
       document.getElementById('sacFormTitleText').innerText = "Lançamento de Ocorrências do SAC";
-      document.getElementById('btnSalvarSACText').innerText = "Lançar no Chamado Mensal";
-      
+      document.getElementById('btnSalvarSACText').innerText = "Lançar no Chamados Mensal";
+
       const anoAtual = new Date().getFullYear();
       document.getElementById('sacChamado').value = calcularPreviaProximoChamado(anoAtual);
       document.getElementById('sacData').value = new Date().toISOString().split('T')[0];
@@ -1923,8 +1916,9 @@ html_code = f"""
       document.getElementById('sacAtendente').value = item.atendente || atendenteSACLogado;
       document.getElementById('sacDataHoraAuto').value = item.dataHoraLancamento || 'Original Preservado';
 
+      const abaExibicao = item.aba || "Chamados Mensal";
       document.getElementById('alertSACEditMode').classList.remove('hidden');
-      document.getElementById('labelSACEditChamado').innerText = item.chamado + ' (' + (item.aba || 'Chamado Mensal') + ')';
+      document.getElementById('labelSACEditChamado').innerText = item.chamado + ' (' + abaExibicao + ')';
       document.getElementById('sacFormTitleText').innerText = 'Edição da Ocorrência: ' + item.chamado;
       document.getElementById('btnSalvarSACText').innerText = 'Salvar Alterações';
       document.getElementById('sacForm').scrollIntoView({{ behavior: 'smooth', block: 'start' }});
@@ -1941,9 +1935,9 @@ html_code = f"""
     function excluirChamadoSAC(numeroChamado) {{
       if (!confirm('Deseja realmente excluir o chamado ' + numeroChamado + '? Esta ação solicitará a remoção na planilha.')) return;
       abrirModalLoading('Excluindo Ocorrência...', 'Removendo a ocorrência ' + numeroChamado + '.', 'loading');
-      
+
       const item = obterChamadosConsolidados().find(c => c.chamado === numeroChamado);
-      const abaAlvo = item?.aba || "Chamado Mensal";
+      const abaAlvo = item?.aba || "Chamados Mensal";
 
       enviarParaPlanilhaGarantido({{
         "action": "excluir", "acao": "excluir", "tipo": "excluir_sac",
@@ -1962,8 +1956,8 @@ html_code = f"""
       if (chamadoEmEdicao && chamadoEmEdicao.chamado === numeroChamado) limparFormSAC();
 
       setTimeout(() => {{
-        abrirModalLoading('Chamado Excluído!', 'A ocorrência ' + numeroChamado + ' foi removida da base com sucesso.', 'excluir');
-        exibirMensagemTopo('🗑️ Chamado ' + numeroChamado + ' excluído!', 'A ocorrência foi removida do sistema.', 'excluir');
+        abrirModalLoading('Chamado Excluído!', 'A ocorrência ' + numeroChamado + ' foi removida da aba ' + abaAlvo + ' com sucesso.', 'excluir');
+        exibirMensagemTopo('🗑️ Chamado ' + numeroChamado + ' excluído!', 'A ocorrência foi removida da aba ' + abaAlvo + '.', 'excluir');
         setTimeout(fecharModalLoading, 1000);
       }}, 500);
     }}
@@ -1992,12 +1986,12 @@ html_code = f"""
         return;
       }}
 
-      // Apenas a aba 'Chamado Mensal' recebe novas inserções
-      const abaDestino = (ehEdicao && chamadoEmEdicao?.aba) ? chamadoEmEdicao.aba : "Chamado Mensal";
+      // Se for edição, preserva rigorosamente a aba de onde veio. Se for novo, vai para Chamados Mensal
+      const abaDestino = (ehEdicao && chamadoEmEdicao?.aba) ? chamadoEmEdicao.aba : "Chamados Mensal";
 
       abrirModalLoading(
-        ehEdicao ? 'Atualizando Ocorrência...' : 'Lançando no Chamado Mensal...',
-        ehEdicao ? 'Gravando alterações do chamado ' + chamado + ' na aba ' + abaDestino + '.' : 'Registrando a ocorrência ' + chamado + ' na aba Chamado Mensal.',
+        ehEdicao ? 'Atualizando Ocorrência...' : 'Lançando no Chamados Mensal...',
+        ehEdicao ? 'Gravando alterações do chamado ' + chamado + ' na aba ' + abaDestino + '.' : 'Registrando a ocorrência ' + chamado + ' na aba Chamados Mensal.',
         'loading'
       );
 
@@ -2042,7 +2036,7 @@ html_code = f"""
       enviarParaPlanilhaGarantido(payloadSAC);
 
       const novoItem = {{
-        linha: ehEdicao && chamadoEmEdicao.linha ? chamadoEmEdicao.linha : (abaDestino === "Chamado Mensal" ? listaChamadosMensal.length + 2 : listaChamadosHistorico.length + 2),
+        linha: ehEdicao && chamadoEmEdicao.linha ? chamadoEmEdicao.linha : (abaDestino.indexOf("Mensal") !== -1 ? listaChamadosMensal.length + 2 : listaChamadosHistorico.length + 2),
         aba: abaDestino,
         chamado, data, cliente, localInterno, cidade, descricao, produto,
         dataTransacao, horaTransacao, valor: formatCurrency(valor),
@@ -2051,13 +2045,12 @@ html_code = f"""
       }};
 
       if (ehEdicao) {{
-        if (abaDestino === "Chamado Mensal") {{
+        if (abaDestino.indexOf("Mensal") !== -1) {{
           listaChamadosMensal = listaChamadosMensal.map(c => c.chamado === chamado ? novoItem : c);
         }} else {{
           listaChamadosHistorico = listaChamadosHistorico.map(c => c.chamado === chamado ? novoItem : c);
         }}
       }} else {{
-        // Novo chamado entra sempre na lista mensal
         listaChamadosMensal.unshift(novoItem);
       }}
 
@@ -2082,7 +2075,7 @@ html_code = f"""
     // =========================================================================
     // RENDERIZAÇÃO DAS TABELAS
     // =========================================================================
-    // 1. Tabela do Formulário SAC: Carrega EXCLUSIVAMENTE os chamados da aba 'Chamado Mensal'
+    // 1. Tabela do Lançamento SAC: Carrega EXCLUSIVAMENTE os chamados do mês (Chamados Mensal)
     function filtrarChamadosSAC() {{
       const termo = (document.getElementById('searchSACChamados')?.value || '').trim().toLowerCase();
       if (!termo) {{ renderizarTabelaChamadosSAC(listaChamadosMensal); return; }}
@@ -2140,7 +2133,7 @@ html_code = f"""
       lucide.createIcons();
     }}
 
-    // 2. Tabela Chamados Abertos: Carrega a consolidação de TODAS as abas
+    // 2. Tabela de Chamados Abertos: Consolida todas as abas
     function filtrarChamadosAbertos() {{
       const termo = (document.getElementById('searchAbertos')?.value || '').trim().toLowerCase();
       const todos = obterChamadosConsolidados();
@@ -2168,7 +2161,7 @@ html_code = f"""
           ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Sim</span>'
           : '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Não</span>';
 
-        const tagAba = (c.aba === 'Chamado Mensal')
+        const tagAba = (c.aba && c.aba.indexOf('Mensal') !== -1)
           ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold bg-sky-50 text-sky-700 border border-sky-200">Mês Atual</span>'
           : '<span class="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Histórico</span>';
 
@@ -2345,7 +2338,7 @@ html_code = f"""
     }}
 
     // =========================================================================
-    // GRÁFICOS DO DASHBOARD SAC (ALIMENTADOS POR TODAS AS ABAS)
+    // GRÁFICOS DO DASHBOARD SAC
     // =========================================================================
     const filterSACCliente = document.getElementById('filterSACCliente');
     const filterSACProduto = document.getElementById('filterSACProduto');
