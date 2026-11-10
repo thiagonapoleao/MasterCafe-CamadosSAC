@@ -614,9 +614,102 @@ html_code = f"""
           </div>
         </section>
 
+        <!-- NOVO: GRÁFICOS DO DIA COM TOP 5 (QUANTIDADE & VALORES R$) -->
+        <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
+            <div>
+              <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                <i data-lucide="calendar" class="w-4 h-4 text-sky-600"></i>
+                Top 5 Locais do Dia (Quantidade & Valores R$)
+              </h3>
+              <p class="text-xs text-slate-400">Ranking diário de locais com foco no mês atual</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-[11px] font-bold text-slate-500">Dia de Referência:</label>
+              <input type="date" id="filterDiaTop5" onchange="atualizarGraficosTop5Dia()" class="text-xs rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1 text-slate-700 font-semibold">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
+              <h4 class="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1.5">
+                <i data-lucide="hash" class="w-3.5 h-3.5 text-sky-600"></i> Top 5 do Dia: Quantidade
+              </h4>
+              <div class="relative h-72"><canvas id="chartTop5DiaQtd"></canvas></div>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
+              <h4 class="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1.5">
+                <i data-lucide="badge-dollar-sign" class="w-3.5 h-3.5 text-emerald-600"></i> Top 5 do Dia: Valores (R$)
+              </h4>
+              <div class="relative h-72"><canvas id="chartTop5DiaVal"></canvas></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- NOVO: LISTAS TOP 3 LOCAIS INTERNOS RESUMIDOS POR PROBLEMA (MÊS, DIA, ÚLTIMOS 7 DIAS) -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- 1. Top 3 do Mês -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div>
+              <div class="flex flex-col gap-1 pb-3 mb-3 border-b border-slate-100">
+                <div class="flex items-center justify-between">
+                  <h3 class="font-bold text-xs uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                    <i data-lucide="calendar-check" class="w-4 h-4 text-sky-600"></i> Top 3 Locais: Mês
+                  </h3>
+                  <input type="month" id="filterResumoMes" onchange="atualizarResumoTop3Mes()" class="text-[11px] rounded-lg border border-slate-300 bg-slate-50 px-2 py-0.5 text-slate-700">
+                </div>
+                <p class="text-[11px] text-slate-400">Resumo de problemas no mês selecionado</p>
+              </div>
+              <div id="listaResumoTop3Mes" class="space-y-3">
+                <p class="text-xs text-slate-400 text-center py-4">Sem dados no período.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Top 3 do Dia -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div>
+              <div class="flex flex-col gap-1 pb-3 mb-3 border-b border-slate-100">
+                <div class="flex items-center justify-between">
+                  <h3 class="font-bold text-xs uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                    <i data-lucide="clock" class="w-4 h-4 text-amber-600"></i> Top 3 Locais: Dia
+                  </h3>
+                  <input type="date" id="filterResumoDia" onchange="atualizarResumoTop3Dia()" class="text-[11px] rounded-lg border border-slate-300 bg-slate-50 px-2 py-0.5 text-slate-700">
+                </div>
+                <p class="text-[11px] text-slate-400">Resumo de problemas no dia específico</p>
+              </div>
+              <div id="listaResumoTop3Dia" class="space-y-3">
+                <p class="text-xs text-slate-400 text-center py-4">Sem dados no período.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Top 3 dos Últimos 7 Dias (com filtro de dia e filial) -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div>
+              <div class="flex flex-col gap-2 pb-3 mb-3 border-b border-slate-100">
+                <div class="flex items-center justify-between">
+                  <h3 class="font-bold text-xs uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                    <i data-lucide="calendar-range" class="w-4 h-4 text-emerald-600"></i> Top 3: Últimos 7 Dias
+                  </h3>
+                  <input type="date" id="filterResumo7DiasDtFim" onchange="atualizarResumoTop37Dias()" class="text-[11px] rounded-lg border border-slate-300 bg-slate-50 px-2 py-0.5 text-slate-700">
+                </div>
+                <div class="flex items-center justify-between gap-2">
+                  <label class="text-[10px] font-bold text-slate-500 uppercase">Filial:</label>
+                  <select id="filterResumo7DiasFilial" onchange="atualizarResumoTop37Dias()" class="text-[11px] w-48 rounded-lg border border-slate-300 bg-slate-50 px-2 py-0.5 text-slate-700">
+                    <option value="ALL">Todas as Filiais</option>
+                  </select>
+                </div>
+              </div>
+              <div id="listaResumoTop37Dias" class="space-y-3">
+                <p class="text-xs text-slate-400 text-center py-4">Sem dados no período.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- SEPARADOS: TOP 5 LOCAIS NO MÊS ANTERIOR & TOP 5 LOCAIS NO MÊS ATUAL -->
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <!-- Top 5 Locais Internos: Mês Anterior -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
               <div>
@@ -634,7 +727,6 @@ html_code = f"""
             <div class="relative h-80"><canvas id="chartLocaisAnterior"></canvas></div>
           </div>
 
-          <!-- Top 5 Locais Internos: Mês Atual -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
               <div>
@@ -655,7 +747,6 @@ html_code = f"""
 
         <!-- SEPARADOS: CHAMADOS POR MÊS (QUANTIDADE) & CHAMADOS POR MÊS (VALORES R$) -->
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <!-- Quantidade de Chamados por Mês -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
               <div>
@@ -673,7 +764,6 @@ html_code = f"""
             <div class="relative h-80"><canvas id="chartMesesQtd"></canvas></div>
           </div>
 
-          <!-- Valores de Chamados por Mês (R$) - AGORA EM BARRAS -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
               <div>
@@ -694,7 +784,6 @@ html_code = f"""
 
         <!-- SEPARADOS: CHAMADOS POR DIA (QUANTIDADE) & CHAMADOS POR DIA (VALORES R$) -->
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <!-- Quantidade de Chamados por Dia (Dias Preenchidos) -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
               <div>
@@ -712,7 +801,6 @@ html_code = f"""
             <div class="relative h-80"><canvas id="chartDiasQtd"></canvas></div>
           </div>
 
-          <!-- Valores de Chamados por Dia (R$) - AGORA EM BARRAS & DIAS PREENCHIDOS -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
               <div>
@@ -733,7 +821,6 @@ html_code = f"""
 
         <!-- TOP 10 LOCAIS NA SEMANA/PERÍODO & TOP 3 LOCAIS POR FILIAL -->
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <!-- Top 10 Locais na Semana / Período -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
               <div>
@@ -752,7 +839,6 @@ html_code = f"""
             <div class="relative h-80"><canvas id="chartTop10Semana"></canvas></div>
           </div>
 
-          <!-- Top 3 Locais por Filial -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
               <div>
@@ -2194,6 +2280,41 @@ html_code = f"""
       options: getHorizontalSACBarOptions()
     }});
 
+    // NOVO: Top 5 do Dia: Quantidade & Valores R$
+    const chartTop5DiaQtd = new Chart(document.getElementById('chartTop5DiaQtd').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(2, 132, 199, 0.85)', borderRadius: 6 }}] }},
+      options: getHorizontalSACBarOptions()
+    }});
+
+    const chartTop5DiaVal = new Chart(document.getElementById('chartTop5DiaVal').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(16, 185, 129, 0.85)', borderRadius: 6 }}] }},
+      options: {{
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {{ padding: {{ right: 50, left: 10, top: 10, bottom: 10 }} }},
+        plugins: {{
+          legend: {{ display: false }},
+          tooltip: {{
+            backgroundColor: '#ffffff', titleColor: '#0f172a', bodyColor: '#334155',
+            borderColor: '#e2e8f0', borderWidth: 1, padding: 10,
+            callbacks: {{ label: (c) => 'Valor: ' + formatCurrency(c.raw) }}
+          }},
+          datalabels: {{
+            anchor: 'end', align: 'right', offset: 4, color: '#047857',
+            font: {{ family: 'Inter', weight: 'bold', size: 9 }},
+            formatter: (v) => v ? 'R$' + Number(v).toLocaleString('pt-BR', {{ maximumFractionDigits: 0 }}) : ''
+          }}
+        }},
+        scales: {{
+          x: {{ grid: {{ color: 'rgba(226, 232, 240, 0.7)' }}, ticks: {{ color: '#475569', font: {{ size: 10 }} }}, beginAtZero: true }},
+          y: {{ grid: {{ display: false }}, ticks: {{ color: '#475569', font: {{ size: 10, weight: '600' }} }} }}
+        }}
+      }}
+    }});
+
     // 1. Gráficos Divididos de Top 5 Locais (Mês Anterior & Mês Atual)
     const chartLocaisAnterior = new Chart(document.getElementById('chartLocaisAnterior').getContext('2d'), {{
       type: 'bar',
@@ -2344,6 +2465,129 @@ html_code = f"""
         if (parts[0].length === 4) return parts[0] + '-' + parts[1].padStart(2, '0') + '-' + parts[2].padStart(2, '0');
       }}
       return '';
+    }}
+
+    // ATUALIZAÇÃO DO NOVO TOP 5 DO DIA: QUANTIDADE E VALORES
+    function atualizarGraficosTop5Dia() {{
+      const diaInput = document.getElementById('filterDiaTop5')?.value;
+      if (!diaInput) return;
+      const contQtd = {{}};
+      const contVal = {{}};
+
+      listaChamadosSAC.forEach(c => {{
+        const ymd = parseDateToYMD(c.data);
+        if (ymd === diaInput) {{
+          const loc = (c.localInterno || c.cliente || 'Outros').trim();
+          contQtd[loc] = (contQtd[loc] || 0) + 1;
+          contVal[loc] = (contVal[loc] || 0) + parseValorNumerico(c.valor);
+        }}
+      }});
+
+      const truncar = (t, max = 22) => t.length > max ? t.substring(0, max) + '...' : t;
+      
+      const top5Qtd = Object.entries(contQtd).map(([nome, qt]) => ({{ nome, qt }})).sort((a,b) => b.qt - a.qt).slice(0, 5);
+      chartTop5DiaQtd.data.labels = top5Qtd.map(t => truncar(t.nome));
+      chartTop5DiaQtd.data.datasets[0].data = top5Qtd.map(t => t.qt);
+      chartTop5DiaQtd.update();
+
+      const top5Val = Object.entries(contVal).map(([nome, vl]) => ({{ nome, vl }})).sort((a,b) => b.vl - a.vl).slice(0, 5);
+      chartTop5DiaVal.data.labels = top5Val.map(t => truncar(t.nome));
+      chartTop5DiaVal.data.datasets[0].data = top5Val.map(t => t.vl);
+      chartTop5DiaVal.update();
+    }}
+
+    // HELPER PARA RENDERIZAR LISTAS DE TOP 3 COM RESUMO POR PROBLEMA
+    function montarHtmlResumoTop3(listaFiltrada, containerId) {{
+      const container = document.getElementById(containerId);
+      if (!container) return;
+
+      const contLocais = {{}};
+      listaFiltrada.forEach(c => {{
+        const loc = (c.localInterno || c.cliente || 'Outros').trim();
+        const prob = (c.problemas || 'Outros').trim();
+        if (!contLocais[loc]) contLocais[loc] = {{ total: 0, probs: {{}} }};
+        contLocais[loc].total++;
+        contLocais[loc].probs[prob] = (contLocais[loc].probs[prob] || 0) + 1;
+      }});
+
+      const top3 = Object.entries(contLocais)
+        .map(([loc, info]) => ({{ loc, total: info.total, probs: info.probs }}))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 3);
+
+      if (!top3.length) {{
+        container.innerHTML = '<p class="text-xs text-slate-400 text-center py-6 font-semibold">Sem ocorrências no período selecionado.</p>';
+        return;
+      }}
+
+      container.innerHTML = top3.map((item, idx) => {{
+        const badgesProb = Object.entries(item.probs)
+          .sort((a,b) => b[1] - a[1])
+          .map(([p, qtd]) => `
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-[10px] font-medium text-slate-700 border border-slate-200">
+              <span class="truncate max-w-[120px]" title="${{p}}">${{p}}</span>
+              <strong class="text-sky-700">${{qtd}}</strong>
+            </span>
+          `).join('');
+
+        const medalhaCor = idx === 0 ? 'bg-amber-100 text-amber-800 border-amber-300' : (idx === 1 ? 'bg-slate-200 text-slate-800 border-slate-300' : 'bg-orange-100 text-orange-800 border-orange-300');
+
+        return `
+          <div class="p-3 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-slate-50 transition">
+            <div class="flex items-center justify-between gap-2 mb-1.5">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] border ${{medalhaCor}}">
+                  ${{idx + 1}}º
+                </span>
+                <span class="font-bold text-xs text-slate-800 truncate" title="${{item.loc}}">${{item.loc}}</span>
+              </div>
+              <span class="text-xs font-black text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200 whitespace-nowrap">
+                ${{item.total}} ${{item.total === 1 ? 'chamado' : 'chamados'}}
+              </span>
+            </div>
+            <div class="flex items-center gap-1.5 flex-wrap pt-1 border-t border-slate-200/60">
+              ${{badgesProb}}
+            </div>
+          </div>
+        `;
+      }}).join('');
+    }}
+
+    // ATUALIZAÇÃO DOS TOP 3 RESUMIDOS
+    function atualizarResumoTop3Mes() {{
+      const mesInput = document.getElementById('filterResumoMes')?.value;
+      if (!mesInput) return;
+      const filtrados = listaChamadosSAC.filter(c => {{
+        const ymd = parseDateToYMD(c.data);
+        return ymd && ymd.startsWith(mesInput);
+      }});
+      montarHtmlResumoTop3(filtrados, 'listaResumoTop3Mes');
+    }}
+
+    function atualizarResumoTop3Dia() {{
+      const diaInput = document.getElementById('filterResumoDia')?.value;
+      if (!diaInput) return;
+      const filtrados = listaChamadosSAC.filter(c => parseDateToYMD(c.data) === diaInput);
+      montarHtmlResumoTop3(filtrados, 'listaResumoTop3Dia');
+    }}
+
+    function atualizarResumoTop37Dias() {{
+      const dtFimInput = document.getElementById('filterResumo7DiasDtFim')?.value;
+      const filialInput = document.getElementById('filterResumo7DiasFilial')?.value || 'ALL';
+      if (!dtFimInput) return;
+
+      const dFim = new Date(dtFimInput + 'T23:59:59');
+      const dIni = new Date(dFim);
+      dIni.setDate(dIni.getDate() - 6);
+      const strDIni = dIni.toISOString().split('T')[0];
+
+      const filtrados = listaChamadosSAC.filter(c => {{
+        const ymd = parseDateToYMD(c.data);
+        if (!ymd || ymd < strDIni || ymd > dtFimInput) return false;
+        if (filialInput !== 'ALL' && (c.cidade || '').toLowerCase() !== filialInput.toLowerCase()) return false;
+        return true;
+      }});
+      montarHtmlResumoTop3(filtrados, 'listaResumoTop37Dias');
     }}
 
     function atualizarGraficoLocaisAnterior() {{
@@ -2563,6 +2807,7 @@ html_code = f"""
       const anoHoje = hoje.getFullYear();
       const mesHoje = hoje.getMonth() + 1;
       const strMesAtual = anoHoje + '-' + pad(mesHoje);
+      const strHoje = hoje.toISOString().split('T')[0];
 
       let mesAnt = mesHoje - 1;
       let anoAnt = anoHoje;
@@ -2581,7 +2826,20 @@ html_code = f"""
       const elDiasVal = document.getElementById('filterMesDiasVal');
       if (elDiasVal) elDiasVal.value = strMesAtual;
 
-      const dFim = hoje.toISOString().split('T')[0];
+      // Inicializa os filtros novos focados no Mês / Dia Atual
+      const elTop5Dia = document.getElementById('filterDiaTop5');
+      if (elTop5Dia) elTop5Dia.value = strHoje;
+
+      const elResumoMes = document.getElementById('filterResumoMes');
+      if (elResumoMes) elResumoMes.value = strMesAtual;
+
+      const elResumoDia = document.getElementById('filterResumoDia');
+      if (elResumoDia) elResumoDia.value = strHoje;
+
+      const elResumo7Fim = document.getElementById('filterResumo7DiasDtFim');
+      if (elResumo7Fim) elResumo7Fim.value = strHoje;
+
+      const dFim = strHoje;
       const dIniDate = new Date();
       dIniDate.setDate(dIniDate.getDate() - 7);
       const dIni = dIniDate.toISOString().split('T')[0];
@@ -2603,6 +2861,15 @@ html_code = f"""
         const opt = document.createElement('option'); opt.value = f; opt.textContent = f;
         selFilial.appendChild(opt);
       }});
+
+      const selFilialResumo = document.getElementById('filterResumo7DiasFilial');
+      if (selFilialResumo) {{
+        selFilialResumo.innerHTML = '<option value="ALL">Todas as Filiais</option>';
+        filiais.forEach(f => {{
+          const opt = document.createElement('option'); opt.value = f; opt.textContent = f;
+          selFilialResumo.appendChild(opt);
+        }});
+      }}
     }}
     inicializarFiltrosDashboardSAC();
 
@@ -2669,7 +2936,11 @@ html_code = f"""
       chartAtendentesSAC.data.datasets[0].data = topAtendentes.map(a => a.qt);
       chartAtendentesSAC.update();
 
-      // Dispara renderização dos gráficos divididos com filtros dinâmicos
+      // Dispara renderização dos gráficos divididos e novos blocos
+      atualizarGraficosTop5Dia();
+      atualizarResumoTop3Mes();
+      atualizarResumoTop3Dia();
+      atualizarResumoTop37Dias();
       atualizarGraficoLocaisAnterior();
       atualizarGraficoLocaisAtual();
       atualizarGraficoMesesQtd();
@@ -2694,4 +2965,4 @@ html_code = f"""
 </html>
 """
 
-components.html(html_code, height=4200, scrolling=True)
+components.html(html_code, height=4800, scrolling=True)
