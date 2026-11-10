@@ -5,6 +5,7 @@ import pandas as pd
 import re
 import os
 import base64
+import urllib.request
 
 # Links oficiais dos Web Apps do Google Apps Script
 APPS_SCRIPT_SAC_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyGRxQBo5j-gWQ4OEeGFqfwzgjcfQRzDKE2kKbyQeSvOKOdIMr1snR8YV766KBfE7RY9w/exec"
@@ -32,8 +33,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# CARREGAMENTO DO LOGOTIPO
+# CARREGAMENTO DO LOGOTIPO (COM CACHE)
 # ==============================================================================
+@st.cache_data(show_spinner=False)
 def obter_logo_base64():
     pastas_busca = [
         os.path.dirname(os.path.abspath(__file__)) if "__file__" in locals() else "",
@@ -72,15 +74,27 @@ URL_CSV_SAC_CLIENTES = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC
 URL_CSV_SAC_CONFIGS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_CONFIG_ID}/export?format=csv&gid={GID_SAC_CONFIGS}"
 URL_CSV_SAC_USUARIOS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_USUARIOS}"
 
-@st.cache_data(ttl=5)
+def carregar_csv_com_timeout(url, timeout=12):
+    """Lê CSV do Google Sheets com timeout para evitar travamento da thread"""
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        return pd.read_csv(response, dtype=str)
+
+RE_SAC_SEQ = re.compile(r'SAC-(\d{4})-(\d+)', re.IGNORECASE)
+
+# TTL ajustado para 45s (evita rate-limit do Google na Streamlit Cloud e garante performance máxima)
+@st.cache_data(ttl=45, show_spinner=False)
 def carregar_dados_sac():
     clientes_dados = []
     cidades_clientes = []
     lista_clientes_completa = []
+    
+    # 1. CLIENTES (Otimizado sem iterrows)
     try:
-        df_cli = pd.read_csv(URL_CSV_SAC_CLIENTES, dtype=str)
+        df_cli = carregar_csv_com_timeout(URL_CSV_SAC_CLIENTES)
         if df_cli is not None and not df_cli.empty:
             cols = [c.strip() for c in df_cli.columns]
+            df_cli.columns = cols
 
             def find_cli_col(candidates, default_idx):
                 for cand in candidates:
@@ -96,16 +110,14 @@ def carregar_dados_sac():
             col_c_modelo = find_cli_col(["Modelo de máquina", "Modelo de Máquina", "Modelo Maquina", "modelo de maquina"], 4)
             col_c_filial = find_cli_col(["Filial Responsavel", "Filial Responsável", "Filial", "filial responsavel", "Cidade", "cidade"], 5)
 
-            for idx, r in df_cli.iterrows():
-                def val_de(col):
-                    return str(r[col]).strip() if col and col in r and pd.notna(r[col]) else ""
-
-                cli = val_de(col_c_cliente)
-                loc = val_de(col_c_local)
-                loc_int = val_de(col_c_local_int) or loc
-                maq = val_de(col_c_maquina)
-                mod = val_de(col_c_modelo)
-                filial = val_de(col_c_filial)
+            records_cli = df_cli.fillna("").to_dict('records')
+            for idx, r in enumerate(records_cli):
+                cli = str(r.get(col_c_cliente, "")).strip()
+                loc = str(r.get(col_c_local, "")).strip()
+                loc_int = str(r.get(col_c_local_int, "")).strip() or loc
+                maq = str(r.get(col_c_maquina, "")).strip()
+                mod = str(r.get(col_c_modelo, "")).strip()
+                filial = str(r.get(col_c_filial, "")).strip()
 
                 if cli and cli.lower() not in ["nan", "cliente"]:
                     clientes_dados.append({
@@ -127,11 +139,12 @@ def carregar_dados_sac():
     except Exception:
         pass
 
+    # 2. CONFIGURAÇÕES
     formas_pagamento = []
     problemas = []
     descricoes = []
     try:
-        df_cfg = pd.read_csv(URL_CSV_SAC_CONFIGS, dtype=str)
+        df_cfg = carregar_csv_com_timeout(URL_CSV_SAC_CONFIGS)
         if df_cfg is not None and not df_cfg.empty:
             if len(df_cfg.columns) > 0:
                 col_a = df_cfg.columns[0]
@@ -145,20 +158,22 @@ def carregar_dados_sac():
     except Exception:
         pass
 
+    # 3. USUÁRIOS (Otimizado sem iterrows)
     usuarios_validos = []
     try:
-        df_usr = pd.read_csv(URL_CSV_SAC_USUARIOS, dtype=str)
+        df_usr = carregar_csv_com_timeout(URL_CSV_SAC_USUARIOS)
         if df_usr is not None and not df_usr.empty:
             col_nome = df_usr.columns[0]
             col_u = df_usr.columns[1] if len(df_usr.columns) > 1 else col_nome
             col_s = df_usr.columns[2] if len(df_usr.columns) > 2 else col_u
             col_acesso = df_usr.columns[3] if len(df_usr.columns) > 3 else ""
 
-            for _, r in df_usr.iterrows():
-                nome = str(r[col_nome]).strip() if pd.notna(r[col_nome]) else ""
-                u = str(r[col_u]).strip().lower() if pd.notna(r[col_u]) else ""
-                s = str(r[col_s]).strip().lower() if pd.notna(r[col_s]) else ""
-                acesso = str(r[col_acesso]).strip() if (col_acesso and pd.notna(r[col_acesso])) else "Atendente"
+            records_usr = df_usr.fillna("").to_dict('records')
+            for r in records_usr:
+                nome = str(r.get(col_nome, "")).strip()
+                u = str(r.get(col_u, "")).strip().lower()
+                s = str(r.get(col_s, "")).strip().lower()
+                acesso = str(r.get(col_acesso, "")).strip() if col_acesso else "Atendente"
 
                 if u and u not in ["nan", "usuario", "usuário", "login"]:
                     usuarios_validos.append({
@@ -170,12 +185,14 @@ def carregar_dados_sac():
     except Exception:
         pass
 
+    # 4. CHAMADOS (Otimizado com to_dict e regex pré-compilada)
     maior_sac_ano = {}
     chamados_salvos = []
     try:
-        df_ch = pd.read_csv(URL_CSV_SAC_CHAMADOS, dtype=str)
+        df_ch = carregar_csv_com_timeout(URL_CSV_SAC_CHAMADOS)
         if df_ch is not None and not df_ch.empty:
             cols = [c.strip() for c in df_ch.columns]
+            df_ch.columns = cols
             
             def get_col(candidates):
                 for cand in candidates:
@@ -224,47 +241,46 @@ def carregar_dados_sac():
             if not col_obs and len(cols) >= 21:
                 col_obs = cols[20]
 
-            for idx, r in df_ch.iterrows():
-                val = str(r[col_chamado]).strip() if col_chamado and pd.notna(r[col_chamado]) else ""
+            records_ch = df_ch.fillna("").to_dict('records')
+            for idx, r in enumerate(records_ch):
+                val = str(r.get(col_chamado, "")).strip() if col_chamado else ""
                 if not val or val.lower() in ["nan", "chamado"]:
                     continue
 
-                m = re.search(r'SAC-(\d{4})-(\d+)', val, re.IGNORECASE)
+                m = RE_SAC_SEQ.search(val)
                 if m:
                     ano = m.group(1)
                     seq = int(m.group(2))
-                    maior_sac_ano[ano] = max(maior_sac_ano.get(ano, 0), seq)
+                    if seq > maior_sac_ano.get(ano, 0):
+                        maior_sac_ano[ano] = seq
 
-                def get_val(col_name):
-                    return str(r[col_name]).strip() if col_name and col_name in r and pd.notna(r[col_name]) else ""
-
-                val_reemb_real = get_val(col_reemb_realizado)
+                val_reemb_real = str(r.get(col_reemb_realizado, "")).strip() if col_reemb_realizado else ""
                 if not val_reemb_real:
                     val_reemb_real = "Não"
 
                 chamados_salvos.append({
                     "linha": idx + 2,
                     "chamado": val,
-                    "data": get_val(col_data),
-                    "cliente": get_val(col_cli),
-                    "localInterno": get_val(col_loc),
-                    "cidade": get_val(col_cid),
-                    "descricao": get_val(col_desc),
-                    "produto": get_val(col_prod),
-                    "dataTransacao": get_val(col_dt_trans),
-                    "horaTransacao": get_val(col_hr_trans),
-                    "valor": get_val(col_val),
-                    "nomeSobrenome": get_val(col_nome_atend),
-                    "celular": get_val(col_cel),
-                    "problemas": get_val(col_prob),
-                    "formaPgto": get_val(col_pag),
-                    "reembolso": get_val(col_reemb),
-                    "pix": get_val(col_pix),
-                    "atendente": get_val(col_atend),
-                    "dataHoraLancamento": get_val(col_dthr),
+                    "data": str(r.get(col_data, "")).strip() if col_data else "",
+                    "cliente": str(r.get(col_cli, "")).strip() if col_cli else "",
+                    "localInterno": str(r.get(col_loc, "")).strip() if col_loc else "",
+                    "cidade": str(r.get(col_cid, "")).strip() if col_cid else "",
+                    "descricao": str(r.get(col_desc, "")).strip() if col_desc else "",
+                    "produto": str(r.get(col_prod, "")).strip() if col_prod else "",
+                    "dataTransacao": str(r.get(col_dt_trans, "")).strip() if col_dt_trans else "",
+                    "horaTransacao": str(r.get(col_hr_trans, "")).strip() if col_hr_trans else "",
+                    "valor": str(r.get(col_val, "")).strip() if col_val else "",
+                    "nomeSobrenome": str(r.get(col_nome_atend, "")).strip() if col_nome_atend else "",
+                    "celular": str(r.get(col_cel, "")).strip() if col_cel else "",
+                    "problemas": str(r.get(col_prob, "")).strip() if col_prob else "",
+                    "formaPgto": str(r.get(col_pag, "")).strip() if col_pag else "",
+                    "reembolso": str(r.get(col_reemb, "")).strip() if col_reemb else "",
+                    "pix": str(r.get(col_pix, "")).strip() if col_pix else "",
+                    "atendente": str(r.get(col_atend, "")).strip() if col_atend else "",
+                    "dataHoraLancamento": str(r.get(col_dthr, "")).strip() if col_dthr else "",
                     "reembolsoRealizado": val_reemb_real,
-                    "financeiroResponsavel": get_val(col_fin_resp),
-                    "observacao": get_val(col_obs)
+                    "financeiroResponsavel": str(r.get(col_fin_resp, "")).strip() if col_fin_resp else "",
+                    "observacao": str(r.get(col_obs, "")).strip() if col_obs else ""
                 })
     except Exception:
         pass
