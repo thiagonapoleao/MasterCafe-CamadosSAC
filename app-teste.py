@@ -62,7 +62,8 @@ logo_base64_src = obter_logo_base64()
 
 # IDs e GIDs de Planilhas
 SPREADSHEET_SAC_ID = "1YUS9AwQti0Gl79X-TGCIqZSkOfF0bE0BX5gyDClo3rc"
-GID_SAC_CHAMADOS = "0"
+GID_SAC_CHAMADOS = "0"                 # Histórico completo
+GID_SAC_CHAMADOS_MENSAL = "11223344"   # GID da aba 'Chamado Mensal' (ou export por sheet)
 GID_SAC_CLIENTES = "1332839106"
 GID_SAC_USUARIOS = "437161325"
 
@@ -70,26 +71,126 @@ SPREADSHEET_SAC_CONFIG_ID = "1vOa6QpGPZ6rZ1doT2RRU1SAXWR5usPzv"
 GID_SAC_CONFIGS = "1833376686"
 
 URL_CSV_SAC_CHAMADOS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_CHAMADOS}"
+URL_CSV_SAC_CHAMADOS_MENSAL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/gviz/tq?tqx=out:csv&sheet=Chamado%20Mensal"
 URL_CSV_SAC_CLIENTES = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_CLIENTES}"
 URL_CSV_SAC_CONFIGS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_CONFIG_ID}/export?format=csv&gid={GID_SAC_CONFIGS}"
 URL_CSV_SAC_USUARIOS = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_SAC_ID}/export?format=csv&gid={GID_SAC_USUARIOS}"
 
 def carregar_csv_com_timeout(url, timeout=12):
-    """Lê CSV do Google Sheets com timeout para evitar travamento da thread"""
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
     with urllib.request.urlopen(req, timeout=timeout) as response:
         return pd.read_csv(response, dtype=str)
 
 RE_SAC_SEQ = re.compile(r'SAC-(\d{4})-(\d+)', re.IGNORECASE)
 
-# TTL ajustado para 45s (evita rate-limit do Google na Streamlit Cloud e garante performance máxima)
+def parse_df_chamados(df, aba_origem="Chamados"):
+    chamados_lista = []
+    maior_ano = {}
+    if df is None or df.empty:
+        return chamados_lista, maior_ano
+
+    cols = [c.strip() for c in df.columns]
+    df.columns = cols
+
+    def get_col(candidates):
+        for cand in candidates:
+            for c in cols:
+                if c.lower() == cand.lower():
+                    return c
+        return None
+
+    col_chamado = get_col(["Chamado", "chamado"]) or (cols[0] if len(cols) > 0 else "")
+    col_data = get_col(["Data", "data"]) or (cols[1] if len(cols) > 1 else "")
+    col_cli = get_col(["Cliente", "cliente"]) or (cols[2] if len(cols) > 2 else "")
+    col_loc = get_col(["Local Interno", "local interno", "localInterno"]) or (cols[3] if len(cols) > 3 else "")
+    col_cid = get_col(["Filial Responsável", "Filial Responsavel", "Cidade", "cidade"]) or (cols[4] if len(cols) > 4 else "")
+    col_desc = get_col(["Descrição", "Descricao", "descricao"]) or (cols[5] if len(cols) > 5 else "")
+    col_prod = get_col(["Produto", "produto"]) or (cols[6] if len(cols) > 6 else "")
+    col_dt_trans = get_col(["Data da Transação", "Data da Transacao", "dataTransacao"]) or (cols[7] if len(cols) > 7 else "")
+    col_hr_trans = get_col(["Hora da Transação", "Hora da Transacao", "horaTransacao"]) or (cols[8] if len(cols) > 8 else "")
+    col_val = get_col(["Valor", "Valor(R$)", "valor"]) or (cols[9] if len(cols) > 9 else "")
+    col_nome_atend = get_col(["Nome/Sobrenome", "Nome", "nomeSobrenome"]) or (cols[10] if len(cols) > 10 else "")
+    col_cel = get_col(["Celular", "celular"]) or (cols[11] if len(cols) > 11 else "")
+    col_prob = get_col(["Problemas", "Problema", "problemas"]) or (cols[12] if len(cols) > 12 else "")
+    col_pag = get_col(["Forma de Pagamento", "Forma Pagamento", "formaPgto", "forma de pagamento"]) or (cols[13] if len(cols) > 13 else "")
+    col_reemb = get_col(["Reembolso", "reembolso", "Reebolso"])
+    col_pix = get_col(["Pix - Reembolso", "Pix", "pix"])
+    col_atend = get_col(["Atendente", "atendente"])
+    col_dthr = get_col(["Data/Hora do lançamento", "Data/Hora", "dataHoraLancamento"])
+
+    col_reemb_realizado = get_col([
+        "Reembolso Realizado", "reembolsoRealizado", "Reembolso Realizado?", 
+        "Reemb. Pago?", "Reemb Pago", "Reembolso Pago", "Pago", "reembolso_realizado"
+    ])
+    if not col_reemb_realizado and len(cols) >= 19:
+        col_reemb_realizado = cols[18]
+
+    col_fin_resp = get_col([
+        "Financeiro Responsavel", "Financeiro Responsável", "financeiroResponsavel",
+        "Financeiro", "Resp Financeiro", "Resp. Financeiro"
+    ])
+    if not col_fin_resp and len(cols) >= 20:
+        col_fin_resp = cols[19]
+
+    col_obs = get_col([
+        "Observação", "Observacao", "observacao", "observação", 
+        "Observações", "Observacoes", "Obs", "obs"
+    ])
+    if not col_obs and len(cols) >= 21:
+        col_obs = cols[20]
+
+    records = df.fillna("").to_dict('records')
+    for idx, r in enumerate(records):
+        val = str(r.get(col_chamado, "")).strip() if col_chamado else ""
+        if not val or val.lower() in ["nan", "chamado"]:
+            continue
+
+        m = RE_SAC_SEQ.search(val)
+        if m:
+            ano = m.group(1)
+            seq = int(m.group(2))
+            if seq > maior_ano.get(ano, 0):
+                maior_ano[ano] = seq
+
+        val_reemb_real = str(r.get(col_reemb_realizado, "")).strip() if col_reemb_realizado else ""
+        if not val_reemb_real:
+            val_reemb_real = "Não"
+
+        chamados_lista.append({
+            "linha": idx + 2,
+            "aba": aba_origem,
+            "chamado": val,
+            "data": str(r.get(col_data, "")).strip() if col_data else "",
+            "cliente": str(r.get(col_cli, "")).strip() if col_cli else "",
+            "localInterno": str(r.get(col_loc, "")).strip() if col_loc else "",
+            "cidade": str(r.get(col_cid, "")).strip() if col_cid else "",
+            "descricao": str(r.get(col_desc, "")).strip() if col_desc else "",
+            "produto": str(r.get(col_prod, "")).strip() if col_prod else "",
+            "dataTransacao": str(r.get(col_dt_trans, "")).strip() if col_dt_trans else "",
+            "horaTransacao": str(r.get(col_hr_trans, "")).strip() if col_hr_trans else "",
+            "valor": str(r.get(col_val, "")).strip() if col_val else "",
+            "nomeSobrenome": str(r.get(col_nome_atend, "")).strip() if col_nome_atend else "",
+            "celular": str(r.get(col_cel, "")).strip() if col_cel else "",
+            "problemas": str(r.get(col_prob, "")).strip() if col_prob else "",
+            "formaPgto": str(r.get(col_pag, "")).strip() if col_pag else "",
+            "reembolso": str(r.get(col_reemb, "")).strip() if col_reemb else "",
+            "pix": str(r.get(col_pix, "")).strip() if col_pix else "",
+            "atendente": str(r.get(col_atend, "")).strip() if col_atend else "",
+            "dataHoraLancamento": str(r.get(col_dthr, "")).strip() if col_dthr else "",
+            "reembolsoRealizado": val_reemb_real,
+            "financeiroResponsavel": str(r.get(col_fin_resp, "")).strip() if col_fin_resp else "",
+            "observacao": str(r.get(col_obs, "")).strip() if col_obs else ""
+        })
+
+    return chamados_lista, maior_ano
+
 @st.cache_data(ttl=45, show_spinner=False)
 def carregar_dados_sac():
     clientes_dados = []
     cidades_clientes = []
     lista_clientes_completa = []
-    
-    # 1. CLIENTES (Otimizado sem iterrows)
+
+    # 1. CLIENTES
     try:
         df_cli = carregar_csv_com_timeout(URL_CSV_SAC_CLIENTES)
         if df_cli is not None and not df_cli.empty:
@@ -158,7 +259,7 @@ def carregar_dados_sac():
     except Exception:
         pass
 
-    # 3. USUÁRIOS (Otimizado sem iterrows)
+    # 3. USUÁRIOS
     usuarios_validos = []
     try:
         df_usr = carregar_csv_com_timeout(URL_CSV_SAC_USUARIOS)
@@ -185,107 +286,29 @@ def carregar_dados_sac():
     except Exception:
         pass
 
-    # 4. CHAMADOS (Otimizado com to_dict e regex pré-compilada)
+    # 4. CHAMADOS - ABA 'Chamados' (Base Histórica)
+    chamados_historico = []
     maior_sac_ano = {}
-    chamados_salvos = []
     try:
         df_ch = carregar_csv_com_timeout(URL_CSV_SAC_CHAMADOS)
-        if df_ch is not None and not df_ch.empty:
-            cols = [c.strip() for c in df_ch.columns]
-            df_ch.columns = cols
-            
-            def get_col(candidates):
-                for cand in candidates:
-                    for c in cols:
-                        if c.lower() == cand.lower():
-                            return c
-                return None
-
-            col_chamado = get_col(["Chamado", "chamado"]) or cols[0]
-            col_data = get_col(["Data", "data"]) or (cols[1] if len(cols) > 1 else "")
-            col_cli = get_col(["Cliente", "cliente"]) or (cols[2] if len(cols) > 2 else "")
-            col_loc = get_col(["Local Interno", "local interno", "localInterno"]) or (cols[3] if len(cols) > 3 else "")
-            col_cid = get_col(["Filial Responsável", "Filial Responsavel", "Cidade", "cidade"]) or (cols[4] if len(cols) > 4 else "")
-            col_desc = get_col(["Descrição", "Descricao", "descricao"]) or (cols[5] if len(cols) > 5 else "")
-            col_prod = get_col(["Produto", "produto"]) or (cols[6] if len(cols) > 6 else "")
-            col_dt_trans = get_col(["Data da Transação", "Data da Transacao", "dataTransacao"]) or (cols[7] if len(cols) > 7 else "")
-            col_hr_trans = get_col(["Hora da Transação", "Hora da Transacao", "horaTransacao"]) or (cols[8] if len(cols) > 8 else "")
-            col_val = get_col(["Valor", "Valor(R$)", "valor"]) or (cols[9] if len(cols) > 9 else "")
-            col_nome_atend = get_col(["Nome/Sobrenome", "Nome", "nomeSobrenome"]) or (cols[10] if len(cols) > 10 else "")
-            col_cel = get_col(["Celular", "celular"]) or (cols[11] if len(cols) > 11 else "")
-            col_prob = get_col(["Problemas", "Problema", "problemas"]) or (cols[12] if len(cols) > 12 else "")
-            col_pag = get_col(["Forma de Pagamento", "Forma Pagamento", "formaPgto", "forma de pagamento"]) or (cols[13] if len(cols) > 13 else "")
-            col_reemb = get_col(["Reembolso", "reembolso", "Reebolso"])
-            col_pix = get_col(["Pix - Reembolso", "Pix", "pix"])
-            col_atend = get_col(["Atendente", "atendente"])
-            col_dthr = get_col(["Data/Hora do lançamento", "Data/Hora", "dataHoraLancamento"])
-            
-            col_reemb_realizado = get_col([
-                "Reembolso Realizado", "reembolsoRealizado", "Reembolso Realizado?", 
-                "Reemb. Pago?", "Reemb Pago", "Reembolso Pago", "Pago", "reembolso_realizado"
-            ])
-            if not col_reemb_realizado and len(cols) >= 19:
-                col_reemb_realizado = cols[18]
-
-            col_fin_resp = get_col([
-                "Financeiro Responsavel", "Financeiro Responsável", "financeiroResponsavel",
-                "Financeiro", "Resp Financeiro", "Resp. Financeiro"
-            ])
-            if not col_fin_resp and len(cols) >= 20:
-                col_fin_resp = cols[19]
-
-            col_obs = get_col([
-                "Observação", "Observacao", "observacao", "observação", 
-                "Observações", "Observacoes", "Obs", "obs"
-            ])
-            if not col_obs and len(cols) >= 21:
-                col_obs = cols[20]
-
-            records_ch = df_ch.fillna("").to_dict('records')
-            for idx, r in enumerate(records_ch):
-                val = str(r.get(col_chamado, "")).strip() if col_chamado else ""
-                if not val or val.lower() in ["nan", "chamado"]:
-                    continue
-
-                m = RE_SAC_SEQ.search(val)
-                if m:
-                    ano = m.group(1)
-                    seq = int(m.group(2))
-                    if seq > maior_sac_ano.get(ano, 0):
-                        maior_sac_ano[ano] = seq
-
-                val_reemb_real = str(r.get(col_reemb_realizado, "")).strip() if col_reemb_realizado else ""
-                if not val_reemb_real:
-                    val_reemb_real = "Não"
-
-                chamados_salvos.append({
-                    "linha": idx + 2,
-                    "chamado": val,
-                    "data": str(r.get(col_data, "")).strip() if col_data else "",
-                    "cliente": str(r.get(col_cli, "")).strip() if col_cli else "",
-                    "localInterno": str(r.get(col_loc, "")).strip() if col_loc else "",
-                    "cidade": str(r.get(col_cid, "")).strip() if col_cid else "",
-                    "descricao": str(r.get(col_desc, "")).strip() if col_desc else "",
-                    "produto": str(r.get(col_prod, "")).strip() if col_prod else "",
-                    "dataTransacao": str(r.get(col_dt_trans, "")).strip() if col_dt_trans else "",
-                    "horaTransacao": str(r.get(col_hr_trans, "")).strip() if col_hr_trans else "",
-                    "valor": str(r.get(col_val, "")).strip() if col_val else "",
-                    "nomeSobrenome": str(r.get(col_nome_atend, "")).strip() if col_nome_atend else "",
-                    "celular": str(r.get(col_cel, "")).strip() if col_cel else "",
-                    "problemas": str(r.get(col_prob, "")).strip() if col_prob else "",
-                    "formaPgto": str(r.get(col_pag, "")).strip() if col_pag else "",
-                    "reembolso": str(r.get(col_reemb, "")).strip() if col_reemb else "",
-                    "pix": str(r.get(col_pix, "")).strip() if col_pix else "",
-                    "atendente": str(r.get(col_atend, "")).strip() if col_atend else "",
-                    "dataHoraLancamento": str(r.get(col_dthr, "")).strip() if col_dthr else "",
-                    "reembolsoRealizado": val_reemb_real,
-                    "financeiroResponsavel": str(r.get(col_fin_resp, "")).strip() if col_fin_resp else "",
-                    "observacao": str(r.get(col_obs, "")).strip() if col_obs else ""
-                })
+        chamados_historico, m_ano_ch = parse_df_chamados(df_ch, aba_origem="Chamados")
+        maior_sac_ano.update(m_ano_ch)
     except Exception:
         pass
 
-    chamados_salvos.reverse()
+    # 5. CHAMADOS - ABA 'Chamado Mensal' (Mês Atual Dinâmico)
+    chamados_mensal = []
+    try:
+        df_ch_m = carregar_csv_com_timeout(URL_CSV_SAC_CHAMADOS_MENSAL)
+        chamados_mensal, m_ano_m = parse_df_chamados(df_ch_m, aba_origem="Chamado Mensal")
+        for ano, seq in m_ano_m.items():
+            if seq > maior_sac_ano.get(ano, 0):
+                maior_sac_ano[ano] = seq
+    except Exception:
+        pass
+
+    chamados_historico.reverse()
+    chamados_mensal.reverse()
 
     return {
         "clientes": clientes_dados,
@@ -296,12 +319,15 @@ def carregar_dados_sac():
         "descricoes": sorted(descricoes),
         "usuarios": usuarios_validos,
         "maior_sac_ano": maior_sac_ano,
-        "chamados": chamados_salvos
+        "chamados_mensal": chamados_mensal,
+        "chamados_historico": chamados_historico
     }
 
 dados_sac = carregar_dados_sac()
 dados_sac_json = json.dumps(dados_sac, ensure_ascii=False)
-total_chamados_carregados = len(dados_sac["chamados"])
+total_mensal = len(dados_sac["chamados_mensal"])
+total_historico = len(dados_sac["chamados_historico"])
+total_geral = total_mensal + total_historico
 
 html_code = f"""
 <!DOCTYPE html>
@@ -377,6 +403,7 @@ html_code = f"""
         </svg>
         <i id="modalIconCheck" data-lucide="check" class="hidden w-8 h-8 text-emerald-600"></i>
         <i id="modalIconTrash" data-lucide="trash-2" class="hidden w-8 h-8 text-rose-600"></i>
+        <i id="modalIconArchive" data-lucide="archive" class="hidden w-8 h-8 text-indigo-600"></i>
       </div>
       <div>
         <h3 id="modalLoadingTitle" class="text-base font-bold text-slate-900">Processando Ação...</h3>
@@ -440,7 +467,9 @@ html_code = f"""
             <h1 class="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
               Painel Executivo de Gestão & SAC
             </h1>
-            <p class="text-xs text-slate-500">Controle Operacional, Atendimento & Análises · {total_chamados_carregados} chamados registrados</p>
+            <p class="text-xs text-slate-500">
+              Controle Operacional & Análises · <span id="labelContadorHeader">{total_mensal} no mês</span> ({total_geral} acumulados)
+            </p>
           </div>
         </div>
         
@@ -452,15 +481,18 @@ html_code = f"""
             </button>
             <button id="navSAC" type="button" class="nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('sac')">
               <i data-lucide="headphones" class="w-4 h-4"></i>
-              Lançamento SAC
+              Lançamento SAC (Mês)
             </button>
             <button id="navChamadosAbertos" type="button" class="nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('chamadosAbertos')">
               <i data-lucide="inbox" class="w-4 h-4"></i>
-              Chamados Abertos
+              Chamados Abertos (Todos)
             </button>
             <button id="navCadastroClientes" type="button" class="hidden nav-btn inactive flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition" onclick="switchPage('cadastroClientes')">
               <i data-lucide="user-plus" class="w-4 h-4"></i>
               Cadastro de Clientes
+            </button>
+            <button id="btnFechamentoMensal" type="button" onclick="executarFechamentoMensal()" title="Transferir chamados do mês para a base permanente 'Chamados'" class="hidden inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200 hover:bg-indigo-100 cursor-pointer transition">
+              <i data-lucide="archive" class="w-3.5 h-3.5 mr-1.5 text-indigo-600"></i> Fechamento Mensal
             </button>
             <button type="button" onclick="executarRefresh()" title="Clique para recarregar da planilha" class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 cursor-pointer transition">
               <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span> Sincronizar 🔄
@@ -482,14 +514,14 @@ html_code = f"""
 
     <main class="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 space-y-6">
 
-      <!-- PÁGINA 1: DASHBOARD SAC -->
+      <!-- PÁGINA 1: DASHBOARD SAC (ALIMENTADO POR AMBAS AS ABAS) -->
       <div id="pageDashboardSAC" class="space-y-6">
         <!-- FILTROS GERAIS -->
         <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
               <i data-lucide="sliders" class="w-4 h-4 text-sky-500"></i>
-              <span>Filtros do Painel SAC</span>
+              <span>Filtros do Painel SAC (Base Consolidada: Mensal + Histórico)</span>
             </div>
             <span id="badgeFiltroSAC" class="text-xs font-medium text-slate-500">Filtrando: Todos os chamados</span>
           </div>
@@ -528,12 +560,12 @@ html_code = f"""
         <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <div class="kpi-card p-4 rounded-2xl shadow-sm flex flex-col justify-between">
             <div class="flex items-center justify-between">
-              <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total de Chamados</span>
+              <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Acumulado</span>
               <span class="p-1.5 rounded-lg bg-sky-50 text-sky-600"><i data-lucide="headphones" class="w-4 h-4"></i></span>
             </div>
             <div class="mt-3">
               <span id="kpiSACTotal" class="text-xl font-bold tracking-tight text-slate-800">0</span>
-              <p id="kpiSACTotalSub" class="text-[11px] text-slate-400 mt-0.5">Ocorrências registradas</p>
+              <p id="kpiSACTotalSub" class="text-[11px] text-slate-400 mt-0.5">Mensal + Histórico</p>
             </div>
           </div>
 
@@ -630,7 +662,7 @@ html_code = f"""
           </div>
         </section>
 
-        <!-- NOVO: GRÁFICOS DO DIA COM TOP 5 (QUANTIDADE & VALORES R$) -->
+        <!-- GRÁFICOS DO DIA COM TOP 5 (QUANTIDADE & VALORES R$) -->
         <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
             <div>
@@ -662,9 +694,8 @@ html_code = f"""
           </div>
         </section>
 
-        <!-- NOVO: LISTAS TOP 3 LOCAIS INTERNOS RESUMIDOS POR PROBLEMA (MÊS, DIA, ÚLTIMOS 7 DIAS) -->
+        <!-- LISTAS TOP 3 LOCAIS INTERNOS RESUMIDOS POR PROBLEMA (MÊS, DIA, ÚLTIMOS 7 DIAS) -->
         <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <!-- 1. Top 3 do Mês -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div>
               <div class="flex flex-col gap-1 pb-3 mb-3 border-b border-slate-100">
@@ -682,7 +713,6 @@ html_code = f"""
             </div>
           </div>
 
-          <!-- 2. Top 3 do Dia -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div>
               <div class="flex flex-col gap-1 pb-3 mb-3 border-b border-slate-100">
@@ -700,7 +730,6 @@ html_code = f"""
             </div>
           </div>
 
-          <!-- 3. Top 3 dos Últimos 7 Dias (com filtro de dia e filial) -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div>
               <div class="flex flex-col gap-2 pb-3 mb-3 border-b border-slate-100">
@@ -761,7 +790,7 @@ html_code = f"""
           </div>
         </section>
 
-        <!-- SEPARADOS: CHAMADOS POR MÊS (QUANTIDADE) & CHAMADOS POR MÊS (VALORES R$) -->
+        <!-- CHAMADOS POR MÊS (QUANTIDADE & VALORES R$) -->
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
@@ -798,7 +827,7 @@ html_code = f"""
           </div>
         </section>
 
-        <!-- SEPARADOS: CHAMADOS POR DIA (QUANTIDADE) & CHAMADOS POR DIA (VALORES R$) -->
+        <!-- CHAMADOS POR DIA (QUANTIDADE & VALORES R$) -->
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
@@ -876,7 +905,7 @@ html_code = f"""
         </section>
       </div>
 
-      <!-- PÁGINA 2: LANÇAMENTO SAC -->
+      <!-- PÁGINA 2: LANÇAMENTO SAC (SALVA EM 'Chamado Mensal' E LISTA SÓ O MÊS) -->
       <div id="pageSAC" class="hidden space-y-4">
         <div id="sacMainPanel" class="space-y-4">
           <div id="alertSACEditMode" class="hidden p-3 sm:p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex justify-between items-center shadow-sm">
@@ -884,7 +913,7 @@ html_code = f"""
               <div class="p-2 bg-amber-500 text-white rounded-xl"><i data-lucide="edit-3" class="w-5 h-5"></i></div>
               <div>
                 <p class="text-sm font-bold">Modo de Edição de Chamado: <span id="labelSACEditChamado" class="font-mono text-amber-800">SAC-0000-0000</span></p>
-                <p class="text-xs text-amber-700">Você está alterando este chamado do SAC. O atendente criador e a data/hora original de abertura serão mantidos.</p>
+                <p class="text-xs text-amber-700">Você está alterando este chamado. O atendente original e a data/hora original de abertura serão mantidos.</p>
               </div>
             </div>
             <button type="button" onclick="cancelarEdicaoSAC()" class="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 rounded-xl text-xs font-bold text-amber-900 transition cursor-pointer">
@@ -899,7 +928,7 @@ html_code = f"""
               </div>
               <div>
                 <p id="alertSACSuccessTitle" class="text-sm font-bold">Ação realizada com sucesso!</p>
-                <p id="alertSACSuccessSub" class="text-xs text-emerald-700">A planilha oficial foi atualizada em tempo real.</p>
+                <p id="alertSACSuccessSub" class="text-xs text-emerald-700">A aba Chamado Mensal foi atualizada em tempo real.</p>
               </div>
             </div>
             <button type="button" onclick="document.getElementById('alertSACSuccess').classList.add('hidden')" class="px-3 py-2 rounded-xl hover:bg-emerald-100 text-xs font-semibold text-emerald-800 transition cursor-pointer">
@@ -915,7 +944,7 @@ html_code = f"""
                 </div>
                 <div>
                   <h2 id="sacFormTitleText" class="text-base font-bold text-slate-900">Lançamento de Ocorrências do SAC</h2>
-                  <p class="text-xs text-slate-500">Registro de chamados, ressarcimentos e reembolsos · Aba: Chamados</p>
+                  <p class="text-xs text-slate-500">Lançamento dinâmico direto na aba: <strong class="text-sky-700">Chamado Mensal</strong></p>
                 </div>
               </div>
               <div class="flex items-center gap-3">
@@ -1042,26 +1071,26 @@ html_code = f"""
                 </button>
                 <button type="submit" id="btnSalvarSAC" class="flex items-center gap-2 px-5 py-2 rounded-xl bg-sky-600 text-white text-xs font-bold shadow-lg shadow-sky-500/25 hover:bg-sky-700 transition cursor-pointer">
                   <i data-lucide="send" class="w-4 h-4"></i>
-                  <span id="btnSalvarSACText">Lançar Ocorrência SAC</span>
+                  <span id="btnSalvarSACText">Lançar no Chamado Mensal</span>
                 </button>
               </div>
             </form>
           </section>
 
-          <!-- LISTA DE TODOS OS CHAMADOS REALIZADOS (COM FORMA DE PGTO) -->
+          <!-- LISTA EXCLUSIVA DOS CHAMADOS DO MÊS (ABA: Chamado Mensal) -->
           <section class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 overflow-hidden">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
               <div>
                 <h2 class="text-base font-bold flex items-center gap-2 text-slate-800">
                   <i data-lucide="list-checks" class="w-4 h-4 text-sky-600"></i>
-                  Chamados Realizados no SAC
+                  Chamados Deste Mês
                 </h2>
-                <p class="text-xs text-slate-500">Histórico completo de ocorrências registradas na aba Chamados</p>
+                <p class="text-xs text-slate-500">Exibição rápida e ágil · Registrados exclusivamente na aba: <strong class="text-sky-700">Chamado Mensal</strong></p>
               </div>
               <div class="flex items-center gap-3">
                 <div class="relative">
                   <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
-                  <input type="text" id="searchSACChamados" placeholder="Buscar chamado, cliente, obs..." oninput="filtrarChamadosSAC()" class="text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 w-64">
+                  <input type="text" id="searchSACChamados" placeholder="Buscar no mês atual..." oninput="filtrarChamadosSAC()" class="text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 w-64">
                 </div>
                 <span id="badgeContadorSAC" class="text-xs px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 font-bold border border-sky-200">
                   0 chamado(s)
@@ -1092,7 +1121,7 @@ html_code = f"""
                 </thead>
                 <tbody id="tableSACChamadosBody" class="divide-y divide-slate-100">
                   <tr>
-                    <td colspan="15" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado registrado ainda.</td>
+                    <td colspan="15" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado no mês atual.</td>
                   </tr>
                 </tbody>
               </table>
@@ -1101,7 +1130,7 @@ html_code = f"""
         </div>
       </div>
 
-      <!-- PÁGINA 3: TODOS OS CHAMADOS ABERTOS (COM FORMA DE PGTO) -->
+      <!-- PÁGINA 3: TODOS OS CHAMADOS ABERTOS (CARREGA TODAS AS ABAS) -->
       <div id="pageChamadosAbertos" class="space-y-6 hidden">
         <section class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 overflow-hidden">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
@@ -1113,14 +1142,14 @@ html_code = f"""
                 <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
                   Todos os Chamados Abertos
                 </h2>
-                <p class="text-xs text-slate-500">Lista com status de reembolso, observações, financeiro responsável e edição SAC</p>
+                <p class="text-xs text-slate-500">Exibição global consolidada (Aba 'Chamado Mensal' + Aba 'Chamados')</p>
               </div>
             </div>
 
             <div class="flex items-center gap-3">
               <div class="relative">
                 <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
-                <input type="text" id="searchAbertos" placeholder="Filtrar chamado, cliente, obs..." oninput="filtrarChamadosAbertos()" class="text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 w-64">
+                <input type="text" id="searchAbertos" placeholder="Filtrar em todos os chamados..." oninput="filtrarChamadosAbertos()" class="text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 w-64">
               </div>
               <span id="badgeContadorAbertos" class="text-xs px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 font-bold border border-sky-200">
                 0 chamado(s)
@@ -1134,20 +1163,21 @@ html_code = f"""
                 <tr>
                   <th style="width: 8%;" class="rounded-l-lg font-mono">Chamado</th>
                   <th style="width: 7%;">Data</th>
-                  <th style="width: 11%;">Cliente</th>
+                  <th style="width: 10%;">Cliente</th>
                   <th style="width: 6%;" class="text-right">Valor</th>
-                  <th style="width: 11%;">Nome do Cliente</th>
-                  <th style="width: 9%;">Forma Pgto</th>
-                  <th style="width: 10%;">Pix - Reembolso</th>
+                  <th style="width: 10%;">Nome do Cliente</th>
+                  <th style="width: 8%;">Forma Pgto</th>
+                  <th style="width: 9%;">Pix - Reembolso</th>
                   <th style="width: 5%;" class="text-center">Pago?</th>
-                  <th style="width: 9%;">Fin. Responsável</th>
-                  <th style="width: 19%;">Observação</th>
+                  <th style="width: 8%;">Fin. Responsável</th>
+                  <th style="width: 15%;">Observação</th>
+                  <th style="width: 9%;">Origem</th>
                   <th style="width: 5%;" class="rounded-r-lg text-center">Ação</th>
                 </tr>
               </thead>
               <tbody id="tableChamadosAbertosBody" class="divide-y divide-slate-100">
                 <tr>
-                  <td colspan="11" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado aberto encontrado.</td>
+                  <td colspan="12" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado aberto encontrado.</td>
                 </tr>
               </tbody>
             </table>
@@ -1311,8 +1341,12 @@ html_code = f"""
 
     const APPS_SCRIPT_SAC_URL = "{APPS_SCRIPT_SAC_WEBAPP_URL}";
     const dadosSAC = {dados_sac_json};
-    let listaChamadosSAC = Array.isArray(dadosSAC.chamados) ? dadosSAC.chamados : [];
+    
+    // Separação das bases conforme solicitado:
+    let listaChamadosMensal = Array.isArray(dadosSAC.chamados_mensal) ? dadosSAC.chamados_mensal : [];
+    let listaChamadosHistorico = Array.isArray(dadosSAC.chamados_historico) ? dadosSAC.chamados_historico : [];
     let listaCadastroClientes = Array.isArray(dadosSAC.cadastro_clientes) ? dadosSAC.cadastro_clientes : [];
+    
     let chamadoEmEdicao = null;
     let clienteEmEdicao = null;
     let origemEdicaoSAC = 'sac';
@@ -1327,7 +1361,14 @@ html_code = f"""
       nivelAcessoLogado = sessionStorage.getItem('sac_nivel_acesso') || "";
     }} catch(e) {{}}
 
-    // CONVERSORES DE DATAS ENTRE ISO (YYYY-MM-DD) E PT-BR (DD/MM/AAAA)
+    // Combina todas as abas sem duplicações para alimentar o Dashboard e Chamados Abertos
+    function obterChamadosConsolidados() {{
+      const mapa = new Map();
+      listaChamadosHistorico.forEach(c => mapa.set(c.chamado, c));
+      listaChamadosMensal.forEach(c => mapa.set(c.chamado, c)); // Mês prevalece se houver conflito
+      return Array.from(mapa.values());
+    }}
+
     function dataIsoParaPtBr(isoStr) {{
       if (!isoStr) return '';
       const s = String(isoStr).trim();
@@ -1343,27 +1384,19 @@ html_code = f"""
       const s = String(ptBrStr).trim();
       const parts = s.split(/[/ -]/);
       if (parts.length === 3) {{
-        if (parts[2].length === 4) {{
-          return `${{parts[2]}}-${{parts[1].padStart(2, '0')}}-${{parts[0].padStart(2, '0')}}`;
-        }}
-        if (parts[0].length === 4) {{
-          return `${{parts[0]}}-${{parts[1].padStart(2, '0')}}-${{parts[2].padStart(2, '0')}}`;
-        }}
+        if (parts[2].length === 4) return `${{parts[2]}}-${{parts[1].padStart(2, '0')}}-${{parts[0].padStart(2, '0')}}`;
+        if (parts[0].length === 4) return `${{parts[0]}}-${{parts[1].padStart(2, '0')}}-${{parts[2].padStart(2, '0')}}`;
       }}
       return '';
     }}
 
-    // PARSER RIGOROSO DE VALORES NUMÉRICOS (COLUNA J)
     function parseValorNumerico(v) {{
       if (v === null || v === undefined) return 0;
       let s = String(v).trim().replace('R$', '').replace(/\\s+/g, '');
       if (!s) return 0;
       if (s.includes(',') && s.includes('.')) {{
-        if (s.lastIndexOf(',') > s.lastIndexOf('.')) {{
-          s = s.replace(/\\./g, '').replace(',', '.');
-        }} else {{
-          s = s.replace(/,/g, '');
-        }}
+        if (s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\\./g, '').replace(',', '.');
+        else s = s.replace(/,/g, '');
       }} else if (s.includes(',')) {{
         s = s.replace(',', '.');
       }}
@@ -1375,7 +1408,6 @@ html_code = f"""
       return (val || 0).toLocaleString('pt-BR', {{ style: 'currency', currency: 'BRL' }});
     }}
 
-    // CONTROLE DE AUTENTICAÇÃO
     function verificarEstadoAutenticacao() {{
       const loginScreen = document.getElementById('systemLoginScreen');
       const appContainer = document.getElementById('systemAppContainer');
@@ -1456,6 +1488,7 @@ html_code = f"""
 
     function aplicarRegrasDeAcesso() {{
       const btnCadastro = document.getElementById('navCadastroClientes');
+      const btnFechamento = document.getElementById('btnFechamentoMensal');
       const badgeAcesso = document.getElementById('badgeNivelAcesso');
       const badgeHeader = document.getElementById('badgeHeaderNivelAcesso');
       const containerCli = document.getElementById('containerAcessoClientes');
@@ -1465,6 +1498,7 @@ html_code = f"""
 
       if (ehGeral) {{
         if (btnCadastro) btnCadastro.classList.remove('hidden');
+        if (btnFechamento) btnFechamento.classList.remove('hidden');
         if (containerCli) containerCli.classList.remove('hidden');
         if (bloqueioCli) bloqueioCli.classList.add('hidden');
         if (badgeAcesso) {{
@@ -1477,6 +1511,7 @@ html_code = f"""
         }}
       }} else {{
         if (btnCadastro) btnCadastro.classList.add('hidden');
+        if (btnFechamento) btnFechamento.classList.add('hidden');
         if (containerCli) containerCli.classList.add('hidden');
         if (bloqueioCli) bloqueioCli.classList.remove('hidden');
         if (badgeAcesso) {{
@@ -1498,12 +1533,7 @@ html_code = f"""
         .trim()
         .toLowerCase()
         .split(/\\s+/)
-        .map((palavra, index) => {{
-          if (index > 0 && preposicoes.includes(palavra)) {{
-            return palavra;
-          }}
-          return palavra.charAt(0).toUpperCase() + palavra.slice(1);
-        }})
+        .map((palavra, index) => (index > 0 && preposicoes.includes(palavra)) ? palavra : palavra.charAt(0).toUpperCase() + palavra.slice(1))
         .join(' ');
     }}
 
@@ -1538,9 +1568,7 @@ html_code = f"""
         return false;
       }} else {{
         input.value = achado;
-        if (dispararCascataCliente) {{
-          aoMudarClienteSAC();
-        }}
+        if (dispararCascataCliente) aoMudarClienteSAC();
         return true;
       }}
     }}
@@ -1553,12 +1581,14 @@ html_code = f"""
       const spinner = document.getElementById('modalSpinner');
       const iconCheck = document.getElementById('modalIconCheck');
       const iconTrash = document.getElementById('modalIconTrash');
+      const iconArchive = document.getElementById('modalIconArchive');
       const progressBar = document.getElementById('modalProgressBar');
       const badge = document.getElementById('modalIconContainer');
 
       spinner.classList.add('hidden');
       iconCheck.classList.add('hidden');
       iconTrash.classList.add('hidden');
+      iconArchive.classList.add('hidden');
       progressBar.classList.remove('hidden');
 
       if (tipoAcao === 'loading') {{
@@ -1572,6 +1602,10 @@ html_code = f"""
         iconTrash.classList.remove('hidden');
         progressBar.classList.add('hidden');
         badge.className = "w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shadow-inner";
+      }} else if (tipoAcao === 'fechamento') {{
+        iconArchive.classList.remove('hidden');
+        progressBar.classList.add('hidden');
+        badge.className = "w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-inner";
       }}
       modal.classList.remove('hidden');
       lucide.createIcons();
@@ -1635,6 +1669,45 @@ html_code = f"""
       window.parent.location.reload();
     }}
 
+    // FECHAMENTO MENSAL: Migra chamados da aba 'Chamado Mensal' para a aba 'Chamados'
+    function executarFechamentoMensal() {{
+      if ((nivelAcessoLogado || '').trim().toLowerCase() !== 'geral') {{
+        alert('⛔ Apenas usuários com perfil Geral podem realizar o Fechamento Mensal.');
+        return;
+      }}
+      if (!listaChamadosMensal.length) {{
+        alert('ℹ️ Não há chamados registrados na aba "Chamado Mensal" para realizar o fechamento.');
+        return;
+      }}
+      const confirmacao = confirm('⚠️ Atenção: Deseja realizar o Fechamento Mensal?\\n\\nIsso transferirá todos os ' + listaChamadosMensal.length + ' chamados da aba "Chamado Mensal" para a base permanente "Chamados".');
+      if (!confirmacao) return;
+
+      abrirModalLoading('Processando Fechamento Mensal...', 'Transferindo chamados do mês para a base consolidada "Chamados".', 'loading');
+
+      enviarParaPlanilhaGarantido({{
+        "action": "fechamento_mensal",
+        "acao": "fechamento_mensal",
+        "tipo": "fechamento_mensal",
+        "abaOrigem": "Chamado Mensal",
+        "abaDestino": "Chamados",
+        "usuario": atendenteSACLogado
+      }});
+
+      // Atualiza estado local instantaneamente
+      listaChamadosHistorico = [...listaChamadosMensal, ...listaChamadosHistorico];
+      listaChamadosMensal = [];
+
+      renderizarTabelaChamadosSAC();
+      renderizarTabelaChamadosAbertos();
+      atualizarDashboardSAC();
+
+      setTimeout(() => {{
+        abrirModalLoading('Fechamento Concluído!', 'Os chamados foram transferidos para a aba "Chamados" e a aba mensal foi liberada.', 'fechamento');
+        exibirMensagemTopo('📁 Fechamento Mensal Executado!', 'Os chamados foram consolidados na base permanente "Chamados".');
+        setTimeout(fecharModalLoading, 1500);
+      }}, 600);
+    }}
+
     function switchPage(page) {{
       if (page === 'cadastroClientes' && (nivelAcessoLogado || '').trim().toLowerCase() !== 'geral') {{
         alert('⛔ Acesso Restrito:\\nSeu perfil não tem permissão para cadastrar ou gerenciar clientes.');
@@ -1664,9 +1737,7 @@ html_code = f"""
         }}
       }});
 
-      if (pages[page]) {{
-        pages[page].classList.remove('hidden');
-      }}
+      if (pages[page]) pages[page].classList.remove('hidden');
       if (buttons[page]) {{
         buttons[page].classList.add('active');
         buttons[page].classList.remove('inactive');
@@ -1686,11 +1757,12 @@ html_code = f"""
     }}
 
     // =========================================================================
-    // INICIALIZAÇÃO & FORMULÁRIO SAC
+    // INICIALIZAÇÃO & FORMULÁRIO SAC (ABA 'Chamado Mensal')
     // =========================================================================
     function calcularPreviaProximoChamado(ano) {{
       let maior = dadosSAC.maior_sac_ano[ano] || 0;
-      listaChamadosSAC.forEach(c => {{
+      const todos = obterChamadosConsolidados();
+      todos.forEach(c => {{
         if (c.chamado) {{
           const m = c.chamado.match(new RegExp('SAC-' + ano + '-(\\\\d+)', 'i'));
           if (m) {{
@@ -1800,7 +1872,7 @@ html_code = f"""
 
       document.getElementById('alertSACEditMode').classList.add('hidden');
       document.getElementById('sacFormTitleText').innerText = "Lançamento de Ocorrências do SAC";
-      document.getElementById('btnSalvarSACText').innerText = "Lançar Ocorrência SAC";
+      document.getElementById('btnSalvarSACText').innerText = "Lançar no Chamado Mensal";
       
       const anoAtual = new Date().getFullYear();
       document.getElementById('sacChamado').value = calcularPreviaProximoChamado(anoAtual);
@@ -1811,7 +1883,7 @@ html_code = f"""
     }}
 
     function editarChamadoSAC(numeroChamado, origem = 'sac') {{
-      const item = listaChamadosSAC.find(c => c.chamado === numeroChamado);
+      const item = obterChamadosConsolidados().find(c => c.chamado === numeroChamado);
       if (!item) return;
 
       origemEdicaoSAC = origem;
@@ -1852,7 +1924,7 @@ html_code = f"""
       document.getElementById('sacDataHoraAuto').value = item.dataHoraLancamento || 'Original Preservado';
 
       document.getElementById('alertSACEditMode').classList.remove('hidden');
-      document.getElementById('labelSACEditChamado').innerText = item.chamado;
+      document.getElementById('labelSACEditChamado').innerText = item.chamado + ' (' + (item.aba || 'Chamado Mensal') + ')';
       document.getElementById('sacFormTitleText').innerText = 'Edição da Ocorrência: ' + item.chamado;
       document.getElementById('btnSalvarSACText').innerText = 'Salvar Alterações';
       document.getElementById('sacForm').scrollIntoView({{ behavior: 'smooth', block: 'start' }});
@@ -1868,16 +1940,21 @@ html_code = f"""
 
     function excluirChamadoSAC(numeroChamado) {{
       if (!confirm('Deseja realmente excluir o chamado ' + numeroChamado + '? Esta ação solicitará a remoção na planilha.')) return;
-      abrirModalLoading('Excluindo Ocorrência...', 'Removendo a ocorrência ' + numeroChamado + ' da planilha oficial Chamados.', 'loading');
-      const item = listaChamadosSAC.find(c => c.chamado === numeroChamado);
+      abrirModalLoading('Excluindo Ocorrência...', 'Removendo a ocorrência ' + numeroChamado + '.', 'loading');
+      
+      const item = obterChamadosConsolidados().find(c => c.chamado === numeroChamado);
+      const abaAlvo = item?.aba || "Chamado Mensal";
 
       enviarParaPlanilhaGarantido({{
         "action": "excluir", "acao": "excluir", "tipo": "excluir_sac",
         "Chamado": numeroChamado, "chamado": numeroChamado,
+        "aba": abaAlvo, "sheet": abaAlvo,
         "linha": item?.linha || ""
       }});
 
-      listaChamadosSAC = listaChamadosSAC.filter(c => c.chamado !== numeroChamado);
+      listaChamadosMensal = listaChamadosMensal.filter(c => c.chamado !== numeroChamado);
+      listaChamadosHistorico = listaChamadosHistorico.filter(c => c.chamado !== numeroChamado);
+
       renderizarTabelaChamadosSAC();
       renderizarTabelaChamadosAbertos();
       atualizarDashboardSAC();
@@ -1886,7 +1963,7 @@ html_code = f"""
 
       setTimeout(() => {{
         abrirModalLoading('Chamado Excluído!', 'A ocorrência ' + numeroChamado + ' foi removida da base com sucesso.', 'excluir');
-        exibirMensagemTopo('🗑️ Chamado ' + numeroChamado + ' excluído!', 'A ocorrência foi removida do sistema e da planilha oficial.', 'excluir');
+        exibirMensagemTopo('🗑️ Chamado ' + numeroChamado + ' excluído!', 'A ocorrência foi removida do sistema.', 'excluir');
         setTimeout(fecharModalLoading, 1000);
       }}, 500);
     }}
@@ -1908,22 +1985,24 @@ html_code = f"""
       const anoAtual = new Date().getFullYear();
       if (!ehEdicao) chamado = calcularPreviaProximoChamado(anoAtual);
 
-      if (!ehEdicao && listaChamadosSAC.some(c => c.chamado.toUpperCase() === chamado.toUpperCase())) {{
+      const todos = obterChamadosConsolidados();
+      if (!ehEdicao && todos.some(c => c.chamado.toUpperCase() === chamado.toUpperCase())) {{
         alert('⛔ Chamado Duplicado! O número "' + chamado + '" já existe.');
         document.getElementById('sacChamado').value = calcularPreviaProximoChamado(anoAtual);
         return;
       }}
 
+      // Apenas a aba 'Chamado Mensal' recebe novas inserções
+      const abaDestino = (ehEdicao && chamadoEmEdicao?.aba) ? chamadoEmEdicao.aba : "Chamado Mensal";
+
       abrirModalLoading(
-        ehEdicao ? 'Atualizando Ocorrência...' : 'Lançando no Sistema...',
-        ehEdicao ? 'Gravando alterações do chamado ' + chamado + ' na planilha.' : 'Registrando a ocorrência ' + chamado + ' na planilha oficial.',
+        ehEdicao ? 'Atualizando Ocorrência...' : 'Lançando no Chamado Mensal...',
+        ehEdicao ? 'Gravando alterações do chamado ' + chamado + ' na aba ' + abaDestino + '.' : 'Registrando a ocorrência ' + chamado + ' na aba Chamado Mensal.',
         'loading'
       );
 
-      // Data dos chamados no padrão oficial PT-BR DD/MM/AAAA
       const dataIso = document.getElementById('sacData').value;
       const data = dataIsoParaPtBr(dataIso);
-
       const cliente = document.getElementById('sacCliente').value.trim();
       const localInterno = document.getElementById('sacLocalInterno').value;
       const cidade = document.getElementById('sacCidade').value.trim();
@@ -1948,6 +2027,7 @@ html_code = f"""
 
       const payloadSAC = {{
         "acao": ehEdicao ? "editar" : "inserir", "action": ehEdicao ? "editar" : "inserir",
+        "aba": abaDestino, "sheet": abaDestino,
         "linha": ehEdicao && chamadoEmEdicao.linha ? chamadoEmEdicao.linha : "",
         "Chamado": chamado, "Data": data, "Cliente": cliente, "Local Interno": localInterno,
         "Cidade": cidade, "Descrição": descricao, "Produto": produto,
@@ -1962,7 +2042,8 @@ html_code = f"""
       enviarParaPlanilhaGarantido(payloadSAC);
 
       const novoItem = {{
-        linha: ehEdicao && chamadoEmEdicao.linha ? chamadoEmEdicao.linha : listaChamadosSAC.length + 2,
+        linha: ehEdicao && chamadoEmEdicao.linha ? chamadoEmEdicao.linha : (abaDestino === "Chamado Mensal" ? listaChamadosMensal.length + 2 : listaChamadosHistorico.length + 2),
+        aba: abaDestino,
         chamado, data, cliente, localInterno, cidade, descricao, produto,
         dataTransacao, horaTransacao, valor: formatCurrency(valor),
         nomeSobrenome, celular, problemas, formaPgto, reembolso, pix, atendente,
@@ -1970,9 +2051,14 @@ html_code = f"""
       }};
 
       if (ehEdicao) {{
-        listaChamadosSAC = listaChamadosSAC.map(c => c.chamado === chamado ? novoItem : c);
+        if (abaDestino === "Chamado Mensal") {{
+          listaChamadosMensal = listaChamadosMensal.map(c => c.chamado === chamado ? novoItem : c);
+        }} else {{
+          listaChamadosHistorico = listaChamadosHistorico.map(c => c.chamado === chamado ? novoItem : c);
+        }}
       }} else {{
-        listaChamadosSAC.unshift(novoItem);
+        // Novo chamado entra sempre na lista mensal
+        listaChamadosMensal.unshift(novoItem);
       }}
 
       const m = chamado.match(/SAC-(\d{{4}})-(\d+)/i);
@@ -1986,32 +2072,33 @@ html_code = f"""
       origemEdicaoSAC = 'sac';
 
       setTimeout(() => {{
-        abrirModalLoading(ehEdicao ? 'Ocorrência Atualizada!' : 'Lançamento Concluído!', 'Ocorrência gravada com sucesso.', 'sucesso');
+        abrirModalLoading(ehEdicao ? 'Ocorrência Atualizada!' : 'Lançamento Concluído!', 'Ocorrência gravada com sucesso na aba ' + abaDestino + '.', 'sucesso');
         if (destinoAposSalvar === 'chamadosAbertos') switchPage('chamadosAbertos');
-        exibirMensagemTopo('✅ Ocorrência ' + chamado + ' registrada com sucesso!', 'Valor: ' + formatCurrency(valor) + ' · Forma Pgto: ' + (formaPgto || '-'));
+        exibirMensagemTopo('✅ Ocorrência ' + chamado + ' registrada na aba ' + abaDestino + '!', 'Valor: ' + formatCurrency(valor) + ' · Forma Pgto: ' + (formaPgto || '-'));
         setTimeout(fecharModalLoading, 1000);
       }}, 500);
     }}
 
     // =========================================================================
-    // RENDERIZAÇÃO DAS TABELAS (COM FORMA DE PGTO)
+    // RENDERIZAÇÃO DAS TABELAS
     // =========================================================================
+    // 1. Tabela do Formulário SAC: Carrega EXCLUSIVAMENTE os chamados da aba 'Chamado Mensal'
     function filtrarChamadosSAC() {{
       const termo = (document.getElementById('searchSACChamados')?.value || '').trim().toLowerCase();
-      if (!termo) {{ renderizarTabelaChamadosSAC(listaChamadosSAC); return; }}
-      const filtrados = listaChamadosSAC.filter(c => 
+      if (!termo) {{ renderizarTabelaChamadosSAC(listaChamadosMensal); return; }}
+      const filtrados = listaChamadosMensal.filter(c => 
         Object.values(c).some(val => String(val || '').toLowerCase().includes(termo))
       );
       renderizarTabelaChamadosSAC(filtrados);
     }}
 
-    function renderizarTabelaChamadosSAC(lista = listaChamadosSAC) {{
+    function renderizarTabelaChamadosSAC(lista = listaChamadosMensal) {{
       const tbody = document.getElementById('tableSACChamadosBody');
       const badge = document.getElementById('badgeContadorSAC');
-      if (badge) badge.innerText = lista.length + ' chamado(s)';
+      if (badge) badge.innerText = lista.length + ' no mês';
       if (!tbody) return;
       if (!lista || lista.length === 0) {{
-        tbody.innerHTML = '<tr><td colspan="15" class="text-center py-6 text-slate-400 font-semibold">Nenhuma ocorrência encontrada.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="15" class="text-center py-6 text-slate-400 font-semibold">Nenhuma ocorrência registrada no mês atual.</td></tr>';
         return;
       }}
       tbody.innerHTML = lista.map(c => {{
@@ -2053,22 +2140,25 @@ html_code = f"""
       lucide.createIcons();
     }}
 
+    // 2. Tabela Chamados Abertos: Carrega a consolidação de TODAS as abas
     function filtrarChamadosAbertos() {{
       const termo = (document.getElementById('searchAbertos')?.value || '').trim().toLowerCase();
-      if (!termo) {{ renderizarTabelaChamadosAbertos(listaChamadosSAC); return; }}
-      const filtrados = listaChamadosSAC.filter(c => 
+      const todos = obterChamadosConsolidados();
+      if (!termo) {{ renderizarTabelaChamadosAbertos(todos); return; }}
+      const filtrados = todos.filter(c => 
         Object.values(c).some(val => String(val || '').toLowerCase().includes(termo))
       );
       renderizarTabelaChamadosAbertos(filtrados);
     }}
 
-    function renderizarTabelaChamadosAbertos(lista = listaChamadosSAC) {{
+    function renderizarTabelaChamadosAbertos(lista = null) {{
+      if (!lista) lista = obterChamadosConsolidados();
       const tbody = document.getElementById('tableChamadosAbertosBody');
       const badge = document.getElementById('badgeContadorAbertos');
       if (badge) badge.innerText = lista.length + ' chamado(s)';
       if (!tbody) return;
       if (!lista || lista.length === 0) {{
-        tbody.innerHTML = '<tr><td colspan="11" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado aberto encontrado.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="text-center py-6 text-slate-400 font-semibold">Nenhum chamado aberto encontrado.</td></tr>';
         return;
       }}
       tbody.innerHTML = lista.map(c => {{
@@ -2077,6 +2167,10 @@ html_code = f"""
         const badgePago = pago 
           ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Sim</span>'
           : '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Não</span>';
+
+        const tagAba = (c.aba === 'Chamado Mensal')
+          ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold bg-sky-50 text-sky-700 border border-sky-200">Mês Atual</span>'
+          : '<span class="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Histórico</span>';
 
         return `
           <tr class="hover:bg-slate-50 transition border-b border-slate-100">
@@ -2090,6 +2184,7 @@ html_code = f"""
             <td class="text-center whitespace-nowrap">${{badgePago}}</td>
             <td class="font-semibold text-emerald-800 truncate" title="${{c.financeiroResponsavel || ''}}">${{c.financeiroResponsavel || '-'}}</td>
             <td class="text-slate-600 truncate" title="${{c.observacao || ''}}">${{c.observacao || '-'}}</td>
+            <td class="text-center whitespace-nowrap">${{tagAba}}</td>
             <td class="text-center whitespace-nowrap">
               <button type="button" onclick="editarChamadoSAC('${{c.chamado}}', 'chamadosAbertos')" title="Editar chamado ${{c.chamado}}" class="p-1 rounded bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition cursor-pointer inline-flex items-center justify-center">
                 <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
@@ -2250,7 +2345,7 @@ html_code = f"""
     }}
 
     // =========================================================================
-    // GRÁFICOS DO DASHBOARD SAC (CONFIGURAÇÕES & INSTÂNCIAS COM DATALABELS)
+    // GRÁFICOS DO DASHBOARD SAC (ALIMENTADOS POR TODAS AS ABAS)
     // =========================================================================
     const filterSACCliente = document.getElementById('filterSACCliente');
     const filterSACProduto = document.getElementById('filterSACProduto');
@@ -2296,7 +2391,6 @@ html_code = f"""
       options: getHorizontalSACBarOptions()
     }});
 
-    // NOVO: Top 5 do Dia: Quantidade & Valores R$
     const chartTop5DiaQtd = new Chart(document.getElementById('chartTop5DiaQtd').getContext('2d'), {{
       type: 'bar',
       data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(2, 132, 199, 0.85)', borderRadius: 6 }}] }},
@@ -2331,7 +2425,6 @@ html_code = f"""
       }}
     }});
 
-    // 1. Gráficos Divididos de Top 5 Locais (Mês Anterior & Mês Atual)
     const chartLocaisAnterior = new Chart(document.getElementById('chartLocaisAnterior').getContext('2d'), {{
       type: 'bar',
       data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(100, 116, 139, 0.85)', borderRadius: 6 }}] }},
@@ -2344,7 +2437,6 @@ html_code = f"""
       options: getHorizontalSACBarOptions()
     }});
 
-    // 2. Gráficos Divididos de Chamados por Mês (Qtd & Valores R$) - AMBOS EM BARRAS
     const chartMesesQtd = new Chart(document.getElementById('chartMesesQtd').getContext('2d'), {{
       type: 'bar',
       data: {{ labels: [], datasets: [{{ label: 'Quantidade', data: [], backgroundColor: 'rgba(2, 132, 199, 0.85)', borderRadius: 6 }}] }},
@@ -2399,7 +2491,6 @@ html_code = f"""
       }}
     }});
 
-    // 3. Gráficos Divididos de Chamados por Dia (Qtd & Valores R$) - AMBOS EM BARRAS & DIAS PREENCHIDOS
     const chartDiasQtd = new Chart(document.getElementById('chartDiasQtd').getContext('2d'), {{
       type: 'bar',
       data: {{ labels: [], datasets: [{{ label: 'Quantidade', data: [], backgroundColor: 'rgba(14, 165, 233, 0.85)', borderRadius: 4 }}] }},
@@ -2454,23 +2545,18 @@ html_code = f"""
       }}
     }});
 
-    // 4. Gráfico Top 10 Locais na Semana / Período
     const chartTop10Semana = new Chart(document.getElementById('chartTop10Semana').getContext('2d'), {{
       type: 'bar',
       data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(225, 29, 72, 0.85)', borderRadius: 6 }}] }},
       options: getHorizontalSACBarOptions()
     }});
 
-    // 5. Gráfico Top 3 Locais por Filial
     const chartTop3Filial = new Chart(document.getElementById('chartTop3Filial').getContext('2d'), {{
       type: 'bar',
       data: {{ labels: [], datasets: [{{ data: [], backgroundColor: 'rgba(217, 119, 6, 0.85)', borderRadius: 6 }}] }},
       options: getHorizontalSACBarOptions()
     }});
 
-    // =========================================================================
-    // ATUALIZAÇÃO DOS GRÁFICOS DINÂMICOS
-    // =========================================================================
     function parseDateToYMD(dStr) {{
       if (!dStr) return '';
       dStr = dStr.trim();
@@ -2483,14 +2569,13 @@ html_code = f"""
       return '';
     }}
 
-    // ATUALIZAÇÃO DO NOVO TOP 5 DO DIA: QUANTIDADE E VALORES
     function atualizarGraficosTop5Dia() {{
       const diaInput = document.getElementById('filterDiaTop5')?.value;
       if (!diaInput) return;
       const contQtd = {{}};
       const contVal = {{}};
 
-      listaChamadosSAC.forEach(c => {{
+      obterChamadosConsolidados().forEach(c => {{
         const ymd = parseDateToYMD(c.data);
         if (ymd === diaInput) {{
           const loc = (c.localInterno || c.cliente || 'Outros').trim();
@@ -2500,7 +2585,6 @@ html_code = f"""
       }});
 
       const truncar = (t, max = 22) => t.length > max ? t.substring(0, max) + '...' : t;
-      
       const top5Qtd = Object.entries(contQtd).map(([nome, qt]) => ({{ nome, qt }})).sort((a,b) => b.qt - a.qt).slice(0, 5);
       chartTop5DiaQtd.data.labels = top5Qtd.map(t => truncar(t.nome));
       chartTop5DiaQtd.data.datasets[0].data = top5Qtd.map(t => t.qt);
@@ -2512,7 +2596,6 @@ html_code = f"""
       chartTop5DiaVal.update();
     }}
 
-    // HELPER PARA RENDERIZAR LISTAS DE TOP 3 COM RESUMO POR PROBLEMA
     function montarHtmlResumoTop3(listaFiltrada, containerId) {{
       const container = document.getElementById(containerId);
       if (!container) return;
@@ -2569,11 +2652,10 @@ html_code = f"""
       }}).join('');
     }}
 
-    // ATUALIZAÇÃO DOS TOP 3 RESUMIDOS
     function atualizarResumoTop3Mes() {{
       const mesInput = document.getElementById('filterResumoMes')?.value;
       if (!mesInput) return;
-      const filtrados = listaChamadosSAC.filter(c => {{
+      const filtrados = obterChamadosConsolidados().filter(c => {{
         const ymd = parseDateToYMD(c.data);
         return ymd && ymd.startsWith(mesInput);
       }});
@@ -2583,7 +2665,7 @@ html_code = f"""
     function atualizarResumoTop3Dia() {{
       const diaInput = document.getElementById('filterResumoDia')?.value;
       if (!diaInput) return;
-      const filtrados = listaChamadosSAC.filter(c => parseDateToYMD(c.data) === diaInput);
+      const filtrados = obterChamadosConsolidados().filter(c => parseDateToYMD(c.data) === diaInput);
       montarHtmlResumoTop3(filtrados, 'listaResumoTop3Dia');
     }}
 
@@ -2597,7 +2679,7 @@ html_code = f"""
       dIni.setDate(dIni.getDate() - 6);
       const strDIni = dIni.toISOString().split('T')[0];
 
-      const filtrados = listaChamadosSAC.filter(c => {{
+      const filtrados = obterChamadosConsolidados().filter(c => {{
         const ymd = parseDateToYMD(c.data);
         if (!ymd || ymd < strDIni || ymd > dtFimInput) return false;
         if (filialInput !== 'ALL' && (c.cidade || '').toLowerCase() !== filialInput.toLowerCase()) return false;
@@ -2610,7 +2692,7 @@ html_code = f"""
       const mesAntInput = document.getElementById('filterMesLocaisAnterior')?.value;
       if (!mesAntInput) return;
       const cont = {{}};
-      listaChamadosSAC.forEach(c => {{
+      obterChamadosConsolidados().forEach(c => {{
         const ymd = parseDateToYMD(c.data);
         if (ymd && ymd.startsWith(mesAntInput)) {{
           const loc = (c.localInterno || c.cliente || 'Outros').trim();
@@ -2628,7 +2710,7 @@ html_code = f"""
       const mesAtualInput = document.getElementById('filterMesLocaisAtual')?.value;
       if (!mesAtualInput) return;
       const cont = {{}};
-      listaChamadosSAC.forEach(c => {{
+      obterChamadosConsolidados().forEach(c => {{
         const ymd = parseDateToYMD(c.data);
         if (ymd && ymd.startsWith(mesAtualInput)) {{
           const loc = (c.localInterno || c.cliente || 'Outros').trim();
@@ -2646,7 +2728,7 @@ html_code = f"""
       const selAno = document.getElementById('filterAnoMesesQtd')?.value || new Date().getFullYear();
       const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
       const contQtd = Array(12).fill(0);
-      listaChamadosSAC.forEach(c => {{
+      obterChamadosConsolidados().forEach(c => {{
         const ymd = parseDateToYMD(c.data);
         if (ymd && ymd.startsWith(String(selAno))) {{
           const mIdx = parseInt(ymd.substring(5, 7), 10) - 1;
@@ -2662,7 +2744,7 @@ html_code = f"""
       const selAno = document.getElementById('filterAnoMesesVal')?.value || new Date().getFullYear();
       const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
       const somaVal = Array(12).fill(0);
-      listaChamadosSAC.forEach(c => {{
+      obterChamadosConsolidados().forEach(c => {{
         const ymd = parseDateToYMD(c.data);
         if (ymd && ymd.startsWith(String(selAno))) {{
           const mIdx = parseInt(ymd.substring(5, 7), 10) - 1;
@@ -2674,7 +2756,6 @@ html_code = f"""
       chartMesesVal.update();
     }}
 
-    // Pega exatamente os dias com dados preenchidos no mês selecionado
     function atualizarGraficoDiasQtd() {{
       const mesDiasInput = document.getElementById('filterMesDiasQtd')?.value;
       let anoRef, mesRef;
@@ -2691,7 +2772,7 @@ html_code = f"""
       const strAnoMes = anoRef + '-' + pad(mesRef);
       const contagemPorDia = {{}};
 
-      listaChamadosSAC.forEach(c => {{
+      obterChamadosConsolidados().forEach(c => {{
         const ymd = parseDateToYMD(c.data);
         if (ymd && ymd.startsWith(strAnoMes)) {{
           const dia = ymd.substring(8, 10);
@@ -2699,14 +2780,12 @@ html_code = f"""
         }}
       }});
 
-      // Ordena cronologicamente apenas os dias existentes
       const diasPreenchidos = Object.keys(contagemPorDia).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
       chartDiasQtd.data.labels = diasPreenchidos.map(d => 'Dia ' + d);
       chartDiasQtd.data.datasets[0].data = diasPreenchidos.map(d => contagemPorDia[d]);
       chartDiasQtd.update();
     }}
 
-    // Pega exatamente os dias com valores preenchidos no mês selecionado
     function atualizarGraficoDiasVal() {{
       const mesDiasInput = document.getElementById('filterMesDiasVal')?.value;
       let anoRef, mesRef;
@@ -2723,7 +2802,7 @@ html_code = f"""
       const strAnoMes = anoRef + '-' + pad(mesRef);
       const somaPorDia = {{}};
 
-      listaChamadosSAC.forEach(c => {{
+      obterChamadosConsolidados().forEach(c => {{
         const ymd = parseDateToYMD(c.data);
         if (ymd && ymd.startsWith(strAnoMes)) {{
           const dia = ymd.substring(8, 10);
@@ -2734,7 +2813,6 @@ html_code = f"""
         }}
       }});
 
-      // Ordena cronologicamente apenas os dias existentes
       const diasPreenchidos = Object.keys(somaPorDia).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
       chartDiasVal.data.labels = diasPreenchidos.map(d => 'Dia ' + d);
       chartDiasVal.data.datasets[0].data = diasPreenchidos.map(d => somaPorDia[d]);
@@ -2746,7 +2824,7 @@ html_code = f"""
       const dtFim = document.getElementById('filterTopSemanaDtFim')?.value;
       const cont = {{}};
 
-      listaChamadosSAC.forEach(c => {{
+      obterChamadosConsolidados().forEach(c => {{
         const ymd = parseDateToYMD(c.data);
         if (!ymd) return;
         if (dtIni && ymd < dtIni) return;
@@ -2768,7 +2846,7 @@ html_code = f"""
       const dtFim = document.getElementById('filterTopFilialDtFim')?.value;
       const cont = {{}};
 
-      listaChamadosSAC.forEach(c => {{
+      obterChamadosConsolidados().forEach(c => {{
         const ymd = parseDateToYMD(c.data);
         if (!ymd) return;
         if (dtIni && ymd < dtIni) return;
@@ -2786,21 +2864,22 @@ html_code = f"""
     }}
 
     function inicializarFiltrosDashboardSAC() {{
-      const clientesUnicos = [...new Set(listaChamadosSAC.map(c => c.cliente).filter(Boolean))].sort();
+      const todos = obterChamadosConsolidados();
+      const clientesUnicos = [...new Set(todos.map(c => c.cliente).filter(Boolean))].sort();
       filterSACCliente.innerHTML = '<option value="ALL">Todos os Clientes</option>';
       clientesUnicos.forEach(cli => {{
         const opt = document.createElement('option'); opt.value = cli; opt.textContent = cli;
         filterSACCliente.appendChild(opt);
       }});
 
-      const atendentesUnicos = [...new Set(listaChamadosSAC.map(c => c.atendente).filter(Boolean))].sort();
+      const atendentesUnicos = [...new Set(todos.map(c => c.atendente).filter(Boolean))].sort();
       filterSACAtendente.innerHTML = '<option value="ALL">Todos os Atendentes</option>';
       atendentesUnicos.forEach(a => {{
         const opt = document.createElement('option'); opt.value = a; opt.textContent = a;
         filterSACAtendente.appendChild(opt);
       }});
 
-      const anosUnicos = [...new Set(listaChamadosSAC.map(c => {{
+      const anosUnicos = [...new Set(todos.map(c => {{
         const ymd = parseDateToYMD(c.data);
         return ymd ? ymd.substring(0, 4) : '';
       }}).filter(Boolean))].sort().reverse();
@@ -2842,7 +2921,6 @@ html_code = f"""
       const elDiasVal = document.getElementById('filterMesDiasVal');
       if (elDiasVal) elDiasVal.value = strMesAtual;
 
-      // Inicializa os filtros novos focados no Mês / Dia Atual
       const elTop5Dia = document.getElementById('filterDiaTop5');
       if (elTop5Dia) elTop5Dia.value = strHoje;
 
@@ -2872,7 +2950,7 @@ html_code = f"""
 
       const selFilial = document.getElementById('filterTopFilialSelect');
       selFilial.innerHTML = '<option value="ALL">Todas as Filiais</option>';
-      const filiais = [...new Set(listaChamadosSAC.map(c => c.cidade).filter(Boolean))].sort();
+      const filiais = [...new Set(todos.map(c => c.cidade).filter(Boolean))].sort();
       filiais.forEach(f => {{
         const opt = document.createElement('option'); opt.value = f; opt.textContent = f;
         selFilial.appendChild(opt);
@@ -2894,7 +2972,8 @@ html_code = f"""
       const prodVal = filterSACProduto.value;
       const atendVal = filterSACAtendente.value;
 
-      const filtrados = listaChamadosSAC.filter(item => {{
+      const todos = obterChamadosConsolidados();
+      const filtrados = todos.filter(item => {{
         const matchCli = (cliVal === 'ALL' || (item.cliente && item.cliente.toLowerCase() === cliVal.toLowerCase()));
         const matchProd = (prodVal === 'ALL' || (item.produto && item.produto.toLowerCase() === prodVal.toLowerCase()));
         const matchAtend = (atendVal === 'ALL' || (item.atendente && item.atendente.toLowerCase() === atendVal.toLowerCase()));
@@ -2920,7 +2999,7 @@ html_code = f"""
       const ticketMedio = totalChamados > 0 ? (somaValor / totalChamados) : 0;
 
       document.getElementById('kpiSACTotal').innerText = totalChamados.toLocaleString('pt-BR');
-      document.getElementById('kpiSACTotalSub').innerText = totalChamados + ' ocorrências registradas';
+      document.getElementById('kpiSACTotalSub').innerText = totalChamados + ' ocorrências consolidadas';
       document.getElementById('kpiSACValorTotal').innerText = formatCurrency(somaValor);
       document.getElementById('kpiSACCafé').innerText = chamadosCafe.toLocaleString('pt-BR');
       document.getElementById('kpiSACCaféPct').innerText = pctCafe + '%';
@@ -2929,7 +3008,7 @@ html_code = f"""
       document.getElementById('kpiSACClientes').innerText = new Set(filtrados.map(c => c.cliente)).size;
       document.getElementById('kpiSACTicketMedio').innerText = formatCurrency(ticketMedio);
 
-      // Atualiza Top Problemas
+      // Top Problemas
       const probContagem = {{}};
       filtrados.forEach(c => {{
         const p = (c.problemas || 'Outros').trim();
@@ -2941,7 +3020,7 @@ html_code = f"""
       chartTopProblemasSAC.data.datasets[0].data = top10Problemas.map(p => p.qt);
       chartTopProblemasSAC.update();
 
-      // Atualiza Chamados por Atendente
+      // Top Atendentes
       const atendContagem = {{}};
       filtrados.forEach(c => {{
         const a = (c.atendente || 'Não Informado').trim();
@@ -2952,7 +3031,6 @@ html_code = f"""
       chartAtendentesSAC.data.datasets[0].data = topAtendentes.map(a => a.qt);
       chartAtendentesSAC.update();
 
-      // Dispara renderização dos gráficos divididos e novos blocos
       atualizarGraficosTop5Dia();
       atualizarResumoTop3Mes();
       atualizarResumoTop3Dia();
